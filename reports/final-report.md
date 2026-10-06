@@ -1,9 +1,28 @@
 # Rebuild Studio — final report
 
-Generated 2026-10-06T15:40:07.848128+00:00 on Windows-11-10.0.26200-SP0 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
+Generated 2026-10-06T18:37:15.013826+00:00 on Windows-11-10.0.26200-SP0 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
 
 ## Implementation commits
 
+- `c42355b Windows gate log run 3: installed-app fixtures, guided tools, uninstall/data-keep, crash/relaunch/close drills`
+- `80ff419 Tests: isolate the per-user tools dir in the jsweb no-node probe test`
+- `d94b546 Web capture: automatic start-page check waits for a registering service worker and skips the racy pre-load snapshot`
+- `34800f6 Found via the installed controller: web projects infer how to start the original; --wait returns blockers instead of hanging`
+- `1077820 Browser comparisons in the installed app: Tools-page Node + playwright-core, Edge as the browser; short isolated home`
+- `44cd4fb Windows native decompilation: pin Cutter v2.5.0's rizin (same commit as rizin 0.9.1) which carries rz-ghidra`
+- `40e99a8 Tests: hosted Windows runner portability (gcc writes app.exe; process-limit test uses the base interpreter)`
+- `7db84c1 Scenario authoring and consent in the UI: declare CLI scenarios, record the original (with permission) into a new baseline revision`
+- `5fc16f2 In-app implement/build/compare/repair loop with case budget, retries and resumable attempts; JVM pipeline routing; POSIX file-size cap off by default`
+- `689e5b4 Support matrix: Java/Android recovery (CFR, jadx, pinned JRE); precise detection + honest blockers for IL2CPP, GameMaker, Unreal, Mach-O`
+- `38f6daa Plan r3: state at usage-limit stop`
+- `ef09bcd Plan r2 statuses; non-developer install guide (NSIS .exe, shortcuts, pinning, tools, uninstall data choice)`
+- `357e9d0 Tests: portable PE sample (committed fixture, no mingw); diagnostics for Linux sandbox failures seen in CI`
+- `c008034 Build: bundle every controller module explicitly; fail the build if any backend cannot load when frozen`
+- `a0df280 Guided tool setup from the app: hash-verified downloads with progress, retry, cancel, offline install-from-file`
+- `9774d49 Packaged UI could not reach its controller: answer CORS preflight before the token check`
+- `df9cb85 Truthful outcome states: pipeline progress separate from measured behaviour; no 100% unless fully matched`
+- `d663af6 Isolate untrusted runs: Job Object caps + low integrity + scrubbed env; consent before running the original`
+- `a133113 Controller on native Windows: reject Windows protected roots, report zip members as stored; port POSIX-only tests`
 - `d32eb7a Windows shell/installer: AUMID, desktop-shortcut-aware uninstall data removal, orphan reaping, recovery dialog; PS 5.1 build fixes; pin .NET 8.0.31 runtime`
 - `ce602d7 Plan: production-readiness P-series on a real Windows host; drop stray duplicate file`
 - `e33b4aa Final report; cutter test expects documented validation status`
@@ -15,25 +34,6 @@ Generated 2026-10-06T15:40:07.848128+00:00 on Windows-11-10.0.26200-SP0 (certifi
 - `03bbf80 Windows packaging/CI handoff (worker); package data for schema/harness; untrack build artifacts; OS-aware test skips`
 - `52aa8a8 Checkpoint: in-progress worker output (UI e2e screens/specs, desktop shell fixes, packaging scripts)`
 - `739b7bd Checkpoint`
-- `44a9a9a Web and Godot example records; final report wording`
-- `53cb214 dotnetapp managed-path demo (Rust from ILSpy evidence via MCP, verified 9/9); report wording: runners used, candidate author`
-- `78d26a1 Scaffold candidates carry recovered original-language material and decompiled C as intermediate evidence`
-- `1422b3b API doc: deliver, review, subscriptions, doctor states, error mapping`
-- `68622dd Doctor: usable via smoke, verified via recorded fixture regression bound to tool versions`
-- `5b7dab4 Record e2e run`
-- `d13cc41 Checkpoint; cap evidence body reads`
-- `6751289 Record test runs; plan statuses`
-- `3eb3e01 Support matrix update; plan/preview/feedback cycle test`
-- `1751a8e Final report generator and test-run recorder`
-- `5165c3f Usage docs and README`
-- `70b7551 pecli native demo: Rust candidate proposed through MCP from rz-ghidra evidence, verified 8/8; deliver operation`
-- `46db2fc Web pipeline: single root recovery job, harness module resolution`
-- `11c99fd Knowledge: signature/rewrite application and no-AI reuse demonstration`
-- `e9d7a7d Update plan and checkpoint`
-- `e825044 Pipeline: oracle features in ledger, manifest covers plan exports, untested verdict for empty baselines, goto templating`
-- `d2fefc0 Jobs: dynamic dependencies for recovery fan-in; blocked cascade`
-- `5dcfe1c Providers/budgets/JeV, MCP server, CLI, client packages, Hermes bridge, managed backends, UI and Tauri shell (worker output, integration in progress)`
-- `5d8e6c1 Rizin native backend with rz-ghidra decompilation, loopback API server, fixture oracle adapter`
 
 ## Dependency pins
 
@@ -43,15 +43,17 @@ Generated 2026-10-06T15:40:07.848128+00:00 on Windows-11-10.0.26200-SP0 (certifi
 - Host tools: {"rizin": ["<error [WinError 2] The system cannot find the file specified>"], "wine": "<error [WinError 2] The system cannot find the file specified>", "dotnet": "8.0.424", "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)", "node": "v22.23.2", "python": "3.12.10"}
 - rizin build manifest: n/a
 
-## Backend adapters on this host (doctor source: recorded from reports/doctor-linux.json (the live doctor tools are not present on this host))
+## Backend adapters on this host (doctor source: live)
 
 | Backend | Availability | Tools |
 |---|---|---|
-| gdre | verified | gdre_tools verified 2.7.0 |
+| gdre | installed | gdre_tools installed 2.7.0 |
 | ghidra | missing | ghidra missing  |
-| ilspy | verified | ilspycmd verified 9.1.0.7988 |
-| jsweb | verified | jsweb-native verified 1; node installed 22.22.0; asar installed 4.3.1 |
-| rizin | verified | rizin verified 0.9.1 |
+| ilspy | installed | ilspycmd installed 9.1.0.7988 |
+| jsweb | installed | jsweb-native installed 1; node installed 22.22.0; asar missing  |
+| jvm | missing | java installed 17.0.20.1; cfr missing ; jadx missing  |
+| rizin | installed | rizin installed 0.9.1 |
+| triage | installed | builtin-parsers installed 1 |
 
 ## Test runs (recorded from real executions)
 
@@ -69,6 +71,7 @@ Generated 2026-10-06T15:40:07.848128+00:00 on Windows-11-10.0.26200-SP0 (certifi
 
 - **dotnetapp**: dotnet8_console, 9 declared features, oracle: dotnet 8 runtime on Linux (non-certifying)
 - **godotgame**: godot4_pck, 10 declared features, oracle: GDRE tools 2.7.0 recovery (game itself not executable here)
+- **javacli**: java17_console_jar, 10 declared features, oracle: java 17 (Temurin/Microsoft OpenJDK) on the Windows host (non-certifying for other hosts)
 - **pecli**: native_pe_x64_cli, 9 declared features, oracle: wine (non-certifying)
 - **webapp**: pwa_and_electron_asar, 11 declared features, oracle: Playwright 1.56.1 + Chromium
 
@@ -115,11 +118,52 @@ Recommended follow-up (not done here): record a `source` (`mcp` or `controller`)
 
 ## Windows (interactive desktop)
 
-PENDING. No interactive Windows desktop results are included in this report. Installer, WebView2, UI capture, Hermes desktop and DPAPI results will be added by the Windows run.
+Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md.
 
-## Windows CI
+Build under test: commit 80ff419: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 b1c15bba9b17a0063eda218385e2f1cfe6a2d5adf3d1e31cb1bad929cef614c4 (NSIS .exe, per-user), portable zip sha256 21830bae2e122f4253ebb2001a3b8d13bcfa372c14856ba7441a399b86bfaedd
 
-PENDING. No Windows CI results are included in this report.
+| Gate | Result | Notes |
+|---|---|---|
+| Windows build (Build-RebuildStudio.ps1 under PowerShell 5.1) | PASS after fixes | PS 5.1 array-unrolling and quote-stripping bugs fixed; build fails if any backend cannot load in the frozen controller |
+| GUI install from a path with spaces, no admin | PASS | default %LOCALAPPDATA%\Rebuild Studio; no UAC prompt |
+| Desktop shortcut offered during install | PASS | finish-page checkbox 'Create desktop shortcut', ticked by default; also created by silent/passive installs |
+| Start-menu entry, Apps entry, icon, AppUserModelID | PASS | shortcuts carry System.AppUserModel.ID io.rebuildstudio.desktop; the process sets the same ID |
+| Double-click desktop icon → full UI, no console | PASS (after fix) | first run showed 'Disconnected' (CORS preflight 401); fixed and re-verified 'Connected' |
+| Start-menu shortcut launch | PASS | controller ready in 1.9 s, UI connected, one taskbar button |
+| Pin to taskbar and relaunch from pin | NOT RUN | Windows blocks programmatic pinning; needs a person |
+| Normal close | PASS | all rebuild-* processes exit, controller.json removed |
+| Forced termination of the shell (crash) | PASS | controller tree killed by the Job Object within 2 s |
+| Relaunch after crash (stale controller.json) | PASS | new port/token, exactly one controller, /health ok |
+| Update over an existing install | PASS | binaries replaced; projects, tools, keys and shortcuts kept |
+| Guided dependency setup without PowerShell | PASS | rizin+rz-ghidra (Cutter v2.5.0 build), GDRE, .NET 8.0.31, ILSpy, Node, playwright-core installed and hash-verified by the app; install-from-file path exercised |
+| Real fixture through the installed controller using only guided-setup components | PASS (web) / BLOCKED (Rust targets) | fixtures/webapp 3/3 fully matched within the declared scenario with system Edge, PATH=System32 only; .NET→Rust blocked: no Rust toolchain in guided setup (see unresolved) |
+| Ordinary uninstall keeps data | PASS | program, shortcuts and Apps entry removed; %LOCALAPPDATA%\RebuildStudio and Credential Manager entries kept |
+| Data-removal credential purge | PASS | rebuild-studio.exe --remove-stored-credentials removed RebuildStudio:* entries headlessly |
+| Uninstall with 'Delete the application data' ticked (GUI) | NOT RUN | needs the uninstaller GUI |
+| Full UI walk (New Project → plan → preview → feedback → scenarios → results → reopen), keyboard, DPI, narrow widths | NOT RUN | the owner was using the desktop; component tests cover the screens (UI vitest 104) |
+| Standard (non-admin) user account; clean VM | NOT RUN | creating accounts/VMs was out of scope on this machine |
+
+Measurements on this host (not a clean machine):
+
+- Controller cold start (installed onefile sidecar): 5.3 s on the first run after install; 1.75–2.04 s warm (3 runs).
+- Idle memory 20 s after a Start-menu launch: shell 31 MiB, controller 78 MiB, WebView2 345 MiB (6 processes): 461 MiB working set / 238 MiB private in total.
+- Web fixture rebuild through the installed controller: 7–9 s end to end (inventory → recovery → port → build → browser comparison → delivery).
+- Guided tool installs: rizin 9–12 s, GDRE 3 s, .NET runtime 2 s, ILSpy 2 s, Node + playwright-core 10 s on this connection.
+
+## Windows CI (hosted runner)
+
+Workflows trigger on main/PR only; runs were dispatched manually (workflow_dispatch) on branch ccr-4dbe9b92-nyzsa8. A hosted runner is not an interactive or clean machine; CI green is not a gate pass.
+
+- windows run 37508069708 at 1077820: success (build + test on windows-latest, unsigned)
+- linux run 37508065315 at 1077820: success (controller py3.12/3.13, UI, desktop cargo, PowerShell parse/dry-run, wine advisory)
+- Earlier runs found and drove fixes: POSIX sandbox (.NET SIGXFSZ), hosted-runner portability (gcc app.exe, process-limit test)
+
+## Unresolved Windows gates
+
+- Rust toolchain for Rust remakes is not yet part of guided setup on a clean machine (in progress at report time).
+- Taskbar pin + relaunch from pin, GUI uninstall with data deletion, full packaged UI walk, high-DPI/narrow-width checks: need a person at the desktop.
+- Clean Windows 10/11 VM with a standard user and no developer tools; Windows Defender first-run timing on such a machine.
+- Code signing (no certificate); live AI provider runs (no keys).
 
 ## Windows release gates (not certified here)
 
@@ -130,9 +174,11 @@ PENDING. No Windows CI results are included in this report.
 
 ## Limits and remaining user-dependent actions
 
-- No interactive Windows host in this session: installer/WebView2/UI capture/Hermes desktop/DPAPI are handoffs (docs/WINDOWS_RELEASE_GATES.md).
-- PE originals were executed under wine; the reports label that runner non-certifying.
-- No provider API key was supplied: provider adapters are covered by mocked protocol tests only; zero paid calls were made.
-- Unity IL2CPP, GameMaker, Android/JVM, Unreal profiles are detected but marked experimental/unverified (no backend run).
+- Not certified: the interactive Windows host was the owner's developer machine (dev tools installed, admin-capable account), not a clean standard-user VM. Clean-machine and standard-user gates remain open.
+- Installer and portable zip are UNSIGNED (no code-signing certificate available); SmartScreen will warn.
+- No AI provider key was available: the in-app implement/repair loop is verified against a scripted OpenAI-compatible server only; live Anthropic/OpenAI/Gemini/OpenRouter behaviour is UNVERIFIED and zero paid calls were made.
+- Original-program isolation is damage limitation, not a security sandbox: Low integrity + Job Object limits on Windows; the program can still read most user files and the network is open unless the opt-in AppContainer mode is chosen (docs/ISOLATION.md).
+- Java (.jar) recovery is supported (CFR); Android code recovery needs jadx; Unity IL2CPP, GameMaker, Unreal and Mach-O are detected with explicit blockers and no code recovery.
 - Scenario results are limited to the scenarios declared for each case. Passing them is not global parity: features with no scenario, Windows-only behaviour and undiscovered scope are not measured.
-- Godot → Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because the original cannot run here and no scenarios were declared.
+- Godot → Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because no gameplay scenarios exist.
+- Scenario authoring in the UI covers command-line programs; web/GUI scenarios are declared through the API or inferred (one automatic start-page check).

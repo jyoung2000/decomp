@@ -1,10 +1,30 @@
 {
- "generated_at": "2026-10-06T15:40:07.848128+00:00",
+ "generated_at": "2026-10-06T18:37:15.013826+00:00",
  "host": {
   "os": "Windows-11-10.0.26200-SP0",
-  "certifies_windows": false
+  "certifies_windows": false,
+  "note": "report generated on the build host; see the Windows sections for what ran where"
  },
  "commits": [
+  "c42355b Windows gate log run 3: installed-app fixtures, guided tools, uninstall/data-keep, crash/relaunch/close drills",
+  "80ff419 Tests: isolate the per-user tools dir in the jsweb no-node probe test",
+  "d94b546 Web capture: automatic start-page check waits for a registering service worker and skips the racy pre-load snapshot",
+  "34800f6 Found via the installed controller: web projects infer how to start the original; --wait returns blockers instead of hanging",
+  "1077820 Browser comparisons in the installed app: Tools-page Node + playwright-core, Edge as the browser; short isolated home",
+  "44cd4fb Windows native decompilation: pin Cutter v2.5.0's rizin (same commit as rizin 0.9.1) which carries rz-ghidra",
+  "40e99a8 Tests: hosted Windows runner portability (gcc writes app.exe; process-limit test uses the base interpreter)",
+  "7db84c1 Scenario authoring and consent in the UI: declare CLI scenarios, record the original (with permission) into a new baseline revision",
+  "5fc16f2 In-app implement/build/compare/repair loop with case budget, retries and resumable attempts; JVM pipeline routing; POSIX file-size cap off by default",
+  "689e5b4 Support matrix: Java/Android recovery (CFR, jadx, pinned JRE); precise detection + honest blockers for IL2CPP, GameMaker, Unreal, Mach-O",
+  "38f6daa Plan r3: state at usage-limit stop",
+  "ef09bcd Plan r2 statuses; non-developer install guide (NSIS .exe, shortcuts, pinning, tools, uninstall data choice)",
+  "357e9d0 Tests: portable PE sample (committed fixture, no mingw); diagnostics for Linux sandbox failures seen in CI",
+  "c008034 Build: bundle every controller module explicitly; fail the build if any backend cannot load when frozen",
+  "a0df280 Guided tool setup from the app: hash-verified downloads with progress, retry, cancel, offline install-from-file",
+  "9774d49 Packaged UI could not reach its controller: answer CORS preflight before the token check",
+  "df9cb85 Truthful outcome states: pipeline progress separate from measured behaviour; no 100% unless fully matched",
+  "d663af6 Isolate untrusted runs: Job Object caps + low integrity + scrubbed env; consent before running the original",
+  "a133113 Controller on native Windows: reject Windows protected roots, report zip members as stored; port POSIX-only tests",
   "d32eb7a Windows shell/installer: AUMID, desktop-shortcut-aware uninstall data removal, orphan reaping, recovery dialog; PS 5.1 build fixes; pin .NET 8.0.31 runtime",
   "ce602d7 Plan: production-readiness P-series on a real Windows host; drop stray duplicate file",
   "e33b4aa Final report; cutter test expects documented validation status",
@@ -15,26 +35,7 @@
   "61a9e73 Cutter plugin + client tests (worker); HTTP briefing endpoint; feedback requires an existing case",
   "03bbf80 Windows packaging/CI handoff (worker); package data for schema/harness; untrack build artifacts; OS-aware test skips",
   "52aa8a8 Checkpoint: in-progress worker output (UI e2e screens/specs, desktop shell fixes, packaging scripts)",
-  "739b7bd Checkpoint",
-  "44a9a9a Web and Godot example records; final report wording",
-  "53cb214 dotnetapp managed-path demo (Rust from ILSpy evidence via MCP, verified 9/9); report wording: runners used, candidate author",
-  "78d26a1 Scaffold candidates carry recovered original-language material and decompiled C as intermediate evidence",
-  "1422b3b API doc: deliver, review, subscriptions, doctor states, error mapping",
-  "68622dd Doctor: usable via smoke, verified via recorded fixture regression bound to tool versions",
-  "5b7dab4 Record e2e run",
-  "d13cc41 Checkpoint; cap evidence body reads",
-  "6751289 Record test runs; plan statuses",
-  "3eb3e01 Support matrix update; plan/preview/feedback cycle test",
-  "1751a8e Final report generator and test-run recorder",
-  "5165c3f Usage docs and README",
-  "70b7551 pecli native demo: Rust candidate proposed through MCP from rz-ghidra evidence, verified 8/8; deliver operation",
-  "46db2fc Web pipeline: single root recovery job, harness module resolution",
-  "11c99fd Knowledge: signature/rewrite application and no-AI reuse demonstration",
-  "e9d7a7d Update plan and checkpoint",
-  "e825044 Pipeline: oracle features in ledger, manifest covers plan exports, untested verdict for empty baselines, goto templating",
-  "d2fefc0 Jobs: dynamic dependencies for recovery fan-in; blocked cascade",
-  "5dcfe1c Providers/budgets/JeV, MCP server, CLI, client packages, Hermes bridge, managed backends, UI and Tauri shell (worker output, integration in progress)",
-  "5d8e6c1 Rizin native backend with rz-ghidra decompilation, loopback API server, fixture oracle adapter"
+  "739b7bd Checkpoint"
  ],
  "branch": "ccr-4dbe9b92-nyzsa8",
  "pins": {
@@ -73,28 +74,41 @@
    "tools": {
     "rizin": {
      "version": "0.9.1",
-     "role": "Native analysis engine (subprocess via rzpipe; LGPL-3.0, never linked)",
-     "license": "LGPL-3.0-only",
+     "role": "Native analysis engine with the rz-ghidra decompiler (subprocess via rzpipe; never linked). Windows artifact is the official Cutter v2.5.0 build, which bundles rizin at the same commit as rizin v0.9.1 plus rz-ghidra; the plain rizin Windows release has no decompiler plugin.",
+     "license": "LGPL-3.0-only (rizin), LGPL-3.0 (rz-ghidra), Apache-2.0 (Ghidra decompiler), GPL-3.0 (Cutter GUI files in the archive; not used)",
      "source": {
       "repo": "https://github.com/rizinorg/rizin",
       "tag": "v0.9.1",
-      "commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7"
+      "commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7",
+      "cutter": {
+       "repo": "https://github.com/rizinorg/cutter",
+       "tag": "v2.5.0",
+       "rizin_submodule_commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7"
+      }
      },
      "artifact": {
-      "name": "rizin-windows-static-v0.9.1.zip",
-      "url": "https://github.com/rizinorg/rizin/releases/download/v0.9.1/rizin-windows-static-v0.9.1.zip",
-      "size_bytes": 115391593,
-      "sha256": "2d14e0a6ecba1196dcd742d63de83bbaffed2a7a78ef5a0a9b4e92a0f73d1d28",
+      "name": "Cutter-v2.5.0-Windows-x86_64.zip",
+      "url": "https://github.com/rizinorg/cutter/releases/download/v2.5.0/Cutter-v2.5.0-Windows-x86_64.zip",
+      "size_bytes": 140530846,
+      "sha256": "a04154a03a392dbf5886a629938582f7d23a93636fa0611c3e1c34905b197e69",
       "verify_required": false,
-      "hash_provenance": "computed by downloading the release asset on 2026-10-06 (Linux build host)"
+      "hash_provenance": "2026-10-06 on Windows 11: downloaded; sha256 equals the GitHub release asset digest (sha256:a04154a0\u00e2\u20ac\u00a6). rizin.exe reports 'rizin 0.9.1'; Cutter v2.5.0's rizin submodule is c3a90e92 (= rizin v0.9.1). pdg verified on fixtures/pecli with ghidra.sleighhome set.",
+      "previous": {
+       "name": "rizin-windows-static-v0.9.1.zip",
+       "sha256": "2d14e0a6ecba1196dcd742d63de83bbaffed2a7a78ef5a0a9b4e92a0f73d1d28",
+       "why_replaced": "no rz-ghidra: no decompilation on Windows"
+      }
      },
      "layout": {
-      "archive_root": "rizin-win-installer-vs2019_static-64",
-      "entry": "bin/rizin.exe",
-      "entry_sha256": "986c06775f08d7645502f49f630db3f2f443a554f82fa304661fda0b2b00ee79",
+      "archive_root": "Cutter-v2.5.0-Windows-x86_64",
+      "entry": "rizin.exe",
+      "entry_sha256": "0b04fc8f44376f16a3f0cf4bd3402b7a28cd5dbc9cbd362840d765ac1712919f",
       "version_args": [
        "-v"
-      ]
+      ],
+      "extra_files": {
+       "lib/rizin/plugins/core_ghidra.dll": "98abf3213feb7105cee733da539ade180406fdc36736caa293e06b8724f823e2"
+      }
      },
      "install_dir": "rizin"
     },
@@ -182,6 +196,170 @@
      },
      "install_dir": "dotnet"
     },
+    "temurin-jre": {
+     "version": "17.0.20.1+1",
+     "role": "Optional: Java runtime for CFR and jadx (Java/Android code recovery). Eclipse Temurin 17 JRE, installed side by side under tools\\jre like the .NET runtime; no machine-wide install. Without it the app falls back to a JDK/JRE 8+ already on PATH/JAVA_HOME.",
+     "license": "GPL-2.0-with-classpath-exception",
+     "optional": true,
+     "source": {
+      "docs": "https://adoptium.net/temurin/releases/?version=17",
+      "repo": "https://github.com/adoptium/temurin17-binaries",
+      "tag": "jdk-17.0.20.1+1",
+      "api": "https://api.adoptium.net/v3/assets/latest/17/hotspot?architecture=x64&image_type=jre&os=windows&vendor=eclipse"
+     },
+     "artifact": {
+      "name": "OpenJDK17U-jre_x64_windows_hotspot_17.0.20.1_1.zip",
+      "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jre_x64_windows_hotspot_17.0.20.1_1.zip",
+      "size_bytes": 43780109,
+      "sha256": "bc21a93923103cdaac93ee337b0ae4365e739fde36df823dd456bc67c8a9d352",
+      "verify_required": false,
+      "hash_provenance": "2026-10-06 on Windows 11 (interactive host): downloaded from the Adoptium GitHub release; sha256 computed locally and matched the official value in OpenJDK17U-jre_x64_windows_hotspot_17.0.20.1_1.zip.sha256.txt published next to the asset (and the 'checksum' field of the Adoptium v3 assets API response).",
+      "sha256_official": "bc21a93923103cdaac93ee337b0ae4365e739fde36df823dd456bc67c8a9d352",
+      "sha256_official_url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jre_x64_windows_hotspot_17.0.20.1_1.zip.sha256.txt"
+     },
+     "layout": {
+      "archive_root": "jdk-17.0.20.1+1-jre",
+      "entry": "bin/java.exe",
+      "entry_sha256": "1977f302375adbb920d41dac65c7e22eb9c2ed8e1e8d6258964154ff16f14406",
+      "version_args": [
+       "-version"
+      ]
+     },
+     "install_dir": "jre"
+    },
+    "cfr": {
+     "version": "0.152",
+     "role": "Optional: Java bytecode decompiler for .jar/.class (CFR, MIT). Single jar run as `java -jar` in a separate process; needs the JRE above (or any Java 8+).",
+     "license": "MIT",
+     "optional": true,
+     "source": {
+      "repo": "https://github.com/leibnitz27/cfr",
+      "tag": "0.152",
+      "commit": "68477be3ff7171ee17ddd1a26064b9b253f1604f",
+      "docs": "https://www.benf.org/other/cfr/"
+     },
+     "artifact": {
+      "name": "cfr-0.152.jar",
+      "url": "https://github.com/leibnitz27/cfr/releases/download/0.152/cfr-0.152.jar",
+      "size_bytes": 2162315,
+      "sha256": "f686e8f3ded377d7bc87d216a90e9e9512df4156e75b06c655a16648ae8765b2",
+      "verify_required": false,
+      "hash_provenance": "2026-10-06 on Windows 11 (interactive host): downloaded the release asset with curl; sha256 computed locally. The release publishes no checksum file, so the pin is trust-on-first-use of the GitHub release asset at tag 0.152; a clean decompile of fixtures/javacli with this exact jar is recorded in tests/test_jvm.py.",
+      "format": "file"
+     },
+     "layout": {
+      "archive_root": "",
+      "entry": "cfr-0.152.jar",
+      "entry_sha256": "f686e8f3ded377d7bc87d216a90e9e9512df4156e75b06c655a16648ae8765b2",
+      "launch": "java -jar",
+      "version_args": [
+       "--version"
+      ],
+      "requires": [
+       "temurin-jre"
+      ]
+     },
+     "install_dir": "cfr"
+    },
+    "jadx": {
+     "version": "1.5.6",
+     "role": "Optional: Android recovery (jadx CLI, Apache-2.0): APK/DEX/AAB to Java-like sources plus decoded resources. Run as `java -cp lib/jadx-1.5.6-all.jar jadx.cli.JadxCLI` in a separate process; needs Java 11+ (the JRE above).",
+     "license": "Apache-2.0",
+     "optional": true,
+     "source": {
+      "repo": "https://github.com/skylot/jadx",
+      "tag": "v1.5.6",
+      "commit": "4c0ac37699aa8c9803f1c73cfaacd9205acb044b (annotated tag object)"
+     },
+     "artifact": {
+      "name": "jadx-1.5.6.zip",
+      "url": "https://github.com/skylot/jadx/releases/download/v1.5.6/jadx-1.5.6.zip",
+      "size_bytes": 72646741,
+      "sha256": "545ea2be9c242511bc145755cf4bda2485ade42966e096f8b4d3da2a230e8974",
+      "verify_required": false,
+      "hash_provenance": "2026-10-06 on Windows 11 (interactive host): downloaded the release asset with curl; sha256 computed locally and matched the asset digest published by the GitHub releases API (sha256:545ea2be...8974)."
+     },
+     "layout": {
+      "archive_root": "",
+      "entry": "bin/jadx.bat",
+      "entry_sha256": "54f498be8eedbe5fe25d8627dc90eddc7dba4cf1e435a4ea3481c89f3fef26eb",
+      "version_args": [
+       "--version"
+      ],
+      "requires": [
+       "temurin-jre"
+      ],
+      "extra_files": {
+       "lib/jadx-1.5.6-all.jar": "fe3e12c45acf75f92369685fd02d1d7a7323385dc725680a9b98a0dac0ea554b"
+      }
+     },
+     "install_dir": "jadx"
+    },
+    "rust": {
+     "version": "1.97.0",
+     "role": "Rust compiler for building rebuilt programs as Windows .exe files (cargo + rustc, stable 1.97.0, host/target x86_64-pc-windows-gnu). Installed privately under tools\\rust by the official rustup-init 1.29.1 (sha256-pinned below) run as a lock-declared post_install step with RUSTUP_HOME/CARGO_HOME inside the tools folder: no administrator rights, no PATH changes, no Visual Studio Build Tools (the GNU toolchain ships its own self-contained mingw linker). Without it the app falls back to a cargo already on PATH.",
+     "license": "MIT OR Apache-2.0 (rustup, Rust toolchain); the bundled mingw-w64 linker files carry their own permissive/GPL-with-exception licenses",
+     "optional": false,
+     "source": {
+      "repo": "https://github.com/rust-lang/rustup",
+      "docs": "https://rust-lang.github.io/rustup/installation/other.html",
+      "rustup_init_version": "1.29.1",
+      "channel_manifest": "https://static.rust-lang.org/dist/channel-rust-1.97.0.toml",
+      "toolchain": "1.97.0",
+      "host_triple": "x86_64-pc-windows-gnu"
+     },
+     "artifact": {
+      "name": "rustup-init.exe",
+      "url": "https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe",
+      "size_bytes": 12721664,
+      "sha256": "6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e",
+      "verify_required": false,
+      "format": "file",
+      "hash_provenance": "2026-10-06 on Windows 11: downloaded rustup-init.exe 1.29.1 (x86_64-pc-windows-msvc host binary, which only needs the Windows system DLLs) from static.rust-lang.org; sha256 computed locally and matched the official value in rustup-init.exe.sha256 published next to it (https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe.sha256). 1.29.1 is the version named in https://static.rust-lang.org/rustup/release-stable.toml that day.",
+      "sha256_official": "6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e",
+      "sha256_official_url": "https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe.sha256"
+     },
+     "footprint": {
+      "installer_download_bytes": 150000000,
+      "disk_bytes": 320000000,
+      "note": "rustup-init (12.7 MB, pinned above) downloads the toolchain components itself (about 150 MB) and unpacks to about 320 MB. rustup verifies every component's hash against Rust's signed release manifests (channel-rust-1.97.0.toml); that check is rustup's, the lock pins only the installer and the toolchain version."
+     },
+     "layout": {
+      "archive_root": "",
+      "entry": "rustup-init.exe",
+      "entry_sha256": "6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e",
+      "version_args": [
+       "--version"
+      ],
+      "post_install": {
+       "argv": [
+        "{staged}/rustup-init.exe",
+        "--default-host",
+        "x86_64-pc-windows-gnu",
+        "--default-toolchain",
+        "1.97.0",
+        "--profile",
+        "minimal",
+        "--no-modify-path",
+        "-y"
+       ],
+       "env": {
+        "RUSTUP_HOME": "{staged}/rustup",
+        "CARGO_HOME": "{staged}/cargo",
+        "RUSTUP_INIT_SKIP_PATH_CHECK": "yes",
+        "RUSTUP_TERM_COLOR": "never"
+       },
+       "timeout_seconds": 2400,
+       "progress_message": "Installing the Rust toolchain",
+       "log_name": "rust-install.log",
+       "produces": [
+        "rustup/toolchains/1.97.0-x86_64-pc-windows-gnu/bin/cargo.exe",
+        "rustup/toolchains/1.97.0-x86_64-pc-windows-gnu/bin/rustc.exe"
+       ]
+      }
+     },
+     "install_dir": "rust"
+    },
     "node": {
      "version": "22.22.0",
      "role": "Optional: JS/Electron extraction (@electron/asar) at runtime. Not required for native/.NET/Godot paths.",
@@ -207,6 +385,33 @@
       ]
      },
      "install_dir": "node"
+    },
+    "playwright-core": {
+     "version": "1.58.2",
+     "role": "Optional: Playwright library the browser comparison harness drives (Edge/Chromium). Not required for native/.NET/Java/Godot paths.",
+     "license": "Apache-2.0",
+     "optional": true,
+     "source": {
+      "npm": "https://www.npmjs.com/package/playwright-core/v/1.58.2"
+     },
+     "artifact": {
+      "name": "playwright-core-1.58.2.tgz",
+      "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.58.2.tgz",
+      "size_bytes": 2208739,
+      "sha256": "50e358de81526d5b20ce75a89c96bdc50ae653f077bbc834ada26d92046ce713",
+      "verify_required": false,
+      "format": "tgz",
+      "hash_provenance": "2026-10-06 on Windows 11: downloaded from registry.npmjs.org; SHA-512 matched the registry dist.integrity sha512-yZkEtftgwS8CsfYo7nm0KE8jsvm6i/PTgVtB8DL726wNf6H2IMsDuxCpJj59KDaxCtSnrWan2AeDqM7JBaultg==; sha256 computed from the same bytes"
+     },
+     "layout": {
+      "archive_root": "package",
+      "entry": "package.json",
+      "entry_sha256": "16a25dbd7368a87af8b58a45c6216b9cec5a91a72cf704533344701997ebde22",
+      "requires": [
+       "node"
+      ]
+     },
+     "install_dir": "playwright-core"
     }
    },
    "system_prerequisites": {
@@ -239,7 +444,8 @@
      "toolchain": "1.97.0",
      "msrv": "1.90",
      "target": "x86_64-pc-windows-msvc",
-     "note": "CI uses the stable channel; the pin records the version the shell was validated with (cargo check on Linux). Windows MSVC builds are unverified until docs/WINDOWS_RELEASE_GATES.md gate W1 passes."
+     "note": "CI uses the stable channel; the pin records the version the shell was validated with (cargo check on Linux). Windows MSVC builds are unverified until docs/WINDOWS_RELEASE_GATES.md gate W1 passes.",
+     "private_install": "Guided setup (tool 'rust') installs 1.97.0 for x86_64-pc-windows-gnu privately; the Rust builder prefers it over PATH. Release builds of the shell itself still use the msvc target above."
     },
     "node": {
      "major": 22,
@@ -349,15 +555,15 @@
     "tools": [
      {
       "name": "gdre_tools",
-      "availability": "verified",
-      "path": "/opt/rebuild-tools/gdre/gdre_tools.x86_64",
+      "availability": "installed",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\gdre\\gdre_tools.exe",
       "version": "2.7.0",
-      "detail": "GDRE_tools-v2.7.0-linux.zip matches the pinned sha256",
+      "detail": "no release archive found next to the tools to verify",
       "prerequisites": [],
       "license": "MIT",
       "source": "https://github.com/GDRETools/gdsdecomp",
       "pinned": "2.7.0",
-      "integrity": "abb4c197fe517d6a46b67faf41fc76d9890c882661a55ca2d49ba605955dfacc",
+      "integrity": "",
       "integration": "cli",
       "optional": false,
       "next_action": "",
@@ -371,15 +577,7 @@
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "verified",
-    "verification": {
-     "when": "2026-10-06T12:18:08.233Z",
-     "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_gdre.py",
-     "host": "vm",
-     "versions": {
-      "gdre_tools": "2.7.0"
-     }
-    }
+    "availability": "installed"
    },
    {
     "backend_id": "ghidra",
@@ -496,8 +694,8 @@
     "tools": [
      {
       "name": "ilspycmd",
-      "availability": "verified",
-      "path": "/root/.dotnet/tools/ilspycmd",
+      "availability": "installed",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\ilspycmd\\ilspycmd.dll",
       "version": "9.1.0.7988",
       "detail": "",
       "prerequisites": [
@@ -521,15 +719,7 @@
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "verified",
-    "verification": {
-     "when": "2026-10-06T12:18:28.807Z",
-     "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_ilspy.py",
-     "host": "vm",
-     "versions": {
-      "ilspycmd": "9.1.0.7988"
-     }
-    }
+    "availability": "installed"
    },
    {
     "backend_id": "jsweb",
@@ -576,7 +766,7 @@
     "tools": [
      {
       "name": "jsweb-native",
-      "availability": "verified",
+      "availability": "installed",
       "path": null,
       "version": "1",
       "detail": "native asar/source-map/bundler inspection; no external tool required",
@@ -593,7 +783,7 @@
      {
       "name": "node",
       "availability": "installed",
-      "path": "/opt/node22/bin/node",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\node\\node.exe",
       "version": "22.22.0",
       "detail": "",
       "prerequisites": [],
@@ -608,18 +798,20 @@
      },
      {
       "name": "asar",
-      "availability": "installed",
-      "path": "/opt/rebuild-tools/asar/node_modules/.bin/asar",
-      "version": "4.3.1",
-      "detail": "",
-      "prerequisites": [],
+      "availability": "missing",
+      "path": null,
+      "version": null,
+      "detail": "optional; not found",
+      "prerequisites": [
+       "Node.js"
+      ],
       "license": "MIT",
       "source": "https://github.com/electron/asar",
       "pinned": "4.3.1",
-      "integrity": "sha512-6pI64z/tMSBkUTZLQFYhs2YiB7fS9sKA6gy7/2nH1Ju7GGwT32UPsj4Mxsws5NMmtR6C0zYdXVxEU/rGqJRCJA==",
+      "integrity": "",
       "integration": "cli",
       "optional": true,
-      "next_action": "",
+      "next_action": "npm install --save-exact @electron/asar@4.3.1 --prefix <tools_dir>/asar   (optional: only for cross-checks; inspection is native)",
       "extra": {}
      }
     ],
@@ -629,15 +821,126 @@
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "verified",
-    "verification": {
-     "when": "2026-10-06T12:18:30.051Z",
-     "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_jsweb.py tests/test_archive.py",
-     "host": "vm",
-     "versions": {
-      "jsweb-native": "1"
+    "availability": "installed"
+   },
+   {
+    "backend_id": "jvm",
+    "title": "Java / Android recovery (CFR, jadx)",
+    "formats": [
+     "jar",
+     "java_class",
+     "apk",
+     "aab",
+     "dex"
+    ],
+    "platforms": [
+     "windows",
+     "linux",
+     "macos"
+    ],
+    "profiles": [
+     "jvm",
+     "android"
+    ],
+    "operations": [
+     {
+      "name": "detect",
+      "description": "Classify jar/class/apk/aab/dex and state what can be recovered",
+      "inputs": {
+       "path": "path"
+      },
+      "outputs": {
+       "support": "dict"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "inspect",
+      "description": "Tool-free facts: manifest, main class, class versions, Android manifest, dex inventory",
+      "inputs": {
+       "module_path": "path"
+      },
+      "outputs": {
+       "inspect": "dict"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "decompile",
+      "description": "Decompile a jar/class with CFR or an apk/dex/aab with jadx; per-class recovery report",
+      "inputs": {
+       "module_path": "path",
+       "out_dir": "path"
+      },
+      "outputs": {
+       "recovery_report": "dict"
+      },
+      "dangerous": false
      }
-    }
+    ],
+    "tools": [
+     {
+      "name": "java",
+      "availability": "installed",
+      "path": "C:\\Program Files\\Microsoft\\jdk-17.0.20.101-hotspot\\bin\\java.EXE",
+      "version": "17.0.20.1",
+      "detail": "",
+      "prerequisites": [],
+      "license": "GPL-2.0-with-classpath-exception",
+      "source": "https://adoptium.net/temurin/",
+      "pinned": "17.0.20.1+1",
+      "integrity": "6db7759259dc79800c5c6014f0ec68961a1fe69c36bb9b2a15a42c3b0c413f6a",
+      "integration": "cli",
+      "optional": false,
+      "next_action": "",
+      "extra": {}
+     },
+     {
+      "name": "cfr",
+      "availability": "missing",
+      "path": null,
+      "version": null,
+      "detail": "cfr jar not found in the tools dir",
+      "prerequisites": [
+       "Java runtime"
+      ],
+      "license": "MIT",
+      "source": "https://github.com/leibnitz27/cfr",
+      "pinned": "0.152",
+      "integrity": "",
+      "integration": "cli",
+      "optional": false,
+      "next_action": "Install the optional tools from docs/dependency-lock.json (Setup-Dependencies.ps1 -Tool temurin-jre,cfr,jadx, or the Tools page in the app); or put cfr-0.152.jar in <tools>/cfr/ and any Java 8+ runtime on PATH",
+      "extra": {}
+     },
+     {
+      "name": "jadx",
+      "availability": "missing",
+      "path": null,
+      "version": null,
+      "detail": "jadx jar not found in the tools dir",
+      "prerequisites": [
+       "Java runtime"
+      ],
+      "license": "Apache-2.0",
+      "source": "https://github.com/skylot/jadx",
+      "pinned": "1.5.6",
+      "integrity": "",
+      "integration": "cli",
+      "optional": true,
+      "next_action": "Optional (Android code recovery only): Setup-Dependencies.ps1 -Tool jadx",
+      "extra": {}
+     }
+    ],
+    "resources": {
+     "typical_seconds_per_jar": "1-120",
+     "ram_mb": 512,
+     "android": "code recovery needs jadx (optional tool); inspect always works",
+     "next_action": "Install the optional tools from docs/dependency-lock.json (Setup-Dependencies.ps1 -Tool temurin-jre,cfr,jadx, or the Tools page in the app); or put cfr-0.152.jar in <tools>/cfr/ and any Java 8+ runtime on PATH"
+    },
+    "tested_support": [],
+    "experimental": false,
+    "availability": "missing"
    },
    {
     "backend_id": "rizin",
@@ -844,10 +1147,10 @@
     "tools": [
      {
       "name": "rizin",
-      "availability": "verified",
-      "path": "/opt/rebuild-tools/rizin-src-install/bin/rizin",
+      "availability": "installed",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\rizin\\rizin.exe",
       "version": "0.9.1",
-      "detail": "commit c3a90e9226d977f58f4e9c75f78fa6b07afe13c7; shared source build (v0.9.1)",
+      "detail": "commit c3a90e9226d977f58f4e9c75f78fa6b07afe13c7; shared source build",
       "prerequisites": [],
       "license": "LGPL-3.0",
       "source": "https://github.com/rizinorg/rizin",
@@ -865,9 +1168,9 @@
       {
        "name": "rz-ghidra",
        "availability": "installed",
-       "path": "/opt/rebuild-tools/rizin-src-install/lib/x86_64-linux-gnu/rizin/plugins/core_ghidra.so",
-       "version": "0.9.0",
-       "detail": "plugin for rizin 0.9.1 at /opt/rebuild-tools/rizin-src-install/bin/rizin; built from v0.9.0 commit 999df7b8e78919b75a330b4710acaf8f956f65cc",
+       "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\rizin\\lib\\rizin\\plugins\\core_ghidra.dll",
+       "version": null,
+       "detail": "plugin for rizin 0.9.1 at C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\rizin\\rizin.exe; build provenance unknown (no build manifest)",
        "prerequisites": [
         "rizin shared build with headers (not the static release)",
         "cmake",
@@ -885,25 +1188,89 @@
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "verified",
-    "verification": {
-     "when": "2026-10-06T12:19:33.748Z",
-     "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_rizin.py tests/test_fixture_oracle.py::test_pecli_oracle_rejects_wrong_remake_and_accepts_original",
-     "host": "vm",
-     "versions": {
-      "rizin": "0.9.1"
+    "availability": "installed"
+   },
+   {
+    "backend_id": "triage",
+    "title": "Triage for detected-only kinds (IL2CPP, GameMaker, Unreal, Mach-O)",
+    "formats": [
+     "il2cpp_metadata",
+     "gamemaker_data",
+     "unreal_pak",
+     "unreal_iostore",
+     "macho"
+    ],
+    "platforms": [
+     "windows",
+     "linux",
+     "macos"
+    ],
+    "profiles": [
+     "unity_il2cpp",
+     "gamemaker",
+     "unreal",
+     "native_macho"
+    ],
+    "operations": [
+     {
+      "name": "describe",
+      "description": "Detection + plain-language support statement + candidate future tools",
+      "inputs": {
+       "path": "path"
+      },
+      "outputs": {
+       "support": "dict"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "inspect",
+      "description": "What the built-in parsers can still give: headers, chunk tables, identifier names, pak footer",
+      "inputs": {
+       "module_path": "path"
+      },
+      "outputs": {
+       "inspect": "dict"
+      },
+      "dangerous": false
      }
-    }
+    ],
+    "tools": [
+     {
+      "name": "builtin-parsers",
+      "availability": "installed",
+      "path": null,
+      "version": "1",
+      "detail": "pure-Python bounded header parsers; no external tool and no code recovery",
+      "prerequisites": [],
+      "license": "project-internal",
+      "source": "",
+      "pinned": "",
+      "integrity": "",
+      "integration": "library",
+      "optional": false,
+      "next_action": "",
+      "extra": {}
+     }
+    ],
+    "resources": {
+     "ram_mb": 50,
+     "recovers_code": false,
+     "note": "detected-only kinds: inventory and evidence, never decompilation"
+    },
+    "tested_support": [],
+    "experimental": true,
+    "availability": "installed"
    }
   ],
   "summary": {
-   "missing": 1,
+   "missing": 2,
    "detected": 0,
-   "installed": 0,
+   "installed": 5,
    "usable": 0,
-   "verified": 4
+   "verified": 0
   },
-  "source": "recorded from reports/doctor-linux.json (the live doctor tools are not present on this host)"
+  "source": "live"
  },
  "test_runs": [
   {
@@ -979,6 +1346,11 @@
   "godotgame": {
    "kind": "godot4_pck",
    "oracle": "GDRE tools 2.7.0 recovery (game itself not executable here)",
+   "features": 10
+  },
+  "javacli": {
+   "kind": "java17_console_jar",
+   "oracle": "java 17 (Temurin/Microsoft OpenJDK) on the Windows host (non-certifying for other hosts)",
    "features": 10
   },
   "pecli": {
@@ -1615,12 +1987,128 @@
   "Gate summary"
  ],
  "hermes_gates": [],
+ "windows": {
+  "host": "Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md.",
+  "build": "commit 80ff419: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 b1c15bba9b17a0063eda218385e2f1cfe6a2d5adf3d1e31cb1bad929cef614c4 (NSIS .exe, per-user), portable zip sha256 21830bae2e122f4253ebb2001a3b8d13bcfa372c14856ba7441a399b86bfaedd",
+  "interactive": [
+   {
+    "gate": "Windows build (Build-RebuildStudio.ps1 under PowerShell 5.1)",
+    "result": "PASS after fixes",
+    "notes": "PS 5.1 array-unrolling and quote-stripping bugs fixed; build fails if any backend cannot load in the frozen controller"
+   },
+   {
+    "gate": "GUI install from a path with spaces, no admin",
+    "result": "PASS",
+    "notes": "default %LOCALAPPDATA%\\Rebuild Studio; no UAC prompt"
+   },
+   {
+    "gate": "Desktop shortcut offered during install",
+    "result": "PASS",
+    "notes": "finish-page checkbox 'Create desktop shortcut', ticked by default; also created by silent/passive installs"
+   },
+   {
+    "gate": "Start-menu entry, Apps entry, icon, AppUserModelID",
+    "result": "PASS",
+    "notes": "shortcuts carry System.AppUserModel.ID io.rebuildstudio.desktop; the process sets the same ID"
+   },
+   {
+    "gate": "Double-click desktop icon \u2192 full UI, no console",
+    "result": "PASS (after fix)",
+    "notes": "first run showed 'Disconnected' (CORS preflight 401); fixed and re-verified 'Connected'"
+   },
+   {
+    "gate": "Start-menu shortcut launch",
+    "result": "PASS",
+    "notes": "controller ready in 1.9 s, UI connected, one taskbar button"
+   },
+   {
+    "gate": "Pin to taskbar and relaunch from pin",
+    "result": "NOT RUN",
+    "notes": "Windows blocks programmatic pinning; needs a person"
+   },
+   {
+    "gate": "Normal close",
+    "result": "PASS",
+    "notes": "all rebuild-* processes exit, controller.json removed"
+   },
+   {
+    "gate": "Forced termination of the shell (crash)",
+    "result": "PASS",
+    "notes": "controller tree killed by the Job Object within 2 s"
+   },
+   {
+    "gate": "Relaunch after crash (stale controller.json)",
+    "result": "PASS",
+    "notes": "new port/token, exactly one controller, /health ok"
+   },
+   {
+    "gate": "Update over an existing install",
+    "result": "PASS",
+    "notes": "binaries replaced; projects, tools, keys and shortcuts kept"
+   },
+   {
+    "gate": "Guided dependency setup without PowerShell",
+    "result": "PASS",
+    "notes": "rizin+rz-ghidra (Cutter v2.5.0 build), GDRE, .NET 8.0.31, ILSpy, Node, playwright-core installed and hash-verified by the app; install-from-file path exercised"
+   },
+   {
+    "gate": "Real fixture through the installed controller using only guided-setup components",
+    "result": "PASS (web) / BLOCKED (Rust targets)",
+    "notes": "fixtures/webapp 3/3 fully matched within the declared scenario with system Edge, PATH=System32 only; .NET\u2192Rust blocked: no Rust toolchain in guided setup (see unresolved)"
+   },
+   {
+    "gate": "Ordinary uninstall keeps data",
+    "result": "PASS",
+    "notes": "program, shortcuts and Apps entry removed; %LOCALAPPDATA%\\RebuildStudio and Credential Manager entries kept"
+   },
+   {
+    "gate": "Data-removal credential purge",
+    "result": "PASS",
+    "notes": "rebuild-studio.exe --remove-stored-credentials removed RebuildStudio:* entries headlessly"
+   },
+   {
+    "gate": "Uninstall with 'Delete the application data' ticked (GUI)",
+    "result": "NOT RUN",
+    "notes": "needs the uninstaller GUI"
+   },
+   {
+    "gate": "Full UI walk (New Project \u2192 plan \u2192 preview \u2192 feedback \u2192 scenarios \u2192 results \u2192 reopen), keyboard, DPI, narrow widths",
+    "result": "NOT RUN",
+    "notes": "the owner was using the desktop; component tests cover the screens (UI vitest 104)"
+   },
+   {
+    "gate": "Standard (non-admin) user account; clean VM",
+    "result": "NOT RUN",
+    "notes": "creating accounts/VMs was out of scope on this machine"
+   }
+  ],
+  "measurements": [
+   "Controller cold start (installed onefile sidecar): 5.3 s on the first run after install; 1.75\u20132.04 s warm (3 runs).",
+   "Idle memory 20 s after a Start-menu launch: shell 31 MiB, controller 78 MiB, WebView2 345 MiB (6 processes): 461 MiB working set / 238 MiB private in total.",
+   "Web fixture rebuild through the installed controller: 7\u20139 s end to end (inventory \u2192 recovery \u2192 port \u2192 build \u2192 browser comparison \u2192 delivery).",
+   "Guided tool installs: rizin 9\u201312 s, GDRE 3 s, .NET runtime 2 s, ILSpy 2 s, Node + playwright-core 10 s on this connection."
+  ],
+  "ci_note": "Workflows trigger on main/PR only; runs were dispatched manually (workflow_dispatch) on branch ccr-4dbe9b92-nyzsa8. A hosted runner is not an interactive or clean machine; CI green is not a gate pass.",
+  "ci": [
+   "windows run 37508069708 at 1077820: success (build + test on windows-latest, unsigned)",
+   "linux run 37508065315 at 1077820: success (controller py3.12/3.13, UI, desktop cargo, PowerShell parse/dry-run, wine advisory)",
+   "Earlier runs found and drove fixes: POSIX sandbox (.NET SIGXFSZ), hosted-runner portability (gcc app.exe, process-limit test)"
+  ],
+  "unresolved": [
+   "Rust toolchain for Rust remakes is not yet part of guided setup on a clean machine (in progress at report time).",
+   "Taskbar pin + relaunch from pin, GUI uninstall with data deletion, full packaged UI walk, high-DPI/narrow-width checks: need a person at the desktop.",
+   "Clean Windows 10/11 VM with a standard user and no developer tools; Windows Defender first-run timing on such a machine.",
+   "Code signing (no certificate); live AI provider runs (no keys)."
+  ]
+ },
  "limits": [
-  "No interactive Windows host in this session: installer/WebView2/UI capture/Hermes desktop/DPAPI are handoffs (docs/WINDOWS_RELEASE_GATES.md).",
-  "PE originals were executed under wine; the reports label that runner non-certifying.",
-  "No provider API key was supplied: provider adapters are covered by mocked protocol tests only; zero paid calls were made.",
-  "Unity IL2CPP, GameMaker, Android/JVM, Unreal profiles are detected but marked experimental/unverified (no backend run).",
+  "Not certified: the interactive Windows host was the owner's developer machine (dev tools installed, admin-capable account), not a clean standard-user VM. Clean-machine and standard-user gates remain open.",
+  "Installer and portable zip are UNSIGNED (no code-signing certificate available); SmartScreen will warn.",
+  "No AI provider key was available: the in-app implement/repair loop is verified against a scripted OpenAI-compatible server only; live Anthropic/OpenAI/Gemini/OpenRouter behaviour is UNVERIFIED and zero paid calls were made.",
+  "Original-program isolation is damage limitation, not a security sandbox: Low integrity + Job Object limits on Windows; the program can still read most user files and the network is open unless the opt-in AppContainer mode is chosen (docs/ISOLATION.md).",
+  "Java (.jar) recovery is supported (CFR); Android code recovery needs jadx; Unity IL2CPP, GameMaker, Unreal and Mach-O are detected with explicit blockers and no code recovery.",
   "Scenario results are limited to the scenarios declared for each case. Passing them is not global parity: features with no scenario, Windows-only behaviour and undiscovered scope are not measured.",
-  "Godot \u2192 Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because the original cannot run here and no scenarios were declared."
+  "Godot \u2192 Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because no gameplay scenarios exist.",
+  "Scenario authoring in the UI covers command-line programs; web/GUI scenarios are declared through the API or inferred (one automatic start-page check)."
  ]
 }

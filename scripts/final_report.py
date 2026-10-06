@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PY = os.environ.get("REBUILD_PY", "/opt/rebuild-tools/venv/bin/python")
+PY = os.environ.get("REBUILD_REPORT_PY") or (os.environ.get("REBUILD_PY", "/opt/rebuild-tools/venv/bin/python") if Path(os.environ.get("REBUILD_PY", "/opt/rebuild-tools/venv/bin/python")).exists() else sys.executable)
 sys.path.insert(0, str(ROOT / "controller"))
 from rebuild_controller.outcome import derive_outcome  # noqa: E402  (same derivation the app uses; reads recorded evidence only)
 
@@ -195,21 +195,36 @@ def hermes_gates() -> list[str]:
     return [l.strip() for l in h.read_text().splitlines() if re.match(r"^\s*[-*]?\s*\*{0,2}G\d", l)][:12] if h.exists() else []
 
 
-def build() -> dict:
+def build() -> dict:  # noqa: C901
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(), "host": {"os": platform.platform(), "certifies_windows": False},
+        "generated_at": datetime.now(timezone.utc).isoformat(), "host": {"os": platform.platform(), "certifies_windows": False, "note": "report generated on the build host; see the Windows sections for what ran where"},
         "commits": sh(["git", "log", "--oneline", "-30"]).splitlines(), "branch": sh(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
         "pins": pins(), "backends": doctor(), "test_runs": test_runs(), "fixtures": {k: {"kind": v.get("kind"), "oracle": v.get("oracle"), "features": len(v.get("features", []))} for k, v in fixtures().get("fixtures", {}).items()},
         "demos": demos(), "windows_gates": gates(), "hermes_gates": hermes_gates(),
+        "windows": _jload(ROOT / "reports" / "windows-validation.json"),
         "limits": [
-            "No interactive Windows host in this session: installer/WebView2/UI capture/Hermes desktop/DPAPI are handoffs (docs/WINDOWS_RELEASE_GATES.md).",
-            "PE originals were executed under wine; the reports label that runner non-certifying.",
-            "No provider API key was supplied: provider adapters are covered by mocked protocol tests only; zero paid calls were made.",
-            "Unity IL2CPP, GameMaker, Android/JVM, Unreal profiles are detected but marked experimental/unverified (no backend run).",
+            "Not certified: the interactive Windows host was the owner's developer machine (dev tools installed, admin-capable account), not a clean standard-user VM. Clean-machine and standard-user gates remain open.",
+            "Installer and portable zip are UNSIGNED (no code-signing certificate available); SmartScreen will warn.",
+            "No AI provider key was available: the in-app implement/repair loop is verified against a scripted OpenAI-compatible server only; live Anthropic/OpenAI/Gemini/OpenRouter behaviour is UNVERIFIED and zero paid calls were made.",
+            "Original-program isolation is damage limitation, not a security sandbox: Low integrity + Job Object limits on Windows; the program can still read most user files and the network is open unless the opt-in AppContainer mode is chosen (docs/ISOLATION.md).",
+            "Java (.jar) recovery is supported (CFR); Android code recovery needs jadx; Unity IL2CPP, GameMaker, Unreal and Mach-O are detected with explicit blockers and no code recovery.",
             "Scenario results are limited to the scenarios declared for each case. Passing them is not global parity: features with no scenario, Windows-only behaviour and undiscovered scope are not measured.",
-            "Godot → Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because the original cannot run here and no scenarios were declared.",
+            "Godot → Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because no gameplay scenarios exist.",
+            "Scenario authoring in the UI covers command-line programs; web/GUI scenarios are declared through the API or inferred (one automatic start-page check).",
         ],
     }
+
+
+def _windows_sections(w: dict | None) -> list[str]:
+    """Rendered from reports/windows-validation.json (recorded from evidence/windows/*/GATE-LOG.md and CI run ids)."""
+    if not w:
+        return ["## Windows (interactive desktop)", "", "PENDING. No interactive Windows desktop results are recorded.", "", "## Windows CI", "", "PENDING."]
+    L = ["## Windows (interactive desktop)", "", w["host"], "", f"Build under test: {w['build']}", "", "| Gate | Result | Notes |", "|---|---|---|"]
+    L += [f"| {g['gate']} | {g['result']} | {g['notes']} |" for g in w["interactive"]]
+    L += ["", "Measurements on this host (not a clean machine):", ""] + [f"- {m}" for m in w["measurements"]]
+    L += ["", "## Windows CI (hosted runner)", "", w["ci_note"], ""] + [f"- {c}" for c in w["ci"]]
+    L += ["", "## Unresolved Windows gates", ""] + [f"- {u}" for u in w["unresolved"]]
+    return L
 
 
 def render(r: dict) -> str:
@@ -267,8 +282,7 @@ def render(r: dict) -> str:
         for x in d["provenance"]:
             L.append(f"| {d['example']} | `{x['candidate_id']}` | {'yes' if x['final'] else 'no'} | {x['authored_by']} | {x['basis']} | {x['stored_author_field']} | {x['app_routed_ai_calls']} |")
     L += ["", "Recommended follow-up (not done here): record a `source` (`mcp` or `controller`) in candidate metadata so provenance does not depend on logs.",
-          "", "## Windows (interactive desktop)", "", "PENDING. No interactive Windows desktop results are included in this report. Installer, WebView2, UI capture, Hermes desktop and DPAPI results will be added by the Windows run.",
-          "", "## Windows CI", "", "PENDING. No Windows CI results are included in this report."]
+          ""] + _windows_sections(r.get("windows"))
     L += ["", "## Windows release gates (not certified here)", ""] + [f"- {g}" for g in r["windows_gates"]]
     L += ["", "## Hermes gates", ""] + [f"- {g}" for g in r["hermes_gates"]]
     L += ["", "## Limits and remaining user-dependent actions", ""] + [f"- {l}" for l in r["limits"]]

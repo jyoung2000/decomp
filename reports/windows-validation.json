@@ -1,0 +1,42 @@
+{
+  "host": "Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md.",
+  "build": "commit 80ff419: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 b1c15bba9b17a0063eda218385e2f1cfe6a2d5adf3d1e31cb1bad929cef614c4 (NSIS .exe, per-user), portable zip sha256 21830bae2e122f4253ebb2001a3b8d13bcfa372c14856ba7441a399b86bfaedd",
+  "interactive": [
+    {"gate": "Windows build (Build-RebuildStudio.ps1 under PowerShell 5.1)", "result": "PASS after fixes", "notes": "PS 5.1 array-unrolling and quote-stripping bugs fixed; build fails if any backend cannot load in the frozen controller"},
+    {"gate": "GUI install from a path with spaces, no admin", "result": "PASS", "notes": "default %LOCALAPPDATA%\\Rebuild Studio; no UAC prompt"},
+    {"gate": "Desktop shortcut offered during install", "result": "PASS", "notes": "finish-page checkbox 'Create desktop shortcut', ticked by default; also created by silent/passive installs"},
+    {"gate": "Start-menu entry, Apps entry, icon, AppUserModelID", "result": "PASS", "notes": "shortcuts carry System.AppUserModel.ID io.rebuildstudio.desktop; the process sets the same ID"},
+    {"gate": "Double-click desktop icon → full UI, no console", "result": "PASS (after fix)", "notes": "first run showed 'Disconnected' (CORS preflight 401); fixed and re-verified 'Connected'"},
+    {"gate": "Start-menu shortcut launch", "result": "PASS", "notes": "controller ready in 1.9 s, UI connected, one taskbar button"},
+    {"gate": "Pin to taskbar and relaunch from pin", "result": "NOT RUN", "notes": "Windows blocks programmatic pinning; needs a person"},
+    {"gate": "Normal close", "result": "PASS", "notes": "all rebuild-* processes exit, controller.json removed"},
+    {"gate": "Forced termination of the shell (crash)", "result": "PASS", "notes": "controller tree killed by the Job Object within 2 s"},
+    {"gate": "Relaunch after crash (stale controller.json)", "result": "PASS", "notes": "new port/token, exactly one controller, /health ok"},
+    {"gate": "Update over an existing install", "result": "PASS", "notes": "binaries replaced; projects, tools, keys and shortcuts kept"},
+    {"gate": "Guided dependency setup without PowerShell", "result": "PASS", "notes": "rizin+rz-ghidra (Cutter v2.5.0 build), GDRE, .NET 8.0.31, ILSpy, Node, playwright-core installed and hash-verified by the app; install-from-file path exercised"},
+    {"gate": "Real fixture through the installed controller using only guided-setup components", "result": "PASS (web) / BLOCKED (Rust targets)", "notes": "fixtures/webapp 3/3 fully matched within the declared scenario with system Edge, PATH=System32 only; .NET→Rust blocked: no Rust toolchain in guided setup (see unresolved)"},
+    {"gate": "Ordinary uninstall keeps data", "result": "PASS", "notes": "program, shortcuts and Apps entry removed; %LOCALAPPDATA%\\RebuildStudio and Credential Manager entries kept"},
+    {"gate": "Data-removal credential purge", "result": "PASS", "notes": "rebuild-studio.exe --remove-stored-credentials removed RebuildStudio:* entries headlessly"},
+    {"gate": "Uninstall with 'Delete the application data' ticked (GUI)", "result": "NOT RUN", "notes": "needs the uninstaller GUI"},
+    {"gate": "Full UI walk (New Project → plan → preview → feedback → scenarios → results → reopen), keyboard, DPI, narrow widths", "result": "NOT RUN", "notes": "the owner was using the desktop; component tests cover the screens (UI vitest 104)"},
+    {"gate": "Standard (non-admin) user account; clean VM", "result": "NOT RUN", "notes": "creating accounts/VMs was out of scope on this machine"}
+  ],
+  "measurements": [
+    "Controller cold start (installed onefile sidecar): 5.3 s on the first run after install; 1.75–2.04 s warm (3 runs).",
+    "Idle memory 20 s after a Start-menu launch: shell 31 MiB, controller 78 MiB, WebView2 345 MiB (6 processes): 461 MiB working set / 238 MiB private in total.",
+    "Web fixture rebuild through the installed controller: 7–9 s end to end (inventory → recovery → port → build → browser comparison → delivery).",
+    "Guided tool installs: rizin 9–12 s, GDRE 3 s, .NET runtime 2 s, ILSpy 2 s, Node + playwright-core 10 s on this connection."
+  ],
+  "ci_note": "Workflows trigger on main/PR only; runs were dispatched manually (workflow_dispatch) on branch ccr-4dbe9b92-nyzsa8. A hosted runner is not an interactive or clean machine; CI green is not a gate pass.",
+  "ci": [
+    "windows run 37508069708 at 1077820: success (build + test on windows-latest, unsigned)",
+    "linux run 37508065315 at 1077820: success (controller py3.12/3.13, UI, desktop cargo, PowerShell parse/dry-run, wine advisory)",
+    "Earlier runs found and drove fixes: POSIX sandbox (.NET SIGXFSZ), hosted-runner portability (gcc app.exe, process-limit test)"
+  ],
+  "unresolved": [
+    "Rust toolchain for Rust remakes is not yet part of guided setup on a clean machine (in progress at report time).",
+    "Taskbar pin + relaunch from pin, GUI uninstall with data deletion, full packaged UI walk, high-DPI/narrow-width checks: need a person at the desktop.",
+    "Clean Windows 10/11 VM with a standard user and no developer tools; Windows Defender first-run timing on such a machine.",
+    "Code signing (no certificate); live AI provider runs (no keys)."
+  ]
+}
