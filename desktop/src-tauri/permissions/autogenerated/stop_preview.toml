@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-stop-preview"
+description = "Enables the stop_preview command without any pre-configured scope."
+commands.allow = ["stop_preview"]
+
+[[permission]]
+identifier = "deny-stop-preview"
+description = "Denies the stop_preview command without any pre-configured scope."
+commands.deny = ["stop_preview"]

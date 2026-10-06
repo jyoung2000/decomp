@@ -1,0 +1,51 @@
+[package]
+name = "rebuild-studio"
+version = "0.1.0"
+description = "Rebuild Studio desktop shell (Tauri 2)"
+authors = ["Rebuild Studio contributors"]
+license = "MIT OR Apache-2.0"
+edition = "2021"
+rust-version = "1.90"
+publish = false
+
+[lib]
+name = "rebuild_studio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.1", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.1", features = [] }
+tauri-plugin-dialog = "=2.8.1"
+tauri-plugin-shell = "=2.4.0"
+tauri-plugin-opener = "=2.7.0"
+tauri-plugin-window-state = "=2.5.0"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+
+[target.'cfg(unix)'.dependencies]
+libc = "=0.2.190"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Credentials",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "=2.5.2"
+
+[features]
+# Enabled by `cargo tauri build`/`dev`; keep as the Tauri default.
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

@@ -1,0 +1,9 @@
+{
+  "name": "rebuild-studio",
+  "displayName": "Rebuild Studio",
+  "version": "0.1.0",
+  "description": "Rebuild or diagnose an existing program with Rebuild Studio through typed, bounded MCP tools.",
+  "author": { "name": "Rebuild Studio" },
+  "license": "MIT",
+  "keywords": ["rebuild", "reverse-engineering", "mcp"]
+}

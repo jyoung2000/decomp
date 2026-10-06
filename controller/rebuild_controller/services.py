@@ -70,7 +70,17 @@ class StudioServices:
             self.optional_errors["connections"] = f"{type(e).__name__}: {e}"
         try:
             from .providers.router import AIClient
-            self.ai = AIClient(self)
+            from .providers.jev import JeVRouter
+            advisor = None
+            try:
+                advisor = JeVRouter(self.budgets, self.events, self.settings.data_dir)
+            except Exception as e:  # advisory only
+                self.optional_errors["jev"] = f"{type(e).__name__}: {e}"
+            self.ai = AIClient(self.connections, self.budgets, self.events, self.db, advisor=advisor)
+            try:
+                self.budgets.sweep_stale(3600)
+            except Exception:
+                pass
         except Exception as e:  # pragma: no cover
             self.optional_errors["ai"] = f"{type(e).__name__}: {e}"
 

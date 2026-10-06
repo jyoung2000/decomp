@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-controller-info"
+description = "Enables the controller_info command without any pre-configured scope."
+commands.allow = ["controller_info"]
+
+[[permission]]
+identifier = "deny-controller-info"
+description = "Denies the controller_info command without any pre-configured scope."
+commands.deny = ["controller_info"]

@@ -68,9 +68,10 @@ class ConnectionCreate(BaseModel):
 
 
 class RouteSet(BaseModel):
-    primary_connection: str | None = None
-    primary_model: str | None = None
+    primary_connection: str
+    primary_model: str
     fallbacks: list[dict[str, str]] = Field(default_factory=list)
+    allow_unlisted: bool = False
 
 
 def create_app(studio: StudioServices, token: str) -> FastAPI:
@@ -105,8 +106,20 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
 
     @app.exception_handler(Exception)
     async def any_exc(request: Request, exc: Exception):
+        name = type(exc).__name__
         code = {KeyError: 404, ValueError: 400, PermissionError: 403}.get(type(exc), 500)
-        return JSONResponse({"error": {"code": type(exc).__name__, "message": str(exc)[:2000]}}, status_code=code)
+        next_action = None
+        if name == "ApprovalRequired":
+            code, next_action = 409, "approve unknown pricing for this model or set an explicit price on the connection"
+        elif name in ("BudgetExhausted", "BudgetRequired", "DuplicateReservation"):
+            code, next_action = 402 if name == "BudgetExhausted" else 400, "raise or configure the per-job budget"
+        elif name in ("NoRoute", "AllCandidatesFailed"):
+            code, next_action = 424, "configure a connection and route for this task"
+        elif name == "HermesBridgeError":
+            return JSONResponse({"error": exc.to_error()}, status_code=400)
+        elif name == "PathPolicyError":
+            code = 400
+        return JSONResponse({"error": {"code": name, "message": str(exc)[:2000], "next_action": next_action}}, status_code=code)
 
     @app.on_event("startup")
     async def _startup():
@@ -331,8 +344,9 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         return _conn().create(**body.model_dump())
 
     @app.post("/connections/{connection_id}/probe")
-    def connection_probe(connection_id: str):
-        return _conn().probe(connection_id)
+    def connection_probe(connection_id: str, body: dict[str, Any] | None = None):
+        body = body or {}
+        return _conn().probe(connection_id, model=body.get("model"), approve_unknown_pricing=bool(body.get("approve_unknown_pricing")))
 
     @app.delete("/connections/{connection_id}")
     def connection_delete(connection_id: str):
@@ -341,17 +355,17 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
 
     @app.get("/routes")
     def routes():
-        return _conn().routes()
+        return _conn().get_routes()
 
     @app.put("/routes/{task}")
     def route_set(task: str, body: RouteSet):
-        return _conn().set_route(task, **body.model_dump())
+        return _conn().set_route(task, body.primary_connection, body.primary_model, body.fallbacks, allow_unlisted=body.allow_unlisted)
 
     @app.get("/budgets")
     def budgets():
         if studio.budgets is None:
             raise _err("unavailable", "budget service unavailable", 503)
-        return studio.budgets.list()
+        return studio.budgets.snapshot()
 
     @app.get("/ai/calls")
     def ai_calls(case_id: str | None = None):
@@ -363,8 +377,8 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     @app.get("/subscriptions")
     def subscriptions():
         try:
-            from ..providers.subscription import handoff_modes
-            return handoff_modes()
+            from ..providers.subscription import all_modes, cli_available
+            return [{**m.__dict__, "cli_available": cli_available(m)} for m in all_modes()]
         except Exception as e:
             return {"error": str(e)}
 
@@ -403,19 +417,19 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     def hermes_status():
         try:
             from ..hermes.bridge import HermesBridge
-            return HermesBridge(studio.settings).status()
+            return HermesBridge(studio.settings.data_dir).status()
         except Exception as e:
             return {"available": False, "error": f"{type(e).__name__}: {e}"}
 
     @app.post("/hermes/pair")
     def hermes_pair(body: dict[str, Any] | None = None):
         from ..hermes.bridge import HermesBridge
-        return HermesBridge(studio.settings).pair((body or {}).get("profile_path"))
+        return HermesBridge(studio.settings.data_dir).pair((body or {}).get("profile_path"))
 
     @app.post("/hermes/register_mcp")
     def hermes_register(body: dict[str, Any] | None = None):
         from ..hermes.bridge import HermesBridge
-        return HermesBridge(studio.settings).register_mcp(dry_run=bool((body or {}).get("dry_run", True)))
+        return HermesBridge(studio.settings.data_dir).register_mcp(dry_run=bool((body or {}).get("dry_run", True)))
 
     return app
 

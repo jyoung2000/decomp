@@ -1,0 +1,9 @@
+# Add to ~/.codex/config.toml (or let scripts/install-clients.py do it). Replace the command with the path of rebuild-mcp.
+[mcp_servers.rebuild_studio]
+command = "rebuild-mcp"
+args = ["--toolset", "all"]
+startup_timeout_sec = 30
+
+# Optional: a non-default data directory.
+# [mcp_servers.rebuild_studio.env]
+# REBUILD_STUDIO_DATA = "/path/to/data"

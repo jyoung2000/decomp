@@ -1,0 +1,10 @@
+# Add under the top level of ~/.hermes/config.yaml (Windows: %LOCALAPPDATA%\hermes\config.yaml, or $HERMES_HOME/config.yaml).
+# Hermes starts stdio servers with a filtered environment, so the data directory is named explicitly.
+mcp_servers:
+  rebuild_studio:
+    command: "rebuild-mcp"
+    args: ["--toolset", "all"]
+    timeout: 120
+    connect_timeout: 60
+    env:
+      REBUILD_STUDIO_DATA: "/home/you/.local/share/rebuild-studio"

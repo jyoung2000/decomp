@@ -1,0 +1,214 @@
+{
+  "$comment": "Pinned external dependencies for Rebuild Studio on Windows. Consumed by scripts/windows/Setup-Dependencies.ps1 and Doctor-RebuildStudio.ps1. An artifact with sha256 == null is NEVER installed (verify_required). Compute with: Setup-Dependencies.ps1 -ComputeHash <tool>, review the source, then paste the value here.",
+  "schema_version": 1,
+  "generated_utc": "2026-10-06",
+  "hash_algorithm": "sha256",
+  "tools": {
+    "rizin": {
+      "version": "0.9.1",
+      "role": "Native analysis engine (subprocess via rzpipe; LGPL-3.0, never linked)",
+      "license": "LGPL-3.0-only",
+      "source": {
+        "repo": "https://github.com/rizinorg/rizin",
+        "tag": "v0.9.1",
+        "commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7"
+      },
+      "artifact": {
+        "name": "rizin-windows-static-v0.9.1.zip",
+        "url": "https://github.com/rizinorg/rizin/releases/download/v0.9.1/rizin-windows-static-v0.9.1.zip",
+        "size_bytes": 115391593,
+        "sha256": "2d14e0a6ecba1196dcd742d63de83bbaffed2a7a78ef5a0a9b4e92a0f73d1d28",
+        "verify_required": false,
+        "hash_provenance": "computed by downloading the release asset on 2026-10-06 (Linux build host)"
+      },
+      "layout": {
+        "archive_root": "rizin-win-installer-vs2019_static-64",
+        "entry": "bin/rizin.exe",
+        "entry_sha256": "986c06775f08d7645502f49f630db3f2f443a554f82fa304661fda0b2b00ee79",
+        "version_args": [
+          "-v"
+        ]
+      },
+      "install_dir": "rizin"
+    },
+    "gdre": {
+      "version": "2.7.0",
+      "role": "Godot PCK recovery (gdsdecomp / GDRE tools, MIT)",
+      "license": "MIT",
+      "source": {
+        "repo": "https://github.com/GDRETools/gdsdecomp",
+        "tag": "v2.7.0",
+        "commit": "4c8c8807ae509f4db7e3c12a5adfb6e334fca3ec"
+      },
+      "artifact": {
+        "name": "GDRE_tools-v2.7.0-windows.zip",
+        "url": "https://github.com/GDRETools/gdsdecomp/releases/download/v2.7.0/GDRE_tools-v2.7.0-windows.zip",
+        "size_bytes": 42619156,
+        "sha256": "92a8d5d3d5c0cca159fc6cc34ebdda2cf7e1b448035cdabe1a67f0981cbd0a2c",
+        "verify_required": false,
+        "hash_provenance": "computed by downloading the release asset on 2026-10-06 (Linux build host)"
+      },
+      "layout": {
+        "archive_root": "",
+        "entry": "gdre_tools.exe",
+        "entry_sha256": "d906ff73cc8e8b0e96e1f89f1690ac39ae187c0e7876bce9ded4d89cdb41fe35",
+        "version_args": [
+          "--version"
+        ],
+        "extra_files": {
+          "gdre_tools.pck": "d445fc7c8e81da30d9de2369b90cb9c4ff1576a046679c53ffcec79787063124"
+        }
+      },
+      "install_dir": "gdre"
+    },
+    "ilspycmd": {
+      "version": "9.1.0.7988",
+      "role": ".NET decompiler CLI (ILSpy, MIT). Framework-dependent; needs the .NET 8 runtime below.",
+      "license": "MIT",
+      "source": {
+        "repo": "https://github.com/icsharpcode/ILSpy",
+        "nuget": "https://www.nuget.org/packages/ilspycmd/9.1.0.7988"
+      },
+      "artifact": {
+        "name": "ilspycmd.9.1.0.7988.nupkg",
+        "url": "https://api.nuget.org/v3-flatcontainer/ilspycmd/9.1.0.7988/ilspycmd.9.1.0.7988.nupkg",
+        "size_bytes": 4183395,
+        "sha256": "2b5058f5ccc164c33b7aabf1a5eb0cf3d3a6af6c145aaf58efd3ed891443af7c",
+        "verify_required": false,
+        "hash_provenance": "computed by downloading the nupkg on 2026-10-06 (Linux build host)",
+        "format": "zip"
+      },
+      "layout": {
+        "archive_root": "tools/net8.0/any",
+        "entry": "ilspycmd.dll",
+        "entry_sha256": "58ef1a86bea09f2e5a114720b607dd0bdaaf91cfe498c6b7a3412bd960d0f57d",
+        "launch": "dotnet ilspycmd.dll",
+        "requires": [
+          "dotnet-runtime"
+        ]
+      },
+      "install_dir": "ilspycmd"
+    },
+    "dotnet-runtime": {
+      "version": "8.0.31",
+      "role": ".NET 8 shared runtime (Microsoft.NETCore.App) for ilspycmd. Installed side by side under tools\\dotnet; no machine-wide install.",
+      "license": "MIT",
+      "source": {
+        "docs": "https://dotnet.microsoft.com/download/dotnet/8.0"
+      },
+      "artifact": {
+        "name": "dotnet-runtime-8.0.31-win-x64.zip",
+        "url": "https://builds.dotnet.microsoft.com/dotnet/Runtime/8.0.31/dotnet-runtime-8.0.31-win-x64.zip",
+        "size_bytes": null,
+        "sha256": null,
+        "verify_required": true,
+        "hash_provenance": "NOT VERIFIED: builds.dotnet.microsoft.com is unreachable from the Linux build host. Run Setup-Dependencies.ps1 -ComputeHash dotnet-runtime on Windows, cross-check against https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json, then record the value."
+      },
+      "layout": {
+        "archive_root": "",
+        "entry": "dotnet.exe",
+        "entry_sha256": null,
+        "version_args": [
+          "--list-runtimes"
+        ]
+      },
+      "install_dir": "dotnet"
+    },
+    "node": {
+      "version": "22.22.0",
+      "role": "Optional: JS/Electron extraction (@electron/asar) at runtime. Not required for native/.NET/Godot paths.",
+      "license": "MIT",
+      "optional": true,
+      "source": {
+        "docs": "https://nodejs.org/dist/v22.22.0/SHASUMS256.txt"
+      },
+      "artifact": {
+        "name": "node-v22.22.0-win-x64.zip",
+        "url": "https://nodejs.org/dist/v22.22.0/node-v22.22.0-win-x64.zip",
+        "size_bytes": 35556852,
+        "sha256": "c97fa376d2becdc8863fcd3ca2dd9a83a9f3468ee7ccf7a6d076ec66a645c77a",
+        "verify_required": false,
+        "hash_provenance": "computed by downloading the zip on 2026-10-06 and matched against nodejs.org SHASUMS256.txt"
+      },
+      "layout": {
+        "archive_root": "node-v22.22.0-win-x64",
+        "entry": "node.exe",
+        "entry_sha256": "bae898add4643fcf890a83ad8ae56e20dce7e781cab161a53991ceba70c99ffb",
+        "version_args": [
+          "--version"
+        ]
+      },
+      "install_dir": "node"
+    }
+  },
+  "system_prerequisites": {
+    "webview2_evergreen_bootstrapper": {
+      "role": "Required by Tauri on Windows. Evergreen runtime is NOT bundled; Install-RebuildStudio.ps1 checks for it and downloads the small bootstrapper if absent.",
+      "docs": "https://developer.microsoft.com/microsoft-edge/webview2/#download-section",
+      "url": "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
+      "file_name": "MicrosoftEdgeWebview2Setup.exe",
+      "sha256": null,
+      "verify_required": true,
+      "hash_note": "Microsoft re-publishes this bootstrapper under a stable URL, so the hash changes; instead of a hash the installer REQUIRES a valid Authenticode signature from 'Microsoft Corporation' (Get-AuthenticodeSignature) before running it.",
+      "authenticode_subject_contains": "Microsoft Corporation",
+      "runtime_registry_keys": [
+        "HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+        "HKLM:\\SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+        "HKCU:\\SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+      ],
+      "minimum_version": "110.0.0.0"
+    },
+    "vc_redist_x64": {
+      "role": "Microsoft Visual C++ 2015-2022 x64 runtime (needed by the Rust MSVC binary, PyInstaller bundle, rizin MSVC build). Detected only; Doctor prints the download link, nothing is bundled.",
+      "docs": "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist",
+      "url": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+      "registry_key": "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
+      "minimum_version": "14.38.0.0"
+    }
+  },
+  "build_toolchain": {
+    "rust": {
+      "toolchain": "1.97.0",
+      "msrv": "1.90",
+      "target": "x86_64-pc-windows-msvc"
+    },
+    "node": {
+      "major": 22,
+      "tested": "22.22.0"
+    },
+    "python": {
+      "version": "3.13",
+      "min": "3.11"
+    },
+    "tauri_cli": {
+      "crate": "tauri-cli",
+      "version": "2.12.1",
+      "install": "cargo install tauri-cli --version 2.12.1 --locked"
+    },
+    "pyinstaller": {
+      "version": "6.22.3"
+    },
+    "sbom_tools": {
+      "cargo-cyclonedx": "0.5.9",
+      "cyclonedx-bom": "7.5.0",
+      "pip-licenses": "5.5.5",
+      "npm_sbom": "npm sbom --sbom-format cyclonedx (npm >= 10)"
+    },
+    "crates": {
+      "tauri": "=2.12.1",
+      "tauri-build": "=2.7.1",
+      "tauri-plugin-dialog": "=2.8.1",
+      "tauri-plugin-shell": "=2.4.0",
+      "tauri-plugin-opener": "=2.7.0",
+      "tauri-plugin-window-state": "=2.5.0",
+      "tauri-plugin-single-instance": "=2.5.2",
+      "serde": "=1.0.229",
+      "serde_json": "=1.0.151",
+      "libc": "=0.2.190",
+      "windows": "=0.62.2"
+    },
+    "npm": {
+      "@tauri-apps/api": "2.12.1"
+    }
+  }
+}

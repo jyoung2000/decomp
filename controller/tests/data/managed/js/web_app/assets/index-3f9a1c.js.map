@@ -1,0 +1,14 @@
+{
+ "version": 3,
+ "file": "index-3f9a1c.js",
+ "sources": [
+  "../../src/main.ts",
+  "../../src/app.ts"
+ ],
+ "sourcesContent": [
+  "export const main = 1;\n",
+  "export const app = 2;\n"
+ ],
+ "names": [],
+ "mappings": "AAAA"
+}

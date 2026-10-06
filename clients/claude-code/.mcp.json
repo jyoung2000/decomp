@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "rebuild-studio": {
+      "command": "rebuild-mcp",
+      "args": ["--toolset", "all"]
+    }
+  }
+}

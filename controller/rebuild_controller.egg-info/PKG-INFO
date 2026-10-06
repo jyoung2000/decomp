@@ -13,6 +13,7 @@ Requires-Dist: lief<2,>=1.0
 Requires-Dist: pefile>=2024.8
 Requires-Dist: mcp<3,>=2.3
 Requires-Dist: pillow>=12
+Requires-Dist: pyyaml>=6
 Provides-Extra: dev
 Requires-Dist: pytest>=9; extra == "dev"
 Requires-Dist: pytest-asyncio>=1.4; extra == "dev"
