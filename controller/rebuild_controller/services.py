@@ -173,6 +173,21 @@ class StudioServices:
     def validate_knowledge(self, knowledge_id: str) -> dict[str, Any]:
         return self.knowledge.validate(knowledge_id)
 
+    def deliver(self, case_id: str, candidate_id: str | None = None) -> dict[str, Any]:
+        """Publish a candidate (default: last known good, else newest built) into the output root."""
+        if candidate_id is None:
+            lkg = self.candidates.last_known_good(case_id)
+            built = [c for c in self.candidates.list(case_id) if c["build_status"] == "built"]
+            if lkg:
+                candidate_id = lkg["candidate_id"]
+            elif built:
+                candidate_id = built[-1]["candidate_id"]
+            else:
+                raise ValueError("no built candidate to deliver")
+        job = self.jobs.create(case_id, "deliver", "Publish source/dist/evidence/reports", {"candidate_id": candidate_id}, milestone_id="M-DELIVER", max_attempts=1)
+        self.plan.link_job(self.plan.milestone_id(case_id, "M-DELIVER"), job.job_id)
+        return job.to_dict()
+
     def capture_original(self, case_id: str, scenario_id: str | None = None) -> dict[str, Any]:
         job = self.jobs.create(case_id, "capture_original", "Capture original behaviour", {"scenario_id": scenario_id})
         return job.to_dict()

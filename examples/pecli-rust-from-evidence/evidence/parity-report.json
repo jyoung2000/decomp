@@ -1,0 +1,2441 @@
+{
+ "generated_at": "2026-10-06T12:10:37.764Z",
+ "case": {
+  "case_id": "case_01a1110f830c4ef23b70ac",
+  "name": "pecli",
+  "source_root": "/home/user/decomp/fixtures/pecli/original",
+  "output_root": "/tmp/claude-0/-home-user-decomp/c456138f-a927-5bb9-bf2d-fa1845ce6ed1/scratchpad/pecli-demo/out",
+  "target_language": "rust",
+  "output_type": "exe",
+  "status": "delivered",
+  "ai_policy": {
+   "mode": "no_ai"
+  }
+ },
+ "candidate": {
+  "candidate_id": "cand_01a11113fa217f3ccb63d3",
+  "revision": 2,
+  "build_hash": "e7bd2792ea0e7570",
+  "build_status": "built",
+  "verification": "verified",
+  "last_known_good": true
+ },
+ "parity": {
+  "full_parity": true,
+  "features_total": 8,
+  "verified": 8,
+  "partial": 0,
+  "failed": 0,
+  "untested": 0,
+  "stale": 0,
+  "critical_incomplete": [],
+  "scope_note": "feature counts are semantic features, not files/functions; undiscovered scope is not counted"
+ },
+ "features": [
+  {
+   "feature_id": "pecli.file_roundtrip",
+   "title": "init creates an empty store: byte-exact 16-byte file",
+   "origin": "user",
+   "critical": false,
+   "impl_status": "blocked",
+   "verify_status": "verified",
+   "verify_candidate": "cand_01a11113fa217f3ccb63d3",
+   "user_review": null
+  },
+  {
+   "feature_id": "pecli.add_get_list",
+   "title": "init, add three records, get one, list all; final file byte-exact",
+   "origin": "user",
+   "critical": false,
+   "impl_status": "blocked",
+   "verify_status": "verified",
+   "verify_candidate": "cand_01a11113fa217f3ccb63d3",
+   "user_review": null
+  },
+  {
+   "feature_id": "pecli.update_remove",
+   "title": "replace an existing key, remove another, list; final file byte-exact",
+   "origin": "user",
+   "critical": false,
+   "impl_status": "blocked",
+   "verify_status": "verified",
+   "verify_candidate": "cand_01a11113fa217f3ccb63d3",
+   "user_review": null
+  },
+  {
+   "feature_id": "pecli.checksum",
+   "title": "checksum of the shipped sample.dat; file unchanged",
+   "origin": "user",
+   "critical": false,
+   "impl_status": "blocked",
+   "verify_status": "verified",
+   "verify_candidate": "cand_01a11113fa217f3ccb63d3",
+   "user_review": null
+  },
+  {
+   "feature_id": "pecli.error_bad_magic",
+   "title": "file with wrong magic: exit 2, message on stderr, file untouched",
+   "origin": "user",
+   "critical": false,
+   "impl_status": "blocked",
+   "verify_status": "verified",
+   "verify_candidate": "cand_01a11113fa217f3ccb63d3",
+   "user_review": null
+  },
+  {
+   "feature_id": "pecli.error_missing_file",
+   "title": "missing file: exit 3; no file is created",
+   "origin": "user",
+   "critical": false,
+   "impl_status": "blocked",
+   "verify_status": "verified",
+   "verify_candidate": "cand_01a11113fa217f3ccb63d3",
+   "user_review": null
+  },
+  {
+   "feature_id": "pecli.error_corrupt",
+   "title": "valid header but a flipped record byte: CRC mismatch, exit 4",
+   "origin": "user",
+   "critical": false,
+   "impl_status": "blocked",
+   "verify_status": "verified",
+   "verify_candidate": "cand_01a11113fa217f3ccb63d3",
+   "user_review": null
+  },
+  {
+   "feature_id": "pecli.error_usage",
+   "title": "missing key exits 1; unknown command and no args print usage and exit 1",
+   "origin": "user",
+   "critical": false,
+   "impl_status": "blocked",
+   "verify_status": "verified",
+   "verify_candidate": "cand_01a11113fa217f3ccb63d3",
+   "user_review": null
+  }
+ ],
+ "comparisons": [
+  {
+   "comparison_id": "cmp_01a1111e560b7fd781beb4",
+   "feature_id": "pecli.file_roundtrip",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "init store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.211Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "init_roundtrip",
+    "step": 0,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e560b161c2a788f",
+   "feature_id": "pecli.file_roundtrip",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "a5ae46f84a2056026325bf50fd6cceaed188f79e01cc9d6c7db12cecbed83647",
+   "candidate_hash": "a5ae46f84a2056026325bf50fd6cceaed188f79e01cc9d6c7db12cecbed83647",
+   "command": "init store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.211Z",
+   "details": {
+    "actual_excerpt": "initialized store.dat (0 records)\n",
+    "diff_at": null,
+    "expected_excerpt": "initialized store.dat (0 records)\n",
+    "scenario": "init_roundtrip",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e560c44c0666105",
+   "feature_id": "pecli.file_roundtrip",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "init store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.212Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "init_roundtrip",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e560c651452f2d6",
+   "feature_id": "pecli.file_roundtrip",
+   "channel": "files",
+   "rule": "sha256:exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "63bcda87b0a546ad0d0ff6321dbe97a784561710016ea2b5638981db404a9d49",
+   "candidate_hash": "63bcda87b0a546ad0d0ff6321dbe97a784561710016ea2b5638981db404a9d49",
+   "command": "init store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.212Z",
+   "details": {
+    "actual_count": 1,
+    "expected_count": 1,
+    "mismatches": {},
+    "scenario": "init_roundtrip"
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e561688621cf881",
+   "feature_id": "pecli.add_get_list",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.222Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "add_get_list",
+    "step": 0,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5617ec3b0b342f",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "a5ae46f84a2056026325bf50fd6cceaed188f79e01cc9d6c7db12cecbed83647",
+   "candidate_hash": "a5ae46f84a2056026325bf50fd6cceaed188f79e01cc9d6c7db12cecbed83647",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual_excerpt": "initialized store.dat (0 records)\n",
+    "diff_at": null,
+    "expected_excerpt": "initialized store.dat (0 records)\n",
+    "scenario": "add_get_list",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56171dd6498ae4",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "add_get_list",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56178f5b6e6681",
+   "feature_id": "pecli.add_get_list",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "add_get_list",
+    "step": 1,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5617f46d11120c",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "410e34fe5b4515ad4dc5814651e900a42b27989debf113bc9ea6dd124f907286",
+   "candidate_hash": "410e34fe5b4515ad4dc5814651e900a42b27989debf113bc9ea6dd124f907286",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual_excerpt": "added alpha (1 records)\n",
+    "diff_at": null,
+    "expected_excerpt": "added alpha (1 records)\n",
+    "scenario": "add_get_list",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56178758abeb51",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "add_get_list",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5617e733865f35",
+   "feature_id": "pecli.add_get_list",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "add_get_list",
+    "step": 2,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5617e5972d99a4",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "4ca730fb25c00da9aed845b35c91073c162320de90cbaada51bab3b871f558e1",
+   "candidate_hash": "4ca730fb25c00da9aed845b35c91073c162320de90cbaada51bab3b871f558e1",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual_excerpt": "added beta (2 records)\n",
+    "diff_at": null,
+    "expected_excerpt": "added beta (2 records)\n",
+    "scenario": "add_get_list",
+    "step": 2
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5617345a165b78",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "add_get_list",
+    "step": 2
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5617f2f7ad2c60",
+   "feature_id": "pecli.add_get_list",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "add_get_list",
+    "step": 3,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e561737392a6ed4",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "09cb0d2c82d1d74996f9c44021b89459fae4e6d9af3eb8afb9c0909954c8e120",
+   "candidate_hash": "09cb0d2c82d1d74996f9c44021b89459fae4e6d9af3eb8afb9c0909954c8e120",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual_excerpt": "added gamma (3 records)\n",
+    "diff_at": null,
+    "expected_excerpt": "added gamma (3 records)\n",
+    "scenario": "add_get_list",
+    "step": 3
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56175608c5603d",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "add_get_list",
+    "step": 3
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5617c5f5b5d8c6",
+   "feature_id": "pecli.add_get_list",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.223Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "add_get_list",
+    "step": 4,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5618938ebbbacf",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e404a071c8d352d4d5c8c2d3b25ffefe9a651bc22465042ffd0c2a65ab312c74",
+   "candidate_hash": "e404a071c8d352d4d5c8c2d3b25ffefe9a651bc22465042ffd0c2a65ab312c74",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.224Z",
+   "details": {
+    "actual_excerpt": "two words here\n",
+    "diff_at": null,
+    "expected_excerpt": "two words here\n",
+    "scenario": "add_get_list",
+    "step": 4
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5618419697fe4a",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.224Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "add_get_list",
+    "step": 4
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56180a0df0e6a1",
+   "feature_id": "pecli.add_get_list",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.224Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "add_get_list",
+    "step": 5,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56182589522eb9",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "02ebec6c531ed8774d926e4f18e0119b807b6ffa03673256372283e2ad586c58",
+   "candidate_hash": "02ebec6c531ed8774d926e4f18e0119b807b6ffa03673256372283e2ad586c58",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.224Z",
+   "details": {
+    "actual_excerpt": "3 records\nalpha=one\nbeta=two words here\ngamma=3\n",
+    "diff_at": null,
+    "expected_excerpt": "3 records\nalpha=one\nbeta=two words here\ngamma=3\n",
+    "scenario": "add_get_list",
+    "step": 5
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56188028ee6716",
+   "feature_id": "pecli.add_get_list",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.224Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "add_get_list",
+    "step": 5
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5618fb12e732c1",
+   "feature_id": "pecli.add_get_list",
+   "channel": "files",
+   "rule": "sha256:exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "4e8f4563e1f2a9e7d8c5e34900da7b7dbef3c489d6b52eb6c706b692b8cc5174",
+   "candidate_hash": "4e8f4563e1f2a9e7d8c5e34900da7b7dbef3c489d6b52eb6c706b692b8cc5174",
+   "command": "init store.dat && add store.dat alpha one && add store.dat beta two words here && add store.dat gamma 3 && get store.dat beta && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.224Z",
+   "details": {
+    "actual_count": 1,
+    "expected_count": 1,
+    "mismatches": {},
+    "scenario": "add_get_list"
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e561f0a803329ab",
+   "feature_id": "pecli.update_remove",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.231Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "update_and_remove",
+    "step": 0,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e561f06b1efec94",
+   "feature_id": "pecli.update_remove",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "f4ce6f1babb10b291a6699c059176e90f31f4de383d79aaba584f1a0563b0407",
+   "candidate_hash": "f4ce6f1babb10b291a6699c059176e90f31f4de383d79aaba584f1a0563b0407",
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.231Z",
+   "details": {
+    "actual_excerpt": "updated level\n",
+    "diff_at": null,
+    "expected_excerpt": "updated level\n",
+    "scenario": "update_and_remove",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e561f22f80c961e",
+   "feature_id": "pecli.update_remove",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.231Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "update_and_remove",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e561fe0c8ff9cc4",
+   "feature_id": "pecli.update_remove",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.231Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "update_and_remove",
+    "step": 1,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e561f2293ff9f7f",
+   "feature_id": "pecli.update_remove",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "514235eb7b73280bbdc40e799b248c5e44aaa5852af3fbe2fe1944b5534b91e2",
+   "candidate_hash": "514235eb7b73280bbdc40e799b248c5e44aaa5852af3fbe2fe1944b5534b91e2",
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.231Z",
+   "details": {
+    "actual_excerpt": "removed owner (2 records)\n",
+    "diff_at": null,
+    "expected_excerpt": "removed owner (2 records)\n",
+    "scenario": "update_and_remove",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e561ffaffefacdc",
+   "feature_id": "pecli.update_remove",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.231Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "update_and_remove",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e561fed8104dbe7",
+   "feature_id": "pecli.update_remove",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.231Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "update_and_remove",
+    "step": 2,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e562054b76efe4a",
+   "feature_id": "pecli.update_remove",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "3b8620fdf10a63da3c50038407567eea169d932a2f2eb72591d1864a435d7f86",
+   "candidate_hash": "3b8620fdf10a63da3c50038407567eea169d932a2f2eb72591d1864a435d7f86",
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.232Z",
+   "details": {
+    "actual_excerpt": "2 records\nname=pecli sample\nlevel=99\n",
+    "diff_at": null,
+    "expected_excerpt": "2 records\nname=pecli sample\nlevel=99\n",
+    "scenario": "update_and_remove",
+    "step": 2
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5620bfdd971f88",
+   "feature_id": "pecli.update_remove",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.232Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "update_and_remove",
+    "step": 2
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5620d6f20d7510",
+   "feature_id": "pecli.update_remove",
+   "channel": "files",
+   "rule": "sha256:exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "969f7c9306a4c19a62c079eb6f69e36857375050d5cb73d5628d2f58e9fb8f30",
+   "candidate_hash": "969f7c9306a4c19a62c079eb6f69e36857375050d5cb73d5628d2f58e9fb8f30",
+   "command": "add store.dat level 99 && remove store.dat owner && list store.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.232Z",
+   "details": {
+    "actual_count": 1,
+    "expected_count": 1,
+    "mismatches": {},
+    "scenario": "update_and_remove"
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5624a1757c9ddf",
+   "feature_id": "pecli.checksum",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "checksum sample.dat && list sample.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.236Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "checksum_sample",
+    "step": 0,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e562499c5c55dea",
+   "feature_id": "pecli.checksum",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "3e2ae1fe027e682f4200e47a569ffd04bb2d0333f02fe7c7559d6208950f92a5",
+   "candidate_hash": "3e2ae1fe027e682f4200e47a569ffd04bb2d0333f02fe7c7559d6208950f92a5",
+   "command": "checksum sample.dat && list sample.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.236Z",
+   "details": {
+    "actual_excerpt": "stored:   30bb9195\ncomputed: 30bb9195\nrecords:  3\n",
+    "diff_at": null,
+    "expected_excerpt": "stored:   30bb9195\ncomputed: 30bb9195\nrecords:  3\n",
+    "scenario": "checksum_sample",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56246a4017d213",
+   "feature_id": "pecli.checksum",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "checksum sample.dat && list sample.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.236Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "checksum_sample",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5624e8423fac9a",
+   "feature_id": "pecli.checksum",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "checksum sample.dat && list sample.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.236Z",
+   "details": {
+    "actual": 0,
+    "expected": 0,
+    "runner": "native",
+    "scenario": "checksum_sample",
+    "step": 1,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e562410be990fec",
+   "feature_id": "pecli.checksum",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3bbd160868dbb3c5100bc9309be3e128998f7f1400813568fbce4ea4ce7e47d",
+   "candidate_hash": "e3bbd160868dbb3c5100bc9309be3e128998f7f1400813568fbce4ea4ce7e47d",
+   "command": "checksum sample.dat && list sample.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.236Z",
+   "details": {
+    "actual_excerpt": "3 records\nname=pecli sample\nowner=fixtures\nlevel=7\n",
+    "diff_at": null,
+    "expected_excerpt": "3 records\nname=pecli sample\nowner=fixtures\nlevel=7\n",
+    "scenario": "checksum_sample",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e562494920780ad",
+   "feature_id": "pecli.checksum",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "checksum sample.dat && list sample.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.236Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "checksum_sample",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e562461808017f2",
+   "feature_id": "pecli.checksum",
+   "channel": "files",
+   "rule": "sha256:exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "fcc91269e66732ad3d46cbee76b39ccc1bbc113c52d6bd44a44f2de2b6f6237a",
+   "candidate_hash": "fcc91269e66732ad3d46cbee76b39ccc1bbc113c52d6bd44a44f2de2b6f6237a",
+   "command": "checksum sample.dat && list sample.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.237Z",
+   "details": {
+    "actual_count": 1,
+    "expected_count": 1,
+    "mismatches": {},
+    "scenario": "checksum_sample"
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e562962813d7ed9",
+   "feature_id": "pecli.error_bad_magic",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "list bad.dat && add bad.dat k v",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.241Z",
+   "details": {
+    "actual": 2,
+    "expected": 2,
+    "runner": "native",
+    "scenario": "err_bad_magic",
+    "step": 0,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5629b6b397c091",
+   "feature_id": "pecli.error_bad_magic",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "list bad.dat && add bad.dat k v",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.241Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_bad_magic",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5629307d24f52b",
+   "feature_id": "pecli.error_bad_magic",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "86dba266bbe3da4a78aa91825b5337f80a60804545656b98b313e8e063685db7",
+   "candidate_hash": "86dba266bbe3da4a78aa91825b5337f80a60804545656b98b313e8e063685db7",
+   "command": "list bad.dat && add bad.dat k v",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.241Z",
+   "details": {
+    "actual_excerpt": "error: bad magic in bad.dat (not a PCLI file)\n",
+    "diff_at": null,
+    "expected_excerpt": "error: bad magic in bad.dat (not a PCLI file)\n",
+    "scenario": "err_bad_magic",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5629db48a06f89",
+   "feature_id": "pecli.error_bad_magic",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "list bad.dat && add bad.dat k v",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.241Z",
+   "details": {
+    "actual": 2,
+    "expected": 2,
+    "runner": "native",
+    "scenario": "err_bad_magic",
+    "step": 1,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e562a0fe6c9eb9e",
+   "feature_id": "pecli.error_bad_magic",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "list bad.dat && add bad.dat k v",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.242Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_bad_magic",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e562a06e7509098",
+   "feature_id": "pecli.error_bad_magic",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "86dba266bbe3da4a78aa91825b5337f80a60804545656b98b313e8e063685db7",
+   "candidate_hash": "86dba266bbe3da4a78aa91825b5337f80a60804545656b98b313e8e063685db7",
+   "command": "list bad.dat && add bad.dat k v",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.242Z",
+   "details": {
+    "actual_excerpt": "error: bad magic in bad.dat (not a PCLI file)\n",
+    "diff_at": null,
+    "expected_excerpt": "error: bad magic in bad.dat (not a PCLI file)\n",
+    "scenario": "err_bad_magic",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e562a0f38f56f61",
+   "feature_id": "pecli.error_bad_magic",
+   "channel": "files",
+   "rule": "sha256:exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "8d922ab53af84712130e647fb0e598ecc8b699e1b6da067f3bb800ee7cecb6c3",
+   "candidate_hash": "8d922ab53af84712130e647fb0e598ecc8b699e1b6da067f3bb800ee7cecb6c3",
+   "command": "list bad.dat && add bad.dat k v",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.242Z",
+   "details": {
+    "actual_count": 1,
+    "expected_count": 1,
+    "mismatches": {},
+    "scenario": "err_bad_magic"
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5630696676014b",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.248Z",
+   "details": {
+    "actual": 3,
+    "expected": 3,
+    "runner": "native",
+    "scenario": "err_missing_file",
+    "step": 0,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56307a87fb25eb",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.248Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_missing_file",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56302e719d7e3a",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "52aed54b7ebe6f24ea090c590473e474ccb95bd1bd7d23491ec4a0b665f0c56a",
+   "candidate_hash": "52aed54b7ebe6f24ea090c590473e474ccb95bd1bd7d23491ec4a0b665f0c56a",
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.248Z",
+   "details": {
+    "actual_excerpt": "error: file not found: nothere.dat\n",
+    "diff_at": null,
+    "expected_excerpt": "error: file not found: nothere.dat\n",
+    "scenario": "err_missing_file",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563083dc2466a2",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.248Z",
+   "details": {
+    "actual": 3,
+    "expected": 3,
+    "runner": "native",
+    "scenario": "err_missing_file",
+    "step": 1,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56303ee74e9401",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.248Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_missing_file",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5630a1d20b3077",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "52aed54b7ebe6f24ea090c590473e474ccb95bd1bd7d23491ec4a0b665f0c56a",
+   "candidate_hash": "52aed54b7ebe6f24ea090c590473e474ccb95bd1bd7d23491ec4a0b665f0c56a",
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.248Z",
+   "details": {
+    "actual_excerpt": "error: file not found: nothere.dat\n",
+    "diff_at": null,
+    "expected_excerpt": "error: file not found: nothere.dat\n",
+    "scenario": "err_missing_file",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56306ce8af71a4",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.248Z",
+   "details": {
+    "actual": 3,
+    "expected": 3,
+    "runner": "native",
+    "scenario": "err_missing_file",
+    "step": 2,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5630a5c9150b29",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.248Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_missing_file",
+    "step": 2
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5631a4405719a8",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "52aed54b7ebe6f24ea090c590473e474ccb95bd1bd7d23491ec4a0b665f0c56a",
+   "candidate_hash": "52aed54b7ebe6f24ea090c590473e474ccb95bd1bd7d23491ec4a0b665f0c56a",
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.249Z",
+   "details": {
+    "actual_excerpt": "error: file not found: nothere.dat\n",
+    "diff_at": null,
+    "expected_excerpt": "error: file not found: nothere.dat\n",
+    "scenario": "err_missing_file",
+    "step": 2
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e56314a108387d5",
+   "feature_id": "pecli.error_missing_file",
+   "channel": "files",
+   "rule": "sha256:exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "candidate_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "command": "get nothere.dat k && list nothere.dat && checksum nothere.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.249Z",
+   "details": {
+    "actual_count": 0,
+    "expected_count": 0,
+    "mismatches": {},
+    "scenario": "err_missing_file"
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563580c42ce6d8",
+   "feature_id": "pecli.error_corrupt",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "list corrupt.dat && checksum corrupt.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.253Z",
+   "details": {
+    "actual": 4,
+    "expected": 4,
+    "runner": "native",
+    "scenario": "err_corrupt_crc",
+    "step": 0,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563520af14d5ef",
+   "feature_id": "pecli.error_corrupt",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "list corrupt.dat && checksum corrupt.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.253Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_corrupt_crc",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5635e74f61b5cd",
+   "feature_id": "pecli.error_corrupt",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "36ddec578554c497582a1252e89ef6bfdaa38205459703d8fbc2f3640cc3ea6f",
+   "candidate_hash": "36ddec578554c497582a1252e89ef6bfdaa38205459703d8fbc2f3640cc3ea6f",
+   "command": "list corrupt.dat && checksum corrupt.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.253Z",
+   "details": {
+    "actual_excerpt": "error: checksum mismatch in corrupt.dat (file is corrupt)\n",
+    "diff_at": null,
+    "expected_excerpt": "error: checksum mismatch in corrupt.dat (file is corrupt)\n",
+    "scenario": "err_corrupt_crc",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5635de05f3a4bd",
+   "feature_id": "pecli.error_corrupt",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "list corrupt.dat && checksum corrupt.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.253Z",
+   "details": {
+    "actual": 4,
+    "expected": 4,
+    "runner": "native",
+    "scenario": "err_corrupt_crc",
+    "step": 1,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563516972a32c5",
+   "feature_id": "pecli.error_corrupt",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "list corrupt.dat && checksum corrupt.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.253Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_corrupt_crc",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e5635ad6ed660d1",
+   "feature_id": "pecli.error_corrupt",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "36ddec578554c497582a1252e89ef6bfdaa38205459703d8fbc2f3640cc3ea6f",
+   "candidate_hash": "36ddec578554c497582a1252e89ef6bfdaa38205459703d8fbc2f3640cc3ea6f",
+   "command": "list corrupt.dat && checksum corrupt.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.253Z",
+   "details": {
+    "actual_excerpt": "error: checksum mismatch in corrupt.dat (file is corrupt)\n",
+    "diff_at": null,
+    "expected_excerpt": "error: checksum mismatch in corrupt.dat (file is corrupt)\n",
+    "scenario": "err_corrupt_crc",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563502978617bc",
+   "feature_id": "pecli.error_corrupt",
+   "channel": "files",
+   "rule": "sha256:exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "480af7166eec2f90b09f1fe9864445b501a8615c73d3a2c9982e2a59b80b8e55",
+   "candidate_hash": "480af7166eec2f90b09f1fe9864445b501a8615c73d3a2c9982e2a59b80b8e55",
+   "command": "list corrupt.dat && checksum corrupt.dat",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.254Z",
+   "details": {
+    "actual_count": 1,
+    "expected_count": 1,
+    "mismatches": {},
+    "scenario": "err_corrupt_crc"
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563ed45ee02201",
+   "feature_id": "pecli.error_usage",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.262Z",
+   "details": {
+    "actual": 1,
+    "expected": 1,
+    "runner": "native",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 0,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563ecb7b30564d",
+   "feature_id": "pecli.error_usage",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.262Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563ecbf5b9c545",
+   "feature_id": "pecli.error_usage",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "de8b3612b95dccf71a4a6e98e12eb2e9f5ca32e3369924485df47a45f501a74e",
+   "candidate_hash": "de8b3612b95dccf71a4a6e98e12eb2e9f5ca32e3369924485df47a45f501a74e",
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.262Z",
+   "details": {
+    "actual_excerpt": "error: key not found: absent\n",
+    "diff_at": null,
+    "expected_excerpt": "error: key not found: absent\n",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 0
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563eb1961047f0",
+   "feature_id": "pecli.error_usage",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.262Z",
+   "details": {
+    "actual": 1,
+    "expected": 1,
+    "runner": "native",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 1,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563e3c97a55f6f",
+   "feature_id": "pecli.error_usage",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.262Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563e22395c224e",
+   "feature_id": "pecli.error_usage",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "de8b3612b95dccf71a4a6e98e12eb2e9f5ca32e3369924485df47a45f501a74e",
+   "candidate_hash": "de8b3612b95dccf71a4a6e98e12eb2e9f5ca32e3369924485df47a45f501a74e",
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.262Z",
+   "details": {
+    "actual_excerpt": "error: key not found: absent\n",
+    "diff_at": null,
+    "expected_excerpt": "error: key not found: absent\n",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 1
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563e8a5c4f12d7",
+   "feature_id": "pecli.error_usage",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.262Z",
+   "details": {
+    "actual": 1,
+    "expected": 1,
+    "runner": "native",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 2,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563ecf96ef3a67",
+   "feature_id": "pecli.error_usage",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.262Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 2
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563ec501954e5f",
+   "feature_id": "pecli.error_usage",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "180e6ab8873cf8a41d4dd5b8d14c2dab5cfabb97483a986e2aa2d46377c958ec",
+   "candidate_hash": "180e6ab8873cf8a41d4dd5b8d14c2dab5cfabb97483a986e2aa2d46377c958ec",
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.262Z",
+   "details": {
+    "actual_excerpt": "usage: pecli <command> <file> [args]\n  init <file>               create an empty store\n  add <file> <key> <value>  add or replace a record\n  get <file> <key>          print a record value\n  list <file>               list all records\n  remove <file> <key>       delete a record\n  checksum <file>           print stored and computed CRC32\n",
+    "diff_at": null,
+    "expected_excerpt": "usage: pecli <command> <file> [args]\n  init <file>               create an empty store\n  add <file> <key> <value>  add or replace a record\n  get <file> <key>          print a record value\n  list <file>               list all records\n  remove <file> <key>       delete a record\n  checksum <file>           print stored and computed CRC32\n",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 2
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563e67831a1dc3",
+   "feature_id": "pecli.error_usage",
+   "channel": "exit_code",
+   "rule": "exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": null,
+   "candidate_hash": null,
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.263Z",
+   "details": {
+    "actual": 1,
+    "expected": 1,
+    "runner": "native",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 3,
+    "timed_out": false
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563f8a2ecadfab",
+   "feature_id": "pecli.error_usage",
+   "channel": "stdout",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "candidate_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.263Z",
+   "details": {
+    "actual_excerpt": "",
+    "diff_at": null,
+    "expected_excerpt": "",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 3
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563fbe81d7967a",
+   "feature_id": "pecli.error_usage",
+   "channel": "stderr",
+   "rule": "normalize:crlf",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "180e6ab8873cf8a41d4dd5b8d14c2dab5cfabb97483a986e2aa2d46377c958ec",
+   "candidate_hash": "180e6ab8873cf8a41d4dd5b8d14c2dab5cfabb97483a986e2aa2d46377c958ec",
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.263Z",
+   "details": {
+    "actual_excerpt": "usage: pecli <command> <file> [args]\n  init <file>               create an empty store\n  add <file> <key> <value>  add or replace a record\n  get <file> <key>          print a record value\n  list <file>               list all records\n  remove <file> <key>       delete a record\n  checksum <file>           print stored and computed CRC32\n",
+    "diff_at": null,
+    "expected_excerpt": "usage: pecli <command> <file> [args]\n  init <file>               create an empty store\n  add <file> <key> <value>  add or replace a record\n  get <file> <key>          print a record value\n  list <file>               list all records\n  remove <file> <key>       delete a record\n  checksum <file>           print stored and computed CRC32\n",
+    "scenario": "err_key_not_found_and_usage",
+    "step": 3
+   }
+  },
+  {
+   "comparison_id": "cmp_01a1111e563f626472a85f",
+   "feature_id": "pecli.error_usage",
+   "channel": "files",
+   "rule": "sha256:exact",
+   "tolerance": {},
+   "verdict": "pass",
+   "original_hash": "349a8ad636680eeeccbb8ff7d5d503be6dc6e512279046179d86a62c32276aa5",
+   "candidate_hash": "349a8ad636680eeeccbb8ff7d5d503be6dc6e512279046179d86a62c32276aa5",
+   "command": "get store.dat absent && remove store.dat absent && frobnicate store.dat && ",
+   "environment": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "created_at": "2026-10-06T12:09:23.263Z",
+   "details": {
+    "actual_count": 1,
+    "expected_count": 1,
+    "mismatches": {},
+    "scenario": "err_key_not_found_and_usage"
+   }
+  }
+ ],
+ "unresolved": [
+  {
+   "feature": "init creates an empty store: byte-exact 16-byte file",
+   "impl": "blocked",
+   "verify": "verified",
+   "critical": false
+  },
+  {
+   "feature": "init, add three records, get one, list all; final file byte-exact",
+   "impl": "blocked",
+   "verify": "verified",
+   "critical": false
+  },
+  {
+   "feature": "replace an existing key, remove another, list; final file byte-exact",
+   "impl": "blocked",
+   "verify": "verified",
+   "critical": false
+  },
+  {
+   "feature": "checksum of the shipped sample.dat; file unchanged",
+   "impl": "blocked",
+   "verify": "verified",
+   "critical": false
+  },
+  {
+   "feature": "file with wrong magic: exit 2, message on stderr, file untouched",
+   "impl": "blocked",
+   "verify": "verified",
+   "critical": false
+  },
+  {
+   "feature": "missing file: exit 3; no file is created",
+   "impl": "blocked",
+   "verify": "verified",
+   "critical": false
+  },
+  {
+   "feature": "valid header but a flipped record byte: CRC mismatch, exit 4",
+   "impl": "blocked",
+   "verify": "verified",
+   "critical": false
+  },
+  {
+   "feature": "missing key exits 1; unknown command and no args print usage and exit 1",
+   "impl": "blocked",
+   "verify": "verified",
+   "critical": false
+  }
+ ],
+ "blockers": [],
+ "ai_usage": [],
+ "jobs": {
+  "queued": 0,
+  "running": 1,
+  "blocked": 0,
+  "failed": 0,
+  "cancelled": 0,
+  "completed": 12,
+  "needs_retest": 0
+ },
+ "reproduction": {
+  "cli": "rebuildctl rebuild --source \"/home/user/decomp/fixtures/pecli/original\" --output \"/tmp/claude-0/-home-user-decomp/c456138f-a927-5bb9-bf2d-fa1845ce6ed1/scratchpad/pecli-demo/out\" --language rust --type exe",
+  "verify": "rebuildctl verify case_01a1110f830c4ef23b70ac cand_01a11113fa217f3ccb63d3"
+ },
+ "host": {
+  "host_certifies_windows": false,
+  "locale": "",
+  "machine": "x86_64",
+  "os": "Linux",
+  "os_release": "6.18.44-fc-v70",
+  "python": "3.13.16",
+  "tz": "UTC",
+  "wine": true
+ }
+}

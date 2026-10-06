@@ -109,6 +109,9 @@ class Verifier:
         for fid, verdict in feature_verdicts.items():
             if fid in known:
                 self.ledger.set_verification(fid, verdict, candidate_id=candidate_id, evidence_id=report_ev["evidence_id"], writer=self.writer)
+                if verdict in ("verified", "partial"):
+                    # a measured pass proves a runnable implementation exists for this feature (impl state, not a verdict)
+                    self.ledger.set_impl(fid, "runnable", evidence_ids=[report_ev["evidence_id"]])
         all_pass = bool(scenario_results) and all(s["verdict"] == "pass" for s in scenario_results)
         if not scenario_results:
             verdict = "untested"   # no scenarios declared: nothing was measured, never 'verified'

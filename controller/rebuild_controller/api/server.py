@@ -212,6 +212,10 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     def cancel(case_id: str):
         return {"cancelled": studio.cancel(case_id=case_id)}
 
+    @app.post("/cases/{case_id}/deliver")
+    def deliver(case_id: str, body: dict[str, Any] | None = None):
+        return studio.deliver(case_id, (body or {}).get("candidate_id"))
+
     @app.get("/cases/{case_id}/jobs")
     def jobs(case_id: str):
         return [j.to_dict() for j in studio.jobs.list(case_id)]
