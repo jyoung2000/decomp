@@ -523,6 +523,7 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         from ..hermes.bridge import HermesBridge
         return HermesBridge(studio.settings.data_dir).register_mcp(dry_run=bool((body or {}).get("dry_run", True)))
 
+    from .tools_routes import mount_tools_routes; mount_tools_routes(app, studio)  # guided tool setup
     return app
 
 

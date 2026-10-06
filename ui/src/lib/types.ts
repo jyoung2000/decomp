@@ -531,3 +531,57 @@ export type HermesStatus = Record<string, unknown> & {
   state?: string;
   diagnostics?: ({ check: string; ok: boolean; detail?: string } | string)[];
 };
+
+// ---- guided tool setup (GET /tools/setup)
+export type ToolSetupStatus = 'not_installed' | 'installed' | 'corrupt' | 'blocked_unverified' | 'update_available' | 'installing';
+
+export interface ToolSetupError {
+  code: string;
+  message: string;
+  affected?: string | null;
+  next_action?: string | null;
+  retryable?: boolean;
+  url?: string | null;
+}
+
+export interface ToolSetupJob {
+  phase: 'queued' | 'downloading' | 'verifying' | 'extracting' | 'checking' | 'activating' | 'done' | 'failed' | 'cancelled';
+  bytes_done: number;
+  bytes_total: number;
+  percent: number | null;
+  message: string;
+  error: ToolSetupError | null;
+  finished: boolean;
+  chain: string[];
+  cancelled: boolean;
+}
+
+export interface ToolSetupEntry {
+  name: string;
+  title: string;
+  purpose: string;
+  role?: string | null;
+  version: string;
+  installed_version?: string | null;
+  license?: string | null;
+  optional: boolean;
+  size_bytes?: number | null;
+  file_name?: string | null;
+  url?: string | null;
+  sha256?: string | null;
+  requires: string[];
+  status: ToolSetupStatus;
+  disk_status: ToolSetupStatus;
+  blocked_reason?: string | null;
+  install_path: string;
+  job: ToolSetupJob | null;
+}
+
+export interface ToolSetupSnapshot {
+  tools_dir: string;
+  lock_path: string | null;
+  tools: ToolSetupEntry[];
+  any_installed: boolean;
+  required_missing: string[];
+  busy: boolean;
+}

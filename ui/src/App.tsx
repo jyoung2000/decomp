@@ -9,6 +9,7 @@ import { WorkspaceView } from './views/Workspace';
 import { ConnectionsView } from './views/Connections';
 import { KnowledgeView } from './views/Knowledge';
 import { SettingsView } from './views/Settings';
+import { ToolsView } from './views/Tools';
 import { Empty } from './components/Empty';
 
 function Sidebar() {
@@ -44,6 +45,10 @@ function Sidebar() {
       <NavLink to="/connections" className="nav-link" data-testid="nav-connections">
         <span className="nav-icon" aria-hidden="true">⇄</span>
         <span className="nav-label">Connections</span>
+      </NavLink>
+      <NavLink to="/tools" className="nav-link" data-testid="nav-tools">
+        <span className="nav-icon" aria-hidden="true">⬇</span>
+        <span className="nav-label">Tools</span>
       </NavLink>
       <NavLink to="/knowledge" className="nav-link" data-testid="nav-knowledge">
         <span className="nav-icon" aria-hidden="true">◈</span>
@@ -83,6 +88,7 @@ export function Shell() {
             <Route path="/new" element={<NewProjectView />} />
             <Route path="/projects/:caseId/*" element={<WorkspaceView />} />
             <Route path="/connections" element={<ConnectionsView />} />
+            <Route path="/tools" element={<ToolsView />} />
             <Route path="/knowledge" element={<KnowledgeView />} />
             <Route path="/settings" element={<SettingsView />} />
             <Route

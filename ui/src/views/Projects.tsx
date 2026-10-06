@@ -13,6 +13,8 @@ export function ProjectsView() {
   const version = useStoreSelector((s) => Object.keys(s.state.cases).length + (s.health ? 1 : 0));
   const res = useResource(() => api.cases(), [api], version);
   const selected = useSelectedCase();
+  const tools = useResource(() => api.toolsSetup(), [api]);
+  const noTools = !!tools.data && !tools.data.any_installed;
   return (
     <div className="page">
       <div className="page-head">
@@ -32,6 +34,14 @@ export function ProjectsView() {
         <div className="card">
           <Empty title="No projects yet" action={<Link className="btn primary" to="/new">Create your first project</Link>}>
             Choose the folder that contains the original program, where the rebuilt output should go, and the target language. The plan appears as soon as discovery starts.
+            {noTools && (
+              <>
+                {' '}
+                <span data-testid="tools-first-run">
+                  No analysis tools are installed yet, so <Link to="/tools">open Tools to install them in one click</Link> before your first project.
+                </span>
+              </>
+            )}
           </Empty>
         </div>
       ) : (

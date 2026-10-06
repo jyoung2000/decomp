@@ -18,6 +18,17 @@ def default_data_dir() -> Path:
     return base / "rebuild-studio"
 
 
+def default_tools_dir() -> Path:
+    """REBUILD_STUDIO_TOOLS, else the per-user RebuildStudio/tools folder under LOCALAPPDATA on Windows, else /opt/rebuild-tools."""
+    env = os.environ.get("REBUILD_STUDIO_TOOLS")
+    if env:
+        return Path(env)
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+        return base / "RebuildStudio" / "tools"
+    return Path("/opt/rebuild-tools")
+
+
 @dataclass
 class Limits:
     """Hard bounds. Every subprocess/stage is checked against these."""
@@ -38,7 +49,7 @@ class Limits:
 class Settings:
     data_dir: Path = field(default_factory=default_data_dir)
     limits: Limits = field(default_factory=Limits)
-    tools_dir: Path = field(default_factory=lambda: Path(os.environ.get("REBUILD_STUDIO_TOOLS", "/opt/rebuild-tools")))
+    tools_dir: Path = field(default_factory=lambda: default_tools_dir())
 
     @property
     def db_path(self) -> Path:

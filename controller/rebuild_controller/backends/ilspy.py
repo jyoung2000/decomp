@@ -477,12 +477,32 @@ def _expected_type_path(name: str, namespace: str) -> str:
     return f"{namespace}/{leaf}.cs" if namespace else f"{leaf}.cs"
 
 
-def _dotnet_env() -> dict[str, str]:
+def _private_dotnet(settings: Settings | None) -> Path | None:
+    """The side-by-side runtime installed by tool_setup (tools/dotnet/dotnet.exe); no machine-wide dotnet needed."""
+    if settings is None:
+        return None
+    p = Path(settings.tools_dir) / "dotnet" / ("dotnet.exe" if os.name == "nt" else "dotnet")
+    return p if p.is_file() else None
+
+
+def _argv(exe: Path, settings: Settings | None = None) -> list[str]:
+    """Command prefix for the tool: a framework-dependent ilspycmd.dll is launched through the private dotnet."""
+    if exe.suffix.lower() == ".dll":
+        dn = _private_dotnet(settings)
+        return [str(dn) if dn else (shutil.which("dotnet") or "dotnet"), str(exe)]
+    return [str(exe)]
+
+
+def _dotnet_env(settings: Settings | None = None) -> dict[str, str]:
     env = dict(os.environ)
     env.setdefault("DOTNET_CLI_TELEMETRY_OPTOUT", "1")
     env.setdefault("DOTNET_NOLOGO", "1")
     env.setdefault("DOTNET_SKIP_FIRST_TIME_EXPERIENCE", "1")
-    if "DOTNET_ROOT" not in env:
+    private = _private_dotnet(settings)
+    if private is not None:
+        env["DOTNET_ROOT"] = str(private.parent)
+        env["DOTNET_MULTILEVEL_LOOKUP"] = "0"
+    elif "DOTNET_ROOT" not in env:
         dn = shutil.which("dotnet")
         if dn:
             root = Path(dn).resolve().parent
@@ -502,11 +522,19 @@ class ILSpyBackend(BackendAdapter):
 
     # -- discovery -----------------------------------------------------------------------------------------------
     def find_tool(self) -> Path | None:
+        dll = Path(self.settings.tools_dir) / "ilspycmd" / "ilspycmd.dll"
+        if dll.is_file() and (_private_dotnet(self.settings) or shutil.which("dotnet")):
+            return dll
         return discover_executable(self.settings, [TOOL_NAME], subdirs=["ilspy", "ilspycmd", "ilspycmd/tools"],
                                    extra_dirs=[Path.home() / ".dotnet" / "tools"])
 
     def _tool_dll_sha(self, exe: Path) -> str:
         """sha256 of the installed ilspycmd.dll (the nupkg digest is not recorded locally)."""
+        if exe.suffix.lower() == ".dll":
+            try:
+                return sha256_of(exe)
+            except OSError:
+                return ""
         store = exe.parent / ".store" / TOOL_NAME
         try:
             for dll in store.glob("*/ilspycmd/*/tools/*/any/ilspycmd.dll"):
@@ -552,7 +580,7 @@ class ILSpyBackend(BackendAdapter):
         else:
             ver, detail = None, ""
             try:
-                r = run_bounded(None, [str(exe), "--version"], limits=self.settings.limits, env=_dotnet_env(), timeout=30)
+                r = run_bounded(None, [*_argv(exe, self.settings), "--version"], limits=self.settings.limits, env=_dotnet_env(self.settings), timeout=30)
                 first = r.text.strip().splitlines()[0] if r.text.strip() else ""
                 if r.returncode == 0 and first.lower().startswith("ilspycmd"):
                     ver = first.split(":", 1)[1].strip()
@@ -582,8 +610,8 @@ class ILSpyBackend(BackendAdapter):
             dll = Path(td) / "SmokeProbe.dll"
             dll.write_bytes(base64.b64decode("".join(_SMOKE_DLL_B64.split())))
             try:
-                r = run_bounded(None, [tool.path, "--disable-updatecheck", str(dll)], limits=self.settings.limits,
-                                env=_dotnet_env(), timeout=120)
+                r = run_bounded(None, [*_argv(Path(tool.path), self.settings), "--disable-updatecheck", str(dll)], limits=self.settings.limits,
+                                env=_dotnet_env(self.settings), timeout=120)
             except (StageError, OSError) as e:
                 tool.detail = f"smoke failed: {e}"
                 return tool
@@ -635,8 +663,8 @@ class ILSpyBackend(BackendAdapter):
         tool_types: list[str] | None = None
         if exe is not None and ver:
             try:
-                r = run_bounded(ctx, [str(exe), "--disable-updatecheck", "-l", "cisde", str(mp)], limits=self.settings.limits,
-                                env=_dotnet_env(), timeout=timeout)
+                r = run_bounded(ctx, [*_argv(exe, self.settings), "--disable-updatecheck", "-l", "cisde", str(mp)], limits=self.settings.limits,
+                                env=_dotnet_env(self.settings), timeout=timeout)
                 if r.returncode == 0:
                     tool_types = [ln.split(" ", 1)[1].strip() for ln in r.text.splitlines() if " " in ln and ln.split(" ", 1)[0] in
                                   ("Class", "Interface", "Struct", "Delegate", "Enum")]
@@ -725,9 +753,9 @@ class ILSpyBackend(BackendAdapter):
             ref_args = ["-r", str(reference_dir)]
         lang_args = ["-lv", language_version] if language_version else []
         out.mkdir(parents=True, exist_ok=True)
-        cmd = [str(exe), "--disable-updatecheck", *lang_args, *ref_args, "-p", "-o", str(out), str(mp)]
+        cmd = [*_argv(exe, self.settings), "--disable-updatecheck", *lang_args, *ref_args, "-p", "-o", str(out), str(mp)]
         try:
-            r = run_bounded(ctx, cmd, limits=self.settings.limits, env=_dotnet_env(), timeout=timeout)
+            r = run_bounded(ctx, cmd, limits=self.settings.limits, env=_dotnet_env(self.settings), timeout=timeout)
         except StageError as e:
             return OperationResult(ok=False, error=str(e))
         mode = "project"
@@ -754,8 +782,8 @@ class ILSpyBackend(BackendAdapter):
                     continue
                 attempted += 1
                 try:
-                    tr = run_bounded(ctx, [str(exe), "--disable-updatecheck", *lang_args, *ref_args, "-t", t["name"], str(mp)],
-                                     limits=self.settings.limits, env=_dotnet_env(), timeout=min(timeout, 300))
+                    tr = run_bounded(ctx, [*_argv(exe, self.settings), "--disable-updatecheck", *lang_args, *ref_args, "-t", t["name"], str(mp)],
+                                     limits=self.settings.limits, env=_dotnet_env(self.settings), timeout=min(timeout, 300))
                 except StageError as e:
                     status_by_type[t["name"]] = {"status": "failed", "file": None, "error_markers": 0, "message": str(e)[:300]}
                     continue

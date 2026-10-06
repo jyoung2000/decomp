@@ -2,7 +2,7 @@ import type { StudioConfig } from './config';
 import type {
   AiCall, ApiErrorBody, Budget, Candidate, Capabilities, Case, Comparison, Connection, ControllerEvent, DoctorReport,
   Evidence, Feature, Feedback, Health, HermesStatus, Job, KnowledgeEntry, Module, NewCaseBody, NewFeedbackBody, Plan,
-  PlanRevision, Preview, PreviewOpenResult, TaskRoute,
+  PlanRevision, Preview, PreviewOpenResult, TaskRoute, ToolSetupEntry, ToolSetupSnapshot,
 } from './types';
 
 /** Error with the controller's three-part explanation: what happened, what is affected, what to do next. */
@@ -90,6 +90,11 @@ export class Api {
     this.get<ControllerEvent[]>(`/events?since=${since}${caseId ? `&case_id=${encodeURIComponent(caseId)}` : ''}`);
   doctor = (smoke = false) => this.get<DoctorReport>(`/doctor?smoke=${smoke ? 1 : 0}`);
   capabilities = () => this.get<Capabilities>('/capabilities');
+  toolsSetup = () => this.get<ToolSetupSnapshot>('/tools/setup');
+  installTool = (name: string) => this.post<ToolSetupEntry>(`/tools/setup/${encodeURIComponent(name)}/install`);
+  installToolFromFile = (name: string, path: string) => this.post<ToolSetupEntry>(`/tools/setup/${encodeURIComponent(name)}/install-from-file`, { path });
+  cancelToolInstall = (name: string) => this.post<ToolSetupEntry>(`/tools/setup/${encodeURIComponent(name)}/cancel`);
+  removeTool = (name: string) => this.del<ToolSetupEntry>(`/tools/setup/${encodeURIComponent(name)}`);
 
   cases = () => this.get<Case[]>('/cases');
   createCase = (b: NewCaseBody) => this.post<Case>('/cases', b);
