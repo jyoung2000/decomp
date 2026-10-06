@@ -17,6 +17,17 @@ _SCHEMA = (Path(__file__).parent / "schema.sql").read_text(encoding="utf-8")
 # Ordered migrations: (version, sql). Version 1 is the base schema.
 MIGRATIONS: list[tuple[int, str]] = [
     (1, _SCHEMA),
+    # AI ladder (docs/AI_LADDER.md): monotonically increasing configuration revisions with stored snapshots, and a JSON detail
+    # column on ai_calls for the per-attempt reason / position / locality / config_revision / policy hash.
+    (2, """
+CREATE TABLE IF NOT EXISTS ai_config_revisions (
+  revision INTEGER PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  snapshot TEXT NOT NULL
+);
+ALTER TABLE ai_calls ADD COLUMN detail TEXT NOT NULL DEFAULT '{}';
+"""),
 ]
 
 

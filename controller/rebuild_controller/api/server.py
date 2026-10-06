@@ -93,6 +93,33 @@ class RouteSet(BaseModel):
     allow_unlisted: bool = False
 
 
+class LadderPut(BaseModel):
+    entries: list[dict[str, Any]] = Field(default_factory=list)
+    allow_unlisted: bool = True
+
+
+class PresetReq(BaseModel):
+    preset: str = Field(pattern="^(local_first|cloud_first|all_local|all_cloud|no_ai)$")
+    apply: bool = False
+    tasks: list[str] | None = None
+
+
+def _plan_ai(studio: StudioServices, case_id: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Plan visibility (docs/AI_LADDER.md section 4): ``ai`` on items that may use AI, ``origin`` on every item. Never fails."""
+    from ..implement import plan_ai, plan_origins
+    try:
+        case = studio.cases.get_case(case_id)
+        ai = plan_ai(studio, case)
+        origins = plan_origins(studio, case, items)
+    except Exception:
+        return items
+    for it in items:
+        if it["item_id"] in ai:
+            it["ai"] = ai[it["item_id"]]
+        it["origin"] = origins.get(it["item_id"], "deterministic")
+    return items
+
+
 def _outcome(studio: StudioServices, case_id: str) -> dict[str, Any] | None:
     """Derived outcome summary (pipeline vs measured behaviour). Never fails the response: the UI has a pure fallback."""
     from ..outcome import case_outcome
@@ -371,9 +398,15 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     @app.get("/cases/{case_id}/plan")
     def plan(case_id: str):
         studio.plan.refresh_statuses(case_id)
-        items = studio.plan.items(case_id)
+        items = _plan_ai(studio, case_id, studio.plan.items(case_id))
         prog = studio.plan.progress(case_id)
-        return {"revision": studio.plan.current_revision(case_id), "items": items, "progress": prog, "eta": prog["eta"],
+        ai_by_item = {i["item_id"]: i["ai"] for i in items if "ai" in i}
+        ai_jobs = []
+        for j in studio.jobs.list(case_id):
+            if j.stage == "implement_loop":
+                ai_jobs.append({"job_id": j.job_id, "stage": j.stage, "title": j.title, "state": j.state.value,
+                                "ai": ai_by_item.get(studio.plan.milestone_id(case_id, "M-IMPL"))})
+        return {"revision": studio.plan.current_revision(case_id), "items": items, "progress": prog, "eta": prog["eta"], "ai_jobs": ai_jobs,
                 "unknown_scope": [i for i in items if i["kind"] in ("discovery", "deferred", "unsupported")],
                 "outcome": _outcome(studio, case_id), "implementation_forecast": _forecast(studio, studio.cases.get_case(case_id))}
 
@@ -497,6 +530,72 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         if case_id:
             sql += " WHERE case_id=?"; params = (case_id,)
         return studio.db.query(sql + " ORDER BY created_at DESC LIMIT 500", params)
+
+    # ---------------------------------------------------------------- AI model ladder (docs/AI_LADDER.md)
+    def _ladder_call(fn, *a, **kw):
+        from ..providers.connections import ConnectionStoreError
+        try:
+            return fn(*a, **kw)
+        except ConnectionStoreError as e:
+            raise _err("ladder", str(e), 400, next_action="pick a known task, an existing connection and an explicit model id")
+
+    @app.get("/ai/ladder")
+    def ai_ladder():
+        from ..providers.ladder import ladder_view
+        return ladder_view(_conn())
+
+    @app.put("/ai/ladder/{task}")
+    def ai_ladder_put(task: str, body: LadderPut):
+        from ..providers.ladder import put_ladder
+        return _ladder_call(put_ladder, _conn(), task, body.entries, allow_unlisted=body.allow_unlisted)
+
+    @app.get("/ai/ladder/revisions")
+    def ai_ladder_revisions(revision: int | None = None):
+        if revision is not None:
+            return _conn().revision_snapshot(revision)
+        return {"config_revision": _conn().config_revision(), "revisions": _conn().revisions()}
+
+    @app.post("/ai/ladder/preset")
+    def ai_ladder_preset(body: PresetReq):
+        from ..providers.ladder import preset
+        return _ladder_call(preset, _conn(), body.preset, apply=body.apply, tasks=body.tasks)
+
+    @app.get("/ai/models")
+    def ai_models(q: str | None = None, task: str | None = None):
+        from ..providers.ladder import model_catalog
+        return model_catalog(_conn(), q, task)
+
+    @app.get("/cases/{case_id}/ai-policy")
+    def case_ai_policy(case_id: str):
+        return _policy_view(case_id)
+
+    @app.put("/cases/{case_id}/ai-policy")
+    def case_ai_policy_put(case_id: str, body: dict[str, Any]):
+        from ..providers.ladder import validate_policy_update
+        case = studio.cases.get_case(case_id)
+        merged = _ladder_call(validate_policy_update, studio.connections, case.get("ai_policy") or {}, body or {})
+        studio.db.update("cases", "case_id", case_id, {"ai_policy": merged, "updated_at": now_iso()})
+        bid = f"case:{case_id}"
+        if studio.budgets is not None and merged.get("budget_usd") is not None and studio.budgets.exists(bid):
+            studio.budgets.set_limit(bid, float(merged["budget_usd"]))      # queued work started afterwards uses the new budget
+        view = _policy_view(case_id)
+        studio.events.emit("case.ai_policy", {"case_id": case_id, "policy_hash": view["policy_hash"], "mode": merged["mode"],
+                                              "locality": merged["locality"]}, case_id=case_id)
+        return view
+
+    def _policy_view(case_id: str) -> dict[str, Any]:
+        from ..providers.ladder import effective_ladders, normalize_policy, policy_hash
+        case = studio.cases.get_case(case_id)
+        pol = normalize_policy(case.get("ai_policy"))
+        return {"case_id": case_id, "policy": pol, "policy_hash": policy_hash(pol),
+                "config_revision": studio.connections.config_revision() if studio.connections else None,
+                "effective": effective_ladders(studio.connections, pol) if studio.connections else {}}
+
+    @app.get("/cases/{case_id}/ai/activity")
+    def case_ai_activity(case_id: str, since: int = 0, limit: int = 500):
+        from ..providers.ladder import activity
+        studio.cases.get_case(case_id)
+        return activity(studio.events, case_id, since=since, limit=limit)
 
     @app.get("/subscriptions")
     def subscriptions():

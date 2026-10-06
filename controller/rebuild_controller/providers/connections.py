@@ -32,7 +32,7 @@ install_redacting_filter(log)
 
 PROVIDERS = ("openai", "anthropic", "gemini", "openrouter", "local")
 AUTH_MODES = ("api_key", "subscription_handoff", "local", "none")
-STATES = ("unprobed", "ok", "auth_failed", "unreachable", "limited")
+STATES = ("unprobed", "ok", "auth_failed", "unreachable", "limited", "no_credits")
 TASKS = ("interpretation", "repair", "visual_review", "verification_assist", "knowledge")
 DIALECTS = ("responses", "chat", "auto")
 HANDOFF_FOR_PROVIDER = {"openai": "openai_siwc", "anthropic": "claude_agent_sdk", "gemini": "gemini_cli"}
@@ -43,6 +43,14 @@ _BAD_CAPS = {"rejected", "unsupported"}
 
 class ConnectionStoreError(ValueError):
     pass
+
+
+def locality_of(conn: Mapping[str, Any]) -> str:
+    """``local`` when the connection is a local provider or its endpoint is a loopback address ("runs on this PC")."""
+    if conn.get("provider") == "local":
+        return "local"
+    host = urlparse(conn.get("endpoint") or "").hostname or ""
+    return "local" if host in _LOOPBACK or host.startswith("127.") else "cloud"
 
 
 class ModelNotListed(ConnectionStoreError):
@@ -192,6 +200,7 @@ class ConnectionStore:
         row = self.db.query_one("SELECT * FROM connections WHERE connection_id=?", (connection_id,))
         if row is None:
             return False
+        routes_changed = False
         with self.db.transaction():
             for r in self.get_routes():
                 changed = False
@@ -205,7 +214,10 @@ class ConnectionStore:
                 if changed:
                     self.db.upsert("task_routes", {"task": r["task"], "primary_connection": prim, "primary_model": pm,
                                                    "fallbacks": fb, "updated_at": now_iso()}, "task")
+                    routes_changed = True
             self.db.execute("DELETE FROM connections WHERE connection_id=?", (connection_id,))
+            if routes_changed:
+                self.bump_revision(f"connection {connection_id} deleted")
         if row.get("secret_ref"):
             self.secrets.delete(row["secret_ref"])
         self._overrides.pop(connection_id, None)
@@ -281,6 +293,13 @@ class ConnectionStore:
                 ids = {m["id"] for m in explicit}
                 discovered = [m.to_dict() for m in disc.models if m.id not in ids]
                 models = explicit + discovered
+                listed = {m.id for m in disc.models}
+                for m in models:
+                    if m["id"] in listed:
+                        m.pop("availability", None)
+                    elif disc.models:
+                        m["availability"] = {"state": "model_unavailable", "at": now_iso(),
+                                             "detail": "not listed by the endpoint's model discovery (not pulled / not offered)"}
                 detail.append(f"discovered {len(disc.models)} model(s)")
             else:
                 caps["discovery"] = "unsupported"
@@ -292,6 +311,26 @@ class ConnectionStore:
         except ProviderError as e:
             return self._store_probe(connection_id, "unreachable", caps, models, limits, [f"{e.kind}: {e}"])
         state = "ok" if auth_proven else "unprobed"
+        # 1b. local Ollama server: capabilities (vision/tools/completion) and context length per model, free and spend-less
+        if auth_proven and locality_of(conn) == "local" and conn["endpoint"] and connection_id not in self._overrides:
+            from .ollama import enrich
+            info = enrich(conn["endpoint"], [m["id"] for m in models], transport=self.transport)
+            if info:
+                limits["server"] = "ollama"
+                if info.get("version"):
+                    limits["server_version"] = info["version"]
+                n = 0
+                for m in models:
+                    e = info["models"].get(m["id"])
+                    if not e:
+                        continue
+                    n += 1
+                    m["capabilities"] = e["capabilities"]
+                    if e.get("context_window"):
+                        m["context_window"] = e["context_window"]
+                    if e.get("details"):
+                        m.setdefault("meta", {})["ollama"] = e["details"]
+                detail.append(f"Ollama server detected; capabilities and context length read for {n} model(s)")
         # 2. capability probe (spends tokens: budgeted, never against an unpriced model without approval)
         probed_model = None
         if capabilities:
@@ -392,7 +431,8 @@ class ConnectionStore:
                            {"models": conn["models"] + [{"id": model, "source": "explicit"}], "updated_at": now_iso()})
 
     def set_route(self, task: str, primary_connection: str, primary_model: str,
-                  fallbacks: Iterable[Mapping[str, str]] | None = None, *, allow_unlisted: bool = False) -> dict[str, Any]:
+                  fallbacks: Iterable[Mapping[str, str]] | None = None, *, allow_unlisted: bool = False, rationale: str = "user",
+                  bump: bool = True) -> dict[str, Any]:
         if task not in TASKS:
             raise ConnectionStoreError(f"unknown task {task!r}; expected one of {TASKS}")
         fb = [{"connection": f["connection"], "model": f["model"]} for f in (fallbacks or [])]
@@ -407,41 +447,139 @@ class ConnectionStore:
                 seen.add(pair)
             self.db.upsert("task_routes", {"task": task, "primary_connection": primary_connection, "primary_model": primary_model,
                                            "fallbacks": fb, "updated_at": now_iso()}, "task")
+            if bump:
+                self.bump_revision(f"ladder for {task} changed", {task: rationale})
         return self.get_route(task)  # type: ignore[return-value]
 
-    def delete_route(self, task: str) -> bool:
-        return self.db.execute("DELETE FROM task_routes WHERE task=?", (task,)).rowcount > 0
+    def delete_route(self, task: str, *, rationale: str = "user", bump: bool = True) -> bool:
+        with self.db.transaction():
+            gone = self.db.execute("DELETE FROM task_routes WHERE task=?", (task,)).rowcount > 0
+            if gone and bump:
+                self.bump_revision(f"ladder for {task} cleared", {task: rationale})
+        return gone
 
-    def resolve_detailed(self, task: str, needs: Iterable[str] | None = None) -> tuple[list[tuple[dict[str, Any], str]], list[dict[str, str]]]:
+    # ------------------------------------------------------------------ configuration revisions (docs/AI_LADDER.md section 2)
+    def config_revision(self) -> int:
+        r = self.db.query_one("SELECT MAX(revision) AS r FROM ai_config_revisions")
+        return int(r["r"] or 0) if r else 0
+
+    def revision_snapshot(self, revision: int | None = None) -> dict[str, Any]:
+        rev = self.config_revision() if revision is None else int(revision)
+        r = self.db.query_one("SELECT * FROM ai_config_revisions WHERE revision=?", (rev,))
+        if r is None:
+            return {"revision": rev, "tasks": {}}
+        return {"revision": r["revision"], "created_at": r["created_at"], "reason": r["reason"], **loads(r["snapshot"], {})}
+
+    def revisions(self, limit: int = 100) -> list[dict[str, Any]]:
+        return self.db.query("SELECT revision, created_at, reason FROM ai_config_revisions ORDER BY revision DESC LIMIT ?", (limit,))
+
+    def rationale(self, task: str) -> str:
+        snap = self.revision_snapshot()
+        return str(((snap.get("tasks") or {}).get(task) or {}).get("rationale") or "user")
+
+    def bump_revision(self, reason: str, rationale: Mapping[str, str] | None = None) -> int:
+        """Store a snapshot of every task ladder under the next (monotonic) revision number. ``rationale`` sets the per-task
+        rationale ("user" | "preset:<name>" | "auto") for the tasks it names; other tasks keep theirs."""
+        rationale = dict(rationale or {})
+        with self.db.transaction():
+            prev_tasks = self.revision_snapshot().get("tasks") or {}
+            tasks: dict[str, Any] = {}
+            for r in self.get_routes():
+                entries = [{"connection_id": c, "model": m} for c, m in self.route_entries(r["task"])]
+                why = rationale.get(r["task"]) or (prev_tasks.get(r["task"]) or {}).get("rationale") or "user"
+                tasks[r["task"]] = {"entries": entries, "rationale": why}
+            for t, why in rationale.items():
+                tasks.setdefault(t, {"entries": [], "rationale": why})
+            rev = self.config_revision() + 1
+            self.db.insert("ai_config_revisions", {"revision": rev, "created_at": now_iso(), "reason": reason[:300],
+                                                   "snapshot": {"tasks": tasks}})
+        self.events.emit("ai.ladder", {"config_revision": rev, "reason": reason[:300]})
+        return rev
+
+    # ------------------------------------------------------------------ per (connection, model) availability
+    def mark_model(self, connection_id: str, model: str, state: str, *, detail: str | None = None) -> None:
+        """Flag a ladder entry (e.g. ``model_unavailable``) or clear the flag (``ok``). Stored on the connection's model entry
+        as ``availability`` so every ladder that uses the same (connection, model) sees it."""
+        row = self.db.query_one("SELECT models FROM connections WHERE connection_id=?", (connection_id,))
+        if row is None:
+            return
+        models = loads(row["models"], [])
+        changed = found = False
+        for m in models:
+            if m.get("id") != model:
+                continue
+            found = True
+            cur = (m.get("availability") or {}).get("state")
+            if state == "ok":
+                if cur is not None:
+                    m.pop("availability", None)
+                    changed = True
+            elif cur != state:
+                m["availability"] = {"state": state, "at": now_iso(), "detail": redact(detail or "")[:300]}
+                changed = True
+        if not found and state != "ok":
+            models.append({"id": model, "source": "explicit",
+                           "availability": {"state": state, "at": now_iso(), "detail": redact(detail or "")[:300]}})
+            changed = True
+        if changed:
+            self.db.update("connections", "connection_id", connection_id, {"models": models, "updated_at": now_iso()})
+
+    def route_entries(self, task: str) -> list[tuple[str, str]]:
         route = self.get_route(task)
         if route is None or not route["primary_connection"]:
-            return [], [{"reason": f"no route configured for task {task!r}"}]
-        entries = [(route["primary_connection"], route["primary_model"])] + [(f["connection"], f["model"]) for f in route["fallbacks"]]
-        usable: list[tuple[dict[str, Any], str]] = []
-        skipped: list[dict[str, str]] = []
-        for cid, model in entries:
+            return []
+        return [(route["primary_connection"], route["primary_model"])] + [(f["connection"], f["model"]) for f in route["fallbacks"]]
+
+    def ladder_candidates(self, task: str, needs: Iterable[str] | None = None,
+                          entries: Iterable[tuple[str, str]] | None = None) -> list[dict[str, Any]]:
+        """Every ladder entry in order with its 1-based ``position``. ``conn`` is the public connection row (None when it no
+        longer exists); ``skip`` is the plain-English reason the entry cannot be used at all and ``skip_outcome`` its taxonomy
+        label. ``entries`` replaces the global ladder (a project's ladder override)."""
+        ents = list(entries) if entries is not None else self.route_entries(task)
+        out: list[dict[str, Any]] = []
+        for i, (cid, model) in enumerate(ents, start=1):
+            item: dict[str, Any] = {"position": i, "connection_id": cid, "model": model, "conn": None, "skip": None, "skip_outcome": None}
+            out.append(item)
             if not cid or not model:
-                skipped.append({"connection_id": str(cid), "model": str(model), "reason": "incomplete route entry"})
+                item.update(skip="incomplete route entry", skip_outcome="unusable")
                 continue
             row = self.db.query_one("SELECT * FROM connections WHERE connection_id=?", (cid,))
             if row is None:
-                skipped.append({"connection_id": cid, "model": model, "reason": "connection no longer exists"})
+                item.update(skip="connection no longer exists", skip_outcome="unusable")
                 continue
             conn = self._public(row)
-            reason = None
+            item["conn"] = conn
             if conn["auth_mode"] == "subscription_handoff":
-                reason = "subscription handoff has no API path"
+                item.update(skip="subscription handoff has no API path", skip_outcome="unusable")
             elif conn["state"] == "auth_failed":
-                reason = "auth failed; update the key or re-probe"
+                item.update(skip="auth failed; update the key or re-probe", skip_outcome="auth_failed")
             else:
+                mcaps = next((m.get("capabilities") for m in conn["models"] if m.get("id") == model
+                              and isinstance(m.get("capabilities"), Mapping)), None) or {}
                 for n in needs or ():
+                    own = mcaps.get({"images": "vision"}.get(n, n))
+                    if isinstance(own, bool):        # per-model facts (Ollama /api/show) beat a connection-wide probe of one model
+                        if not own:
+                            item.update(skip=f"{model} does not support {n} (reported by the server)", skip_outcome="capability_unsupported")
+                            break
+                        continue
                     if conn["capabilities"].get(n) in _BAD_CAPS:
-                        reason = f"endpoint {conn['capabilities'][n]} {n} when probed"
+                        item.update(skip=f"endpoint {conn['capabilities'][n]} {n} when probed", skip_outcome="capability_unsupported")
                         break
-            if reason:
-                skipped.append({"connection_id": cid, "model": model, "reason": reason})
+        return out
+
+    def resolve_detailed(self, task: str, needs: Iterable[str] | None = None,
+                         entries: Iterable[tuple[str, str]] | None = None) -> tuple[list[tuple[dict[str, Any], str]], list[dict[str, str]]]:
+        ents = list(entries) if entries is not None else self.route_entries(task)
+        if not ents:
+            return [], [{"reason": f"no route configured for task {task!r}"}]
+        usable: list[tuple[dict[str, Any], str]] = []
+        skipped: list[dict[str, str]] = []
+        for c in self.ladder_candidates(task, needs, ents):
+            if c["skip"]:
+                skipped.append({"connection_id": str(c["connection_id"]), "model": str(c["model"]), "reason": c["skip"]})
             else:
-                usable.append((conn, model))
+                usable.append((c["conn"], c["model"]))
         return usable, skipped
 
     def resolve(self, task: str, needs: Iterable[str] | None = None) -> list[tuple[dict[str, Any], str]]:

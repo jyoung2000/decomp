@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import re
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +57,8 @@ class LoopPolicy:
     backoff_s: float
     packet_max_chars: int
     briefing_limit: int
+    raw: dict = field(default_factory=dict)
+    request_timeout_s: float | None = None
 
     @classmethod
     def from_case(cls, case: dict[str, Any]) -> "LoopPolicy":
@@ -79,11 +81,13 @@ class LoopPolicy:
                    has_token_cap=p.get("max_output_tokens") not in (None, "", 0),
                    approve_unknown_pricing=bool(p.get("approve_unknown_pricing")),
                    max_retries=int(num("max_retries", 3)), backoff_s=num("retry_backoff_s", 1.0),
-                   packet_max_chars=max(10_000, int(num("packet_max_chars", 200_000))), briefing_limit=int(num("briefing_limit", 8)))
+                   packet_max_chars=max(10_000, int(num("packet_max_chars", 200_000))), briefing_limit=int(num("briefing_limit", 8)),
+                   raw=dict(p), request_timeout_s=num("request_timeout_s", 0.0) or None)
 
     @property
     def ai_enabled(self) -> bool:
-        return self.mode in ("assisted", "assist_on_failure")
+        from .providers.ladder import AI_ON_MODES
+        return self.mode in AI_ON_MODES
 
     @property
     def unknown_price_ok(self) -> bool:
@@ -105,7 +109,20 @@ def route_status(st: Any, pol: LoopPolicy, task: str = "interpretation") -> dict
     if getattr(st, "ai", None) is None or getattr(st, "connections", None) is None:
         out.update(code="ai_unavailable", message="The AI client is not available in this build, so no model can be called.")
         return out
-    usable, skipped = st.connections.resolve_detailed(task)
+    from .providers.ladder import locality_block, override_entries
+    from .providers.connections import locality_of
+    if pol.raw.get("mode") == "no_ai" or (pol.raw and not pol.ai_enabled):
+        out.update(code="ai_disabled", message="AI is off for this project (AI policy mode 'no_ai'), so no model will be called.")
+        return out
+    usable, skipped = st.connections.resolve_detailed(task, entries=override_entries(pol.raw, task))
+    kept = []
+    for conn, model in usable:
+        why = locality_block(pol.raw, locality_of(conn))
+        if why:
+            skipped.append({"connection_id": conn["connection_id"], "model": model, "reason": f"{model}: {why}"})
+        else:
+            kept.append((conn, model))
+    usable = kept
     if not usable:
         why = "; ".join(s.get("reason", "") for s in skipped) or f"no route configured for task '{task}'"
         out.update(code="no_route", message=f"No usable AI route ({why}). Add a connection and a route for '{task}' in Connections.")
@@ -114,6 +131,7 @@ def route_status(st: Any, pol: LoopPolicy, task: str = "interpretation") -> dict
         price = st.connections.prices.lookup(conn["provider"], model, connection=conn)
         free = bool(price.known and price.input_per_mtok == 0 and price.output_per_mtok == 0)
         out["route"].append({"connection_id": conn["connection_id"], "label": conn["label"], "provider": conn["provider"], "model": model,
+                             "locality": locality_of(conn),
                              "price_known": bool(price.known), "free": free, "input_per_mtok": price.input_per_mtok if price.known else None,
                              "output_per_mtok": price.output_per_mtok if price.known else None})
     primary = out["route"][0]
@@ -398,10 +416,10 @@ def _call_with_heartbeat(ctx: StageContext, fn):
     return box["r"]
 
 
-def _task_for(st: Any, attempt: int) -> str:
+def _task_for(st: Any, attempt: int, policy: dict[str, Any] | None = None) -> str:
     if attempt > 1:
-        r = st.connections.get_route("repair")
-        if r and r.get("primary_connection"):
+        from .providers.ladder import override_entries
+        if override_entries(policy, "repair") or st.connections.route_entries("repair"):
             return "repair"
     return "interpretation"
 
@@ -413,7 +431,7 @@ def ensure_case_budget(st: Any, case_id: str, limit_usd: float) -> str:
 
 
 def ask_model(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, *, task: str, system: str, prompt: str, key: str,
-              persist: Any = None) -> dict[str, Any]:
+              persist: Any = None, activity: dict[str, Any] | None = None) -> dict[str, Any]:
     """Single budgeted, retried, fallback-aware model call. Raises ImplementStop for user-fixable conditions.
     Returns {text, usage, cost_usd, cost_known, provider, model, connection_id, call_id, prompt_sha256, router_attempts, stop_reason}."""
     from .budget import BudgetExhausted, DuplicateReservation
@@ -424,17 +442,20 @@ def ask_model(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy,
     if not rs["ok"]:
         raise ImplementStop(rs["code"], rs["message"])
     bid = ensure_case_budget(st, case["case_id"], pol.budget_usd)
-    req = Request(model="", messages=[Message.user(prompt)], system=system, max_output_tokens=pol.max_output_tokens, stream=False)
+    req = Request(model="", messages=[Message.user(prompt)], system=system, max_output_tokens=pol.max_output_tokens, stream=False,
+                  timeout_s=pol.request_timeout_s)
     sha = req.fingerprint()
 
     def do() -> dict[str, Any]:
         res = st.ai.call(task, req, job_id=ctx.job.job_id, case_id=case["case_id"], budget=bid, approve_unknown_pricing=pol.unknown_price_ok,
-                         request_key=key, max_retries=pol.max_retries, retry_unavailable=True, backoff_base_s=pol.backoff_s)
+                         request_key=key, max_retries=pol.max_retries, retry_unavailable=True, backoff_base_s=pol.backoff_s,
+                         policy=pol.raw or None, activity=activity)
         u = res.response.usage
         out = {"text": res.response.text or "", "usage": {"input_tokens": u.input_tokens, "output_tokens": u.output_tokens, "cached_tokens": u.cached_tokens, "known": u.known},
                "cost_usd": res.cost_usd, "cost_known": res.cost_known, "provider": res.provider, "model": res.model, "connection_id": res.connection_id,
                "call_id": res.call_id, "prompt_sha256": sha, "prompt_chars": len(prompt) + len(system), "router_attempts": res.attempts,
-               "stop_reason": res.response.stop_reason, "max_output_tokens": pol.max_output_tokens}
+               "stop_reason": res.response.stop_reason, "max_output_tokens": pol.max_output_tokens, "config_revision": res.config_revision,
+               "policy_hash": res.policy_hash, "locality": res.locality, "position": res.position, "took_over_from": res.took_over_from}
         if persist is not None:
             persist(out)          # on the call thread: the answer survives a cancel or crash that follows
         return out
@@ -451,12 +472,14 @@ def ask_model(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy,
     except BudgetRequired as e:
         raise ImplementStop("no_budget", str(e)) from e
     except NoRoute as e:
-        raise ImplementStop("no_route", redact(str(e))) from e
+        raise ImplementStop("ai_disabled" if type(e).__name__ == "AIDisabled" else "no_route", f"{redact(str(e))} {e.recovery}".strip()) from e
     except AllCandidatesFailed as e:
-        detail = "; ".join(f"{a['provider']}:{a['model']} {a['outcome']}" for a in e.attempts)
+        detail = "; ".join(f"{a['model']}: {a.get('reason') or a['outcome']}" for a in e.attempts)
         kind = "auth_failed" if isinstance(e.last, AuthError) else "provider_failed"
-        raise ImplementStop(kind, f"No configured model route answered ({redact(detail)[:400]}). "
-                            f"{'Check the API key in Connections. ' if kind == 'auth_failed' else ''}Last error: {redact(str(e.last))[:300]}", spent=True) from e
+        spent = any(a.get("assumed_spent") for a in e.attempts)
+        raise ImplementStop(kind, f"No model in the ladder answered ({redact(detail)[:600]}). "
+                            f"{'Check the API key in Connections. ' if kind == 'auth_failed' else ''}{e.recovery} "
+                            f"Last error: {redact(str(e.last))[:300]}", spent=spent) from e
     except DuplicateReservation as e:
         raise ImplementStop("duplicate_call", f"A call for this attempt was already sent ({e.request_key}); not sending it twice.", spent=True) from e
     except ProviderError as e:
@@ -505,14 +528,32 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
         feedback = rec.get("feedback_for_next")
         if verdict == "verified":
             verified, stop = True, ("verified", "all declared scenarios passed")
+            _act(st, ctx, case, "Verified: every declared scenario matches the original; no further attempts needed", "next",
+                 origin="verifier_decided", candidate_id=rec.get("candidate_id"), outcome="verified", plan_item_id=st.plan.milestone_id(case_id, "M-IMPL"))
             break
         if rec["build"]["status"] == "built" and not has_baseline:
             stop = ("unverifiable", "The AI implementation built, but no baseline or scenarios are declared, so its behaviour cannot be verified.")
+            _act(st, ctx, case, f"Next: stop. {stop[1]}", "next", origin="deterministic", outcome="unverifiable", candidate_id=rec.get("candidate_id"))
             break
         if n >= pol.max_attempts:
             stop = ("attempts_exhausted", f"Stopped after {n} attempts without a verified match.")
+            _act(st, ctx, case, f"Next: stop. {stop[1]} The best attempt is kept and delivered, labelled honestly.", "next", origin="deterministic",
+                 outcome="attempts_exhausted", plan_item_id=st.plan.milestone_id(case_id, "M-FIX"))
+        else:
+            _act(st, ctx, case, f"Next: repair attempt {n + 1} of {pol.max_attempts}", "next", origin="deterministic", outcome="repair",
+                 plan_item_id=st.plan.milestone_id(case_id, "M-FIX"), candidate_id=rec.get("candidate_id"))
     stop = stop or ("attempts_exhausted", f"Stopped after {pol.max_attempts} attempts without a verified match.")
     return _finish(st, ctx, case, pol, records, stop, scaffold_id, has_baseline, verified)
+
+
+def _act(st: Any, ctx: StageContext, case: dict[str, Any], text: str, kind: str, **fields: Any) -> None:
+    """One plain-English line in the case's AI activity feed (docs/AI_LADDER.md section 5). Never fails the loop."""
+    try:
+        from .providers.ladder import emit_activity
+        emit_activity(st.events, text, kind=kind, case_id=case["case_id"], job_id=ctx.job.job_id,
+                      config_revision=st.connections.config_revision() if st.connections is not None else None, **fields)
+    except Exception:  # noqa: BLE001 - the feed is informational
+        pass
 
 
 def _record_failed_call(st: Any, ctx: StageContext, case: dict[str, Any], loop_id: str, n: int, s: ImplementStop) -> None:
@@ -521,6 +562,8 @@ def _record_failed_call(st: Any, ctx: StageContext, case: dict[str, Any], loop_i
                           body={"loop_id": loop_id, "attempt": n, "status": "stopped", "stop_code": s.code, "message": s.message, "money_possibly_spent": s.spent},
                           meta={"loop": loop_id, "attempt": n, "counted": False, "stop": s.code}, producer="implement_loop")
     st.events.emit("implement.stopped", {"attempt": n, "code": s.code, "message": s.message[:500]}, case_id=case["case_id"], job_id=ctx.job.job_id)
+    _act(st, ctx, case, f"Stopped before attempt {n} finished: {s.message}", "stopped", outcome=s.code, origin="deterministic",
+         plan_item_id=st.plan.milestone_id(case["case_id"], "M-IMPL" if n == 1 else "M-FIX"))
 
 
 def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, *, n: int, loop_id: str, prev_id: str, scaffold_id: str, packet: dict[str, Any],
@@ -528,7 +571,8 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
     case_id = case["case_id"]
     started = _now()
     key = f"{loop_id}:a{n}"
-    task = _task_for(st, n)
+    task = _task_for(st, n, pol.raw)
+    plan_item = st.plan.milestone_id(case_id, "M-IMPL" if n == 1 else "M-FIX")
     resp = _response_record(st, case_id, loop_id, n)
     lost = False
     if resp is None and _orphan_reservations(st, key):
@@ -551,16 +595,26 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
                                        meta={"loop": loop_id, "attempt": n, "untrusted": True, "model": out["model"], "provider": out["provider"], "prompt_sha256": out["prompt_sha256"],
                                              "cost_usd": out["cost_usd"], "cost_known": out["cost_known"]}, producer="implement_loop")
             out["evidence_id"] = ev["evidence_id"]
-        resp = ask_model(st, ctx, case, pol, task=task, system=SYSTEM_PROMPT, prompt=prompt, key=key, persist=persist)
+        subject = (f"{case['name']} (attempt {n} of {pol.max_attempts})" if n == 1
+                   else f"{case['name']} from candidate r{st.candidates.get(prev_id).get('revision', '?')} (attempt {n} of {pol.max_attempts})")
+        resp = ask_model(st, ctx, case, pol, task=task, system=SYSTEM_PROMPT, prompt=prompt, key=key, persist=persist,
+                         activity={"plan_item_id": plan_item, "subject": subject, "origin": "model_proposed"})
         resp = {**resp, "evidence_id": resp.get("evidence_id")}
     ctx.heartbeat(force=True)
     rec: dict[str, Any] = {"loop_id": loop_id, "attempt": n, "task": task, "started_at": started,
                            "call": ({k: resp.get(k) for k in ("provider", "model", "connection_id", "call_id", "prompt_sha256", "prompt_chars", "max_output_tokens", "usage",
-                                                              "cost_usd", "cost_known", "stop_reason", "router_attempts", "evidence_id")} if resp else
+                                                              "cost_usd", "cost_known", "stop_reason", "router_attempts", "evidence_id", "config_revision", "policy_hash",
+                                                              "locality", "position", "took_over_from")} if resp else
                                     {"status": "response_lost", "note": "the call was sent before a crash/cancel and its answer was not stored; counted as spent, not re-sent"}),
                            "candidate_id": None, "files": [], "build": {"status": "skipped"}, "verdict": None, "feedback_for_next": None}
     files, problem = parse_file_map(resp["text"]) if resp else ({}, "the previous response was lost")
+    mname = (resp or {}).get("model") or "the model"
+    act_base = {"plan_item_id": plan_item, "task": task, "model": (resp or {}).get("model"), "provider": (resp or {}).get("provider"),
+                "locality": (resp or {}).get("locality")}
+    resp_ev = [resp["evidence_id"]] if resp and resp.get("evidence_id") else []
     if not files:
+        _act(st, ctx, case, f"{mname}'s answer had no usable files ({problem})", "proposal", origin="model_proposed", outcome="no_files",
+             evidence_ids=resp_ev, **act_base)
         rec["build"] = {"status": "no_files", "note": problem}
         rec["feedback_for_next"] = {"kind": "unusable_response", "problem": problem, "instruction": "Reply with ONLY a JSON object mapping file paths to full file contents."}
         return _store_attempt(st, case_id, loop_id, n, rec)
@@ -571,6 +625,8 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
         (src / "Cargo.lock").unlink()                      # a stale lock from the previous build must not freeze new dependencies
     st.db.update("candidates", "candidate_id", cid, {"meta": {**cand["meta"], "impl_loop": loop_id, "impl_attempt": n, "origin": "ai_attempt", "ai_model": (resp or {}).get("model")}})
     rec.update(candidate_id=cid, files=sorted(files), file_problem=problem)
+    _act(st, ctx, case, f"{mname} proposed {len(files)} file{'s' if len(files) != 1 else ''} (candidate r{cand.get('revision', '?')})", "proposal",
+         origin="model_proposed", candidate_id=cid, outcome="proposed", evidence_ids=resp_ev, **act_base)
     for f in st.ledger.list(case_id):
         if f["impl_status"] == "planned":
             st.ledger.set_impl(f["feature_id"], "in_progress")
@@ -582,6 +638,8 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
         log = st.cases.list_evidence(case_id, kind="build_log")
         if log:
             rec["build"]["log_evidence"] = log[-1]["evidence_id"]
+        _act(st, ctx, case, "Build passed", "build", origin="deterministic", candidate_id=cid, outcome="built",
+             plan_item_id=st.plan.milestone_id(case_id, "M-BUILD"), evidence_ids=[rec["build"]["log_evidence"]] if rec["build"].get("log_evidence") else [])
     except Cancelled:
         raise
     except Exception as e:  # noqa: BLE001 - compiler errors, bad manifests, missing toolchain: all become feedback
@@ -593,6 +651,8 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
         rec["feedback_for_next"] = {"kind": "build_failed", "build_log": text[-FEEDBACK_BUILD_LOG_CHARS:],
                                     "instruction": "cargo build failed; fix the compile errors and return the full content of every changed file."}
         st.plan.update_item(st.plan.milestone_id(case_id, "M-BUILD"), status="failed", blockers=[f"attempt {n}: cargo build failed"])
+        _act(st, ctx, case, "Build failed (cargo errors are fed back to the model)", "build", origin="deterministic", candidate_id=cid,
+             outcome="build_failed", plan_item_id=st.plan.milestone_id(case_id, "M-BUILD"), evidence_ids=[ev["evidence_id"]])
         return _store_attempt(st, case_id, loop_id, n, rec)
     # ---- verification against the frozen baseline (the only judge)
     if has_baseline:
@@ -603,6 +663,9 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
         rec["verdict"] = {"state": cand_now["verification"], "scenarios": s["scenarios"], "passed": s["passed"], "failed": s["failed"], "errors": s["errors"],
                           "report_evidence": rep["evidence_id"], "feature_verdicts": rep["feature_verdicts"], "written_by": "verifier",
                           "scenario_results": [{"scenario": x["scenario"], "verdict": x["verdict"]} for x in rep["scenarios"]]}
+        _act(st, ctx, case, f"Verifier: {s['passed']} of {s['scenarios']} declared scenarios passed", "verify", origin="verifier_decided",
+             candidate_id=cid, outcome=cand_now["verification"], plan_item_id=st.plan.milestone_id(case_id, "M-COMPARE"),
+             evidence_ids=[rep["evidence_id"]])
         if s["failed"] + s["errors"]:
             rec["feedback_for_next"] = mismatch_digest(st, case_id, cid)
             rec["feedback_for_next"]["instruction"] = "The program built but these declared scenarios do not match the original. Fix the behaviour and return full content of changed files."
@@ -687,3 +750,91 @@ def _finish(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, r
                                           "verified": verified}, case_id=case_id, job_id=ctx.job.job_id)
     return {"final_candidate": final_id, "final_kind": final_kind, "stop_reason": code, "message": message, "verified": verified, "attempts": attempts,
             "attempt_cap": pol.max_attempts, "spent_usd": spent, "budget_usd": pol.budget_usd, "blocker": None if verified else (blockers[0] if blockers else message)}
+
+
+# ====================================================================================== plan visibility (docs/AI_LADDER.md section 4)
+WITHOUT_AI = {
+    "M-IMPL": (True, "Without AI you still get the recovered evidence and a Rust scaffold that builds but does not implement the program; "
+                     "it is labelled 'scaffolded', never a working remake."),
+    "M-FIX": (False, "Without AI nothing is repaired automatically: failing scenarios stay listed for you (or an external MCP client) to fix."),
+}
+
+
+def _ai_block(st: Any, case: dict[str, Any], pol: LoopPolicy, short: str, task: str, attempts: int) -> dict[str, Any]:
+    from .providers.connections import locality_of
+    from .providers.ladder import locality_block, normalize_policy, override_entries
+    from .providers.pricing import CHARS_PER_TOKEN_ESTIMATE
+    runs_without, without = WITHOUT_AI[short]
+    raw = normalize_policy(case.get("ai_policy"))
+    base = {"task": task, "primary": None, "fallbacks": [], "runs_without_ai": runs_without, "without_ai": without,
+            "budget_usd": pol.budget_usd if pol.ai_enabled else None, "max_attempts": attempts, "enabled": pol.ai_enabled}
+    if not pol.ai_enabled:
+        return {**base, "rationale": f"AI is off for this project (policy mode '{raw['mode']}')", "expected_cost": {"min_usd": 0.0, "max_usd": 0.0, "known": True}}
+    if getattr(st, "connections", None) is None:
+        return {**base, "rationale": "AI connections are unavailable in this build", "expected_cost": {"unknown_price": True}}
+    ov = override_entries(raw, task)
+    usable, skipped = st.connections.resolve_detailed(task, entries=ov)
+    entries = []
+    for conn, model in usable:
+        why = locality_block(raw, locality_of(conn))
+        if why:
+            skipped.append({"connection_id": conn["connection_id"], "model": model, "reason": why})
+            continue
+        price = st.connections.prices.lookup(conn["provider"], model, connection=conn)
+        entries.append({"provider": conn["provider"], "model": model, "locality": locality_of(conn), "connection_id": conn["connection_id"],
+                        "connection_label": conn["label"], "price_known": bool(price.known),
+                        "free": bool(price.known and price.input_per_mtok == 0 and price.output_per_mtok == 0), "_price": price})
+    rationale = "project override" if ov is not None else st.connections.rationale(task)
+    out = {**base, "rationale": rationale, "skipped": skipped}
+    if not entries:
+        out["expected_cost"] = {"min_usd": 0.0, "max_usd": 0.0, "known": True}
+        out["rationale"] = f"{rationale}; no usable model: " + ("; ".join(s.get("reason", "") for s in skipped) or f"no ladder for {task}")
+        return out
+    clean = [{k: v for k, v in e.items() if k != "_price"} for e in entries]
+    out["primary"], out["fallbacks"] = clean[0], clean[1:]
+    if any(not e["price_known"] for e in entries) and not pol.unknown_price_ok:
+        out["expected_cost"] = {"unknown_price": True, "note": "a model in the ladder has no known price; it is skipped until you set a price, "
+                                                               "an output-token cap or approve unknown pricing"}
+        return out
+    est_in = int(pol.packet_max_chars / CHARS_PER_TOKEN_ESTIMATE)
+    per_call_max = max(e["_price"].ceiling(est_in, pol.max_output_tokens) for e in entries)
+    p0 = entries[0]["_price"]
+    min_usd = 0.0 if entries[0]["free"] else p0.ceiling(2000, 1000)
+    max_usd = per_call_max * max(1, attempts)
+    if pol.budget_usd > 0:
+        max_usd = min(max_usd, pol.budget_usd)
+    out["expected_cost"] = {"min_usd": round(min_usd, 6), "max_usd": round(max_usd, 6), "known": all(e["price_known"] for e in entries),
+                            "basis": f"up to {attempts} call(s) of at most {pol.max_output_tokens} output tokens; capped by the budget"}
+    return out
+
+
+def plan_ai(st: Any, case: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """``{plan_item_id: ai}`` for the plan items that may use AI (M-IMPL: interpretation, M-FIX: repair)."""
+    pol = LoopPolicy.from_case(case)
+    cid = case["case_id"]
+    repair_task = _task_for(st, 2, pol.raw) if getattr(st, "connections", None) is not None else "repair"
+    out = {f"{cid}:M-IMPL": _ai_block(st, case, pol, "M-IMPL", "interpretation", pol.max_attempts if pol.ai_enabled else 0)}
+    fix = _ai_block(st, case, pol, "M-FIX", repair_task, max(0, pol.max_attempts - 1) if pol.ai_enabled else 0)
+    if repair_task != "repair":
+        fix["note"] = "no ladder is set for 'repair', so repairs use the interpretation ladder"
+    out[f"{cid}:M-FIX"] = fix
+    return out
+
+
+def plan_origins(st: Any, case: dict[str, Any], items: list[dict[str, Any]]) -> dict[str, str]:
+    """Work origin per plan item: deterministic | model_proposed | verifier_decided."""
+    cid = case["case_id"]
+    model_cands = any((c.get("meta") or {}).get("author") == "model" for c in st.candidates.list(cid))
+    feats = {f["feature_id"]: f for f in st.ledger.list(cid)}
+    out: dict[str, str] = {}
+    for it in items:
+        iid = it["item_id"]
+        if iid == f"{cid}:M-COMPARE":
+            out[iid] = "verifier_decided"
+        elif iid in (f"{cid}:M-IMPL", f"{cid}:M-FIX"):
+            out[iid] = "model_proposed" if model_cands else "deterministic"
+        elif it.get("feature_id") and (feats.get(it["feature_id"]) or {}).get("origin") == "model":
+            out[iid] = "model_proposed"
+        else:
+            out[iid] = "deterministic"
+    return out

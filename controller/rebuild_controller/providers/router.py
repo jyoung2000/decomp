@@ -1,15 +1,22 @@
 """Deterministic routing and the single AI call path.
 
 ``AIClient.call`` is the only place model calls are made for case work:
-  resolve route -> (optional advisory reorder) -> price -> reserve budget -> send -> settle actual -> log ``ai_calls`` ->
-  emit ``ai.call``.
-Rules enforced here:
+  project policy -> resolve ladder (global or project override) -> pre-call skips (policy locality, known capability /
+  context window) -> (optional advisory reorder) -> price -> reserve budget -> send -> settle actual -> log ``ai_calls`` ->
+  emit ``ai.call`` + plain-English ``ai.activity``.
+Rules enforced here (docs/AI_LADDER.md section 1):
+* A project with AI policy ``no_ai`` is refused BEFORE any adapter is created: nothing can touch the network.
 * Nothing is sent before a reservation succeeds. Exhausted budget => no request leaves the process.
 * Unknown pricing is never zero: it needs explicit approval and reserves a conservative ceiling.
-* Retries are bounded: at most ONE re-send, and only when the failure confirms the request was not processed
+* Retries are bounded: at most ONE re-send by default, and only when the failure confirms the request was not processed
   (rate limit, connect failure). Read timeouts and cut-off streams are never re-sent to the same endpoint; their
   reservation is settled at the full reserved amount because the provider may have billed. Moving to the next
-  configured fallback is bounded by the route length and each attempt has its own reservation.
+  configured fallback is bounded by the ladder length and each attempt has its own reservation.
+* Credits exhausted / usage limit / auth / model unavailable / capability: spend released, connection or ladder entry state
+  recorded, next candidate. After a FREE candidate runs out of credits the router never silently moves to a paid model: a
+  paid fallback must have a known price (or explicit approval) and fit the budget, otherwise it is skipped with a reason.
+* Every attempt record carries ``reason`` (plain English), ``position``, ``locality``, ``config_revision`` and the policy
+  hash; the winner carries ``took_over_from``.
 * Every string that can carry provider text or secrets is redacted before it is logged or emitted.
 """
 from __future__ import annotations
@@ -17,26 +24,41 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol, Sequence
+from typing import Any, Callable, Mapping, Protocol
 
-from .base import (AmbiguousCompletion, AuthError, InvalidRequest, OnText, ProviderError, ProviderUnavailable, RateLimit,
-                   Request, Response, Timeout, Unreachable, Usage, UsageLimit, with_model)
-from .connections import ConnectionStore, ConnectionStoreError, HandoffOnly
+from .base import (AmbiguousCompletion, AuthError, CapabilityError, CreditsExhausted, InvalidRequest, ModelUnavailable, OnText,
+                   ProviderError, ProviderUnavailable, RateLimit, Request, Response, Timeout, Unreachable, Usage, UsageLimit,
+                   with_model)
+from .connections import ConnectionStore, ConnectionStoreError, HandoffOnly, locality_of
+from .ladder import (TASK_VERB, capabilities as model_caps, emit_activity, locality_block, money, normalize_policy,
+                     override_entries, policy_hash)
 from .pricing import ApprovalRequired, Price, PriceTable, estimate_request_tokens
 from .secrets import install_redacting_filter, redact
 from ..budget import BudgetExhausted, BudgetLedger, DuplicateReservation
 from ..events import EventLog
 from ..ids import new_id, now_iso
-from ..store.db import Database
+from ..store.db import Database, loads
 
 log = logging.getLogger("rebuild.ai")
 install_redacting_filter(log)
 
 
 class NoRoute(Exception):
-    def __init__(self, task: str, skipped: list[dict[str, str]]):
+    def __init__(self, task: str, skipped: list[dict[str, str]], attempts: list[dict[str, Any]] | None = None,
+                 recovery: str | None = None):
         self.task, self.skipped = task, skipped
+        self.attempts = attempts or []
+        self.recovery = recovery or recovery_action(self.attempts) or \
+            f"Add a connection and a ladder entry for '{task}' (Settings > AI models), or change the project's AI policy."
         super().__init__(f"no usable route for task {task!r}: " + "; ".join(s.get("reason", "") for s in skipped))
+
+
+class AIDisabled(NoRoute):
+    """The project's AI policy is ``no_ai``: refused before any adapter was created."""
+
+    def __init__(self, task: str):
+        super().__init__(task, [{"reason": "project AI policy is no_ai"}],
+                         recovery="AI is off for this project. Change the project's AI policy (mode) to use a model.")
 
 
 class BudgetRequired(Exception):
@@ -46,6 +68,7 @@ class BudgetRequired(Exception):
 class AllCandidatesFailed(Exception):
     def __init__(self, task: str, attempts: list[dict[str, Any]], last: BaseException | None):
         self.task, self.attempts, self.last = task, attempts, last
+        self.recovery = recovery_action(attempts)
         super().__init__(f"all routes failed for task {task!r}: " +
                          "; ".join(f"{a['provider']}:{a['model']} {a['outcome']}" for a in attempts))
 
@@ -66,34 +89,50 @@ class CallResult:
     call_id: str
     attempts: list[dict[str, Any]] = field(default_factory=list)
     advisor: dict[str, Any] | None = None
+    config_revision: int = 0
+    policy_hash: str | None = None
+    took_over_from: list[dict[str, Any]] = field(default_factory=list)
+    locality: str = "cloud"
+    position: int = 1
+
+
+DETAIL_KEYS = ("connection_id", "reason", "position", "locality", "config_revision", "policy_hash", "took_over_from", "prompt_sha256",
+               "attempt", "error_kind")
 
 
 def record_ai_call(db: Database, events: EventLog, *, call_id: str, task: str, provider: str, model: str, outcome: str,
                    usage: Usage | None = None, cost_usd: float | None = 0.0, cost_known: bool = True, latency_ms: int | None = None,
                    case_id: str | None = None, job_id: str | None = None, extra: dict[str, Any] | None = None) -> None:
     u = usage or Usage()
+    clean = {k: (redact(v)[:300] if isinstance(v, str) else v) for k, v in (extra or {}).items()}
+    detail = {k: clean[k] for k in DETAIL_KEYS if k in clean}
     db.insert("ai_calls", {"call_id": call_id, "case_id": case_id, "job_id": job_id, "provider": provider, "model": model,
                            "task": task, "input_tokens": u.input_tokens, "output_tokens": u.output_tokens,
                            "cached_tokens": u.cached_tokens, "cost_usd": cost_usd, "cost_known": int(bool(cost_known)),
-                           "outcome": outcome, "latency_ms": latency_ms, "created_at": now_iso()})
+                           "outcome": outcome, "latency_ms": latency_ms, "created_at": now_iso(), "detail": detail})
     payload = {"call_id": call_id, "task": task, "provider": provider, "model": model, "outcome": outcome,
                "input_tokens": u.input_tokens, "output_tokens": u.output_tokens, "cached_tokens": u.cached_tokens,
                "cost_usd": cost_usd, "cost_known": bool(cost_known), "latency_ms": latency_ms}
-    for k, v in (extra or {}).items():
-        payload[k] = redact(v)[:300] if isinstance(v, str) else v
+    payload.update(clean)
     events.emit("ai.call", payload, case_id=case_id, job_id=job_id)
 
 
-# outcome label, release-reservation?, mark connection state
+# outcome label, release-reservation?
 def _classify(e: ProviderError) -> tuple[str, bool]:
     if isinstance(e, AuthError):
         return "auth_failed", True
+    if isinstance(e, CreditsExhausted):
+        return "credits_exhausted", True
     if isinstance(e, UsageLimit):
         return "usage_limit", True
     if isinstance(e, RateLimit):
         return "rate_limit", True
     if isinstance(e, Unreachable):
         return "unreachable", True
+    if isinstance(e, ModelUnavailable):
+        return "model_unavailable", True
+    if isinstance(e, CapabilityError):
+        return "capability_unsupported", True
     if isinstance(e, InvalidRequest):
         return "invalid_request", True
     if isinstance(e, Timeout):
@@ -103,6 +142,85 @@ def _classify(e: ProviderError) -> tuple[str, bool]:
     if isinstance(e, ProviderUnavailable):
         return "unavailable", True
     return "error", False
+
+
+# ====================================================================================== plain-English reasons
+def describe(outcome: str, *, model: str, label: str = "", status: int | None = None, retry_after: float | None = None,
+             detail: str | None = None, requested: float | None = None) -> str:
+    on = f" on {label}" if label else ""
+    if outcome == "rate_limit":
+        return f"{model}{on} is rate-limited (HTTP 429)" + (f"; it asked to wait {retry_after:g}s" if retry_after is not None else "")
+    if outcome == "usage_limit":
+        return f"{model}{on} hit its usage limit"
+    if outcome == "credits_exhausted":
+        return f"{label or model} has run out of credits" + (f" for {model}" if label else "")
+    if outcome == "auth_failed":
+        return f"{label or model} rejected the API key" if not detail else f"{model}{on} cannot be used ({detail})"
+    if outcome == "model_unavailable":
+        return f"{model} is not available{on} (model not found)"
+    if outcome == "capability_unsupported":
+        return f"{model} cannot take this request ({detail or 'unsupported input'})"
+    if outcome == "unreachable":
+        return f"{label or model} could not be reached (nothing was sent)"
+    if outcome == "timeout_not_sent":
+        return f"{label or model} timed out before the request was sent"
+    if outcome == "unavailable":
+        return f"{label or model} returned a server error" + (f" (HTTP {status})" if status else "")
+    if outcome == "timeout":
+        return (f"{model} timed out after the request was sent; it may have been processed, so it is counted as spent and is "
+                f"not sent again")
+    if outcome == "ambiguous":
+        return f"{model}'s answer was cut off; it may have been processed, so it is counted as spent and is not sent again"
+    if outcome == "approval_required":
+        return detail or f"{model} has no known price; it is skipped until you set a price or approve unknown pricing"
+    if outcome == "budget_exhausted":
+        return detail or (f"{model} could cost up to ${requested:.4f}, more than the budget has left" if requested is not None
+                          else f"{model} does not fit the budget")
+    if outcome == "policy_skipped":
+        return f"{model} skipped: {detail or 'excluded by the project AI policy'}"
+    if outcome == "invalid_request":
+        return f"{label or model} rejected the request as invalid" + (f" ({detail})" if detail else "")
+    if outcome in ("unusable", "no_adapter"):
+        return f"{model}{on} cannot be used ({detail or 'no API path'})"
+    if outcome == "ok":
+        return f"{model} answered"
+    return f"{model} failed unexpectedly" + (f" ({detail})" if detail else "")
+
+
+def recovery_action(attempts: list[dict[str, Any]]) -> str:
+    """One precise next step per distinct failing ladder entry, most actionable first."""
+    seen: set[tuple[Any, ...]] = set()
+    steps: list[str] = []
+    for a in attempts:
+        o, m, lab = a.get("outcome"), a.get("model"), a.get("connection_label") or a.get("provider") or ""
+        key = (o, a.get("connection_id"), m)
+        if o == "ok" or key in seen:
+            continue
+        seen.add(key)
+        step = {
+            "credits_exhausted": f"add credits to {lab} (or wait for its free tier to reset)",
+            "usage_limit": f"wait for {lab}'s usage window to reset or raise its limit",
+            "auth_failed": f"update the API key for {lab} in Connections",
+            "model_unavailable": (f"pull the model on this PC (ollama pull {m})" if a.get("provider") == "local"
+                                  else f"choose a current model instead of {m} on {lab}"),
+            "capability_unsupported": f"use a model that can take this input instead of {m}",
+            "unreachable": f"start or reconnect {lab}",
+            "timeout_not_sent": f"check that {lab} is reachable",
+            "unavailable": f"retry later ({lab} had a server error)",
+            "rate_limit": f"retry later ({lab} is rate-limited)",
+            "timeout": f"check whether {lab} processed the timed-out request before retrying",
+            "ambiguous": f"check whether {lab} processed the cut-off request before retrying",
+            "approval_required": f"set a price for {m} or approve unknown pricing in the AI policy",
+            "budget_exhausted": "raise the project's AI budget",
+            "policy_skipped": "change the project's AI locality policy or add a matching model to the ladder",
+            "invalid_request": f"check the request settings for {m}",
+            "unusable": f"fix or remove the ladder entry {m} on {lab}",
+            "no_adapter": f"fix or remove the ladder entry {m} on {lab}",
+        }.get(o or "", f"check {lab}")
+        steps.append(step)
+    if not steps:
+        return ""
+    return "To continue: " + "; ".join(dict.fromkeys(steps)) + ". Then resume."
 
 
 class AIClient:
@@ -125,14 +243,23 @@ class AIClient:
         """The deterministic candidate order for ``task`` (no spend, no advisor)."""
         return self.connections.resolve_detailed(task, request.needs())
 
-    def _advise(self, task: str, usable: list[tuple[dict[str, Any], str]], request: Request, est_in: int, case_id: str | None,
-                job_id: str | None) -> tuple[list[tuple[dict[str, Any], str]], dict[str, Any] | None]:
+    def _policy_for(self, case_id: str | None, policy: Mapping[str, Any] | None) -> dict[str, Any] | None:
+        if policy is not None:
+            return normalize_policy(policy)
+        if case_id:
+            row = self.db.query_one("SELECT ai_policy FROM cases WHERE case_id=?", (case_id,))
+            if row is not None:
+                return normalize_policy(loads(row["ai_policy"], {}))
+        return None
+
+    def _advise(self, task: str, usable: list[dict[str, Any]], request: Request, est_in: int, case_id: str | None,
+                job_id: str | None) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
         if self.advisor is None or len(usable) < 2:
             return usable, None
         cands = []
-        for i, (c, m) in enumerate(usable):
-            p = self.prices.lookup(c["provider"], m, connection=c)
-            cands.append({"index": i, "connection_id": c["connection_id"], "provider": c["provider"], "model": m,
+        for i, c in enumerate(usable):
+            p = self.prices.lookup(c["conn"]["provider"], c["model"], connection=c["conn"])
+            cands.append({"index": i, "connection_id": c["conn"]["connection_id"], "provider": c["conn"]["provider"], "model": c["model"],
                           "price_known": p.known, "input_per_mtok": p.input_per_mtok, "output_per_mtok": p.output_per_mtok})
         summary = {"task": task, "needs": sorted(request.needs()), "est_input_tokens": est_in,
                    "max_output_tokens": request.max_output_tokens, "messages": len(request.messages)}
@@ -147,20 +274,60 @@ class AIClient:
             return usable, info
         return [usable[i] for i in order], info
 
+    @staticmethod
+    def _precall_skip(cand: dict[str, Any], request: Request, est_in: int, pol: dict[str, Any] | None) -> tuple[str, str] | None:
+        """(outcome, detail) when the entry is known to be unusable for this request without sending anything."""
+        conn, model = cand["conn"], cand["model"]
+        if pol is not None:
+            why = locality_block(pol, locality_of(conn))
+            if why:
+                return "policy_skipped", why
+        caps = model_caps(conn, model)
+        needs = request.needs()
+        if "images" in needs and caps["vision"] is False:
+            return "capability_unsupported", "it cannot take images"
+        if "tools" in needs and caps["tools"] is False:
+            return "capability_unsupported", "it cannot call tools"
+        cw = caps["context_window"]
+        if cw and est_in + int(request.max_output_tokens) > cw:
+            return "capability_unsupported", (f"the request (about {est_in} input + {request.max_output_tokens} output tokens) does not fit "
+                                              f"its {cw}-token context window")
+        return None
+
     # ------------------------------------------------------------------ the call
     def call(self, task: str, request: Request, *, job_id: str | None = None, case_id: str | None = None,
              budget: str | None = None, approve_unknown_pricing: bool = False, request_key: str | None = None,
              on_text: OnText | None = None, max_retries: int | None = None, retry_unavailable: bool = False,
-             backoff_base_s: float = 1.0) -> CallResult:
+             backoff_base_s: float = 1.0, policy: Mapping[str, Any] | None = None,
+             activity: Mapping[str, Any] | None = None) -> CallResult:
         """``max_retries``/``retry_unavailable``/``backoff_base_s`` opt in to the unattended-loop policy: up to
         ``max_retries`` re-sends per route with exponential backoff (``Retry-After`` wins when the provider sends it) on
         429 and, with ``retry_unavailable``, on 5xx. 5xx reservations are released (provider processed nothing), so a
-        retry never double-reserves. Without them the conservative default (one re-send, 429/connect only) applies."""
-        usable, skipped = self.connections.resolve_detailed(task, request.needs())
-        if not usable:
-            raise NoRoute(task, skipped)
+        retry never double-reserves. Without them the conservative default (one re-send, 429/connect only) applies.
+
+        ``policy`` is the project's effective AI policy (loaded from the case when omitted and ``case_id`` names a case).
+        ``activity`` adds context to the activity feed lines (``plan_item_id``, ``subject``, ``origin``, ``candidate_id``)."""
+        pol = self._policy_for(case_id, policy)
+        rev = self.connections.config_revision()
+        phash = policy_hash(pol) if pol is not None else None
+        sha = request.fingerprint()
+        act_ctx = {k: v for k, v in (activity or {}).items() if k in ("plan_item_id", "candidate_id", "evidence_ids", "origin")}
+        subject = (activity or {}).get("subject") or "the request"
+
+        def say(text: str, kind: str, **fields: Any) -> None:
+            emit_activity(self.events, text, kind=kind, case_id=case_id, job_id=job_id, task=task, config_revision=rev,
+                          policy_hash=phash, prompt_sha256=sha, **{**act_ctx, **fields})
+
+        if pol is not None and pol["mode"] == "no_ai":
+            # refused before any adapter is created: nothing can reach the network
+            say(f"AI is off for this project (policy: no AI); {subject} was not sent to any model.", "refused", outcome="policy_skipped")
+            raise AIDisabled(task)
+        override = override_entries(pol, task) if pol is not None else None
+        ladder = self.connections.ladder_candidates(task, request.needs(), override)
+        if not ladder:
+            say(f"No model is configured for {task}; nothing was sent.", "refused", outcome="no_route")
+            raise NoRoute(task, [{"reason": f"no route configured for task {task!r}"}])
         est_in = estimate_request_tokens(request)
-        usable, adv = self._advise(task, usable, request, est_in, case_id, job_id)
         call_id = new_id("call")
         base_key = request_key or f"call:{call_id}"
         attempts: list[dict[str, Any]] = []
@@ -168,26 +335,93 @@ class AIClient:
         budget_err: BudgetExhausted | None = None
         unpriced: list[tuple[str, str]] = []
         provider_failed = False
+        free_ran_out: str | None = None
+        pending: list[str] = []            # failure phrases waiting for "; trying <next>"
 
-        def note(conn: dict[str, Any], model: str, outcome: str, **kw: Any) -> None:
-            attempts.append({"connection_id": conn["connection_id"], "provider": conn["provider"], "model": model,
-                             "outcome": outcome, **kw})
+        def note(cand: dict[str, Any], outcome: str, reason: str, **kw: Any) -> dict[str, Any]:
+            conn = cand.get("conn") or {}
+            rec = {"connection_id": cand.get("connection_id"), "connection_label": conn.get("label"), "provider": conn.get("provider"),
+                   "model": cand["model"], "outcome": outcome, "reason": reason, "position": cand["position"],
+                   "locality": locality_of(conn) if conn else None, "config_revision": rev, "policy_hash": phash, **kw}
+            attempts.append(rec)
+            if outcome != "ok":
+                pending.append(reason)
+            return rec
 
-        for conn, model in usable:
-            cid, provider = conn["connection_id"], conn["provider"]
+        def start_line(cand: dict[str, Any], paid_note: str = "") -> None:
+            conn, model = cand["conn"], cand["model"]
+            loc = locality_of(conn)
+            where = "local model" if loc == "local" else "cloud model"
+            if pending:
+                text = "; ".join(pending) + f"; trying {model} ({'runs on this PC' if loc == 'local' else conn['label']})" + paid_note
+                say(text, "fallback", provider=conn["provider"], model=model, locality=loc, position=cand["position"],
+                    fallback_reason=pending[-1], outcome=attempts[-1]["outcome"] if attempts else None)
+                pending.clear()
+            else:
+                say(f"{TASK_VERB.get(task, 'Working on')} {subject} with {where} {model}" + ("" if loc == "local" else f" ({conn['label']})"),
+                    "start", provider=conn["provider"], model=model, locality=loc, position=cand["position"])
+
+        # ---- pre-call skips (nothing sent, nothing reserved)
+        usable: list[dict[str, Any]] = []
+        for cand in ladder:
+            if cand["skip"]:
+                o = cand["skip_outcome"] or "unusable"
+                note(cand, o, describe(o, model=cand["model"], label=(cand["conn"] or {}).get("label", ""), detail=cand["skip"]))
+                continue
+            sk = self._precall_skip(cand, request, est_in, pol)
+            if sk:
+                note(cand, sk[0], describe(sk[0], model=cand["model"], label=cand["conn"]["label"], detail=sk[1]))
+                record_ai_call(self.db, self.events, call_id=new_id("aic"), task=task, provider=cand["conn"]["provider"], model=cand["model"],
+                               outcome=sk[0], case_id=case_id, job_id=job_id,
+                               extra={"connection_id": cand["connection_id"], "reason": attempts[-1]["reason"], "position": cand["position"],
+                                      "locality": attempts[-1]["locality"], "config_revision": rev, "policy_hash": phash,
+                                      "prompt_sha256": sha})
+                continue
+            usable.append(cand)
+        if not usable:
+            skipped = [{"connection_id": str(a["connection_id"]), "model": str(a["model"]), "reason": a["reason"]} for a in attempts]
+            err = NoRoute(task, skipped, attempts)
+            say(("; ".join(pending) if pending else f"No usable model for {task}") + f". Nothing was sent. {err.recovery}", "stopped",
+                outcome="no_route")
+            raise err
+        usable, adv = self._advise(task, usable, request, est_in, case_id, job_id)
+
+        for idx, cand in enumerate(usable):
+            conn, model = cand["conn"], cand["model"]
+            cid, provider, label = conn["connection_id"], conn["provider"], conn["label"]
+            loc = locality_of(conn)
             price = self.prices.lookup(provider, model, connection=conn)
+            free = bool(price.known and price.input_per_mtok == 0 and price.output_per_mtok == 0)
+            base_extra = {"connection_id": cid, "position": cand["position"], "locality": loc, "config_revision": rev,
+                          "policy_hash": phash, "prompt_sha256": sha}
+            if free_ran_out and not free and not price.known and not approve_unknown_pricing:
+                why = (f"{free_ran_out} ran out of free credits; {model} costs money and has no known price, so it is not used "
+                       f"without your approval")
+                note(cand, "approval_required", why)
+                unpriced.append((provider, model))
+                record_ai_call(self.db, self.events, call_id=new_id("aic"), task=task, provider=provider, model=model,
+                               outcome="approval_required", case_id=case_id, job_id=job_id, extra={**base_extra, "reason": why})
+                continue
             if price.approval_required and not approve_unknown_pricing:
                 unpriced.append((provider, model))
-                note(conn, model, "approval_required")
+                why = describe("approval_required", model=model, label=label)
+                note(cand, "approval_required", why)
                 record_ai_call(self.db, self.events, call_id=new_id("aic"), task=task, provider=provider, model=model,
-                               outcome="approval_required", case_id=case_id, job_id=job_id, extra={"connection_id": cid})
+                               outcome="approval_required", case_id=case_id, job_id=job_id, extra={**base_extra, "reason": why})
                 continue
             amount = price.ceiling(est_in, request.max_output_tokens, cache_write=request.cache)
+            if budget is None and amount > 0 and (provider_failed or free_ran_out):
+                why = (f"{model} costs money (up to ${amount:.4f}) but no budget was given, so it is not used"
+                       + (f" after {free_ran_out} ran out of free credits" if free_ran_out else ""))
+                note(cand, "budget_exhausted", why, requested=amount)
+                continue
             try:
                 adapter = self.connections.adapter(cid)
             except (AuthError, HandoffOnly, ConnectionStoreError) as e:
                 last_exc, provider_failed = e, True
-                note(conn, model, "auth_failed" if isinstance(e, AuthError) else "no_adapter", error=redact(str(e))[:200])
+                o = "auth_failed" if isinstance(e, AuthError) else "no_adapter"
+                note(cand, o, describe(o, model=model, label=label, detail=redact(str(e))[:120] if o != "auth_failed" else None),
+                     error=redact(str(e))[:200])
                 if isinstance(e, AuthError):
                     self.connections.set_state(cid, "auth_failed")
                 continue
@@ -204,13 +438,16 @@ class AIClient:
                         rsv = self.budgets.reserve(budget, amount, rkey)
                     except BudgetExhausted as e:
                         budget_err = e
-                        note(conn, model, "budget_exhausted", requested=amount)
+                        why = describe("budget_exhausted", model=model, requested=amount)
+                        note(cand, "budget_exhausted", why, requested=amount)
                         record_ai_call(self.db, self.events, call_id=new_id("aic"), task=task, provider=provider, model=model,
                                        outcome="budget_exhausted", case_id=case_id, job_id=job_id,
-                                       extra={"connection_id": cid, "requested_usd": amount})
+                                       extra={**base_extra, "requested_usd": amount, "reason": why})
                         break
                     except DuplicateReservation:
                         raise
+                if tries == 1:
+                    start_line(cand, f" - a paid model, up to ${amount:.4f} from the budget" if free_ran_out and not free else "")
                 t0 = self._mono()
                 aic = new_id("aic")
                 try:
@@ -229,28 +466,45 @@ class AIClient:
                     elif not release:
                         cost, known = 0.0, True
                     provider_failed = True
-                    note(conn, model, outcome, error=redact(str(e))[:200], retry=tries)
+                    detail = redact(str(e))[:160] if outcome in ("capability_unsupported", "invalid_request") else None
+                    why = describe(outcome, model=model, label=label, status=e.status, retry_after=e.retry_after, detail=detail)
+                    note(cand, outcome, why, error=redact(str(e))[:200], retry=tries, assumed_spent=not release,
+                         cost_usd=cost, cost_known=known)
                     record_ai_call(self.db, self.events, call_id=aic, task=task, provider=provider, model=model, outcome=outcome,
                                    usage=e.partial_usage, cost_usd=cost, cost_known=known, latency_ms=latency, case_id=case_id,
-                                   job_id=job_id, extra={"connection_id": cid, "error": str(e), "attempt": tries,
+                                   job_id=job_id, extra={**base_extra, "error": str(e), "attempt": tries, "reason": why,
                                                          "retry_safe": e.retry_safe, "error_kind": e.kind})
                     log.info("ai call failed task=%s %s:%s outcome=%s", task, provider, model, outcome)
                     if isinstance(e, AuthError):
                         self.connections.set_state(cid, "auth_failed")
+                    elif isinstance(e, CreditsExhausted):
+                        self.connections.set_state(cid, "no_credits")
+                        if free:
+                            free_ran_out = label
                     elif isinstance(e, UsageLimit):
                         self.connections.set_state(cid, "limited")
                     elif isinstance(e, Unreachable):
                         self.connections.set_state(cid, "unreachable")
+                    elif isinstance(e, ModelUnavailable):
+                        self.connections.mark_model(cid, model, "model_unavailable", detail=str(e))
                     limit = self.MAX_RESEND if max_retries is None else max(0, int(max_retries))
-                    resend = tries <= limit and ((e.retry_safe and isinstance(e, (RateLimit, Timeout, Unreachable)))
+                    resend = tries <= limit and ((e.retry_safe and isinstance(e, (RateLimit, Timeout, Unreachable))
+                                                  and not isinstance(e, UsageLimit))
                                                  or (retry_unavailable and isinstance(e, ProviderUnavailable) and release))
                     if resend:
                         default_wait = 1.0 if max_retries is None else float(backoff_base_s) * (2 ** (tries - 1))
                         wait = min(e.retry_after if e.retry_after is not None else default_wait, self.max_retry_wait_s)
+                        pending.pop()            # not a fallback: the same entry is tried again
+                        say(f"{why}; waiting {max(0.0, wait):g}s and sending again ({tries + 1} of {limit + 1})", "retry",
+                            provider=provider, model=model, locality=loc, outcome=outcome, position=cand["position"],
+                            fallback_reason=why)
                         self._sleep(max(0.0, wait))
                         continue
                     if not release and not self.fallback_on_ambiguous:
-                        raise AllCandidatesFailed(task, attempts, e) from e
+                        exc = AllCandidatesFailed(task, attempts, e)
+                        say(f"{why}. Not trying another model (fallback after an uncertain outcome is off). {exc.recovery}",
+                            "stopped", provider=provider, model=model, locality=loc, outcome=outcome)
+                        raise exc from e
                     break
                 except Exception as e:  # not a provider error: we cannot prove nothing was sent, so assume the ceiling was spent
                     if rsv is not None:
@@ -259,25 +513,43 @@ class AIClient:
                     record_ai_call(self.db, self.events, call_id=aic, task=task, provider=provider, model=model,
                                    outcome="internal_error", cost_usd=amount if rsv is not None else 0.0, cost_known=False,
                                    latency_ms=int((self._mono() - t0) * 1000), case_id=case_id, job_id=job_id,
-                                   extra={"connection_id": cid, "error": f"{type(e).__name__}: {e}"})
+                                   extra={**base_extra, "error": f"{type(e).__name__}: {e}"})
                     raise
                 latency = int((self._mono() - t0) * 1000)
                 cost, known = self._cost(price, resp.usage, amount)
                 if rsv is not None:
                     self.budgets.settle(rsv["reservation_id"], cost, {**resp.usage.to_dict(), "cost_known": known})
-                note(conn, model, "ok", cost_usd=cost, cost_known=known)
+                took = _took_over(attempts)
+                why = (f"{model} answered" + (f" after {len(took)} other option(s) failed" if took else ""))
+                note(cand, "ok", why, cost_usd=cost, cost_known=known, took_over_from=took)
                 record_ai_call(self.db, self.events, call_id=aic, task=task, provider=provider, model=model, outcome="ok",
                                usage=resp.usage, cost_usd=cost, cost_known=known, latency_ms=latency, case_id=case_id,
-                               job_id=job_id, extra={"connection_id": cid, "attempt": tries, "stop_reason": resp.stop_reason,
-                                                     "price_known": price.known})
+                               job_id=job_id, extra={**base_extra, "attempt": tries, "stop_reason": resp.stop_reason,
+                                                     "price_known": price.known, "reason": why, "took_over_from": took})
+                u = resp.usage
+                say(f"{model} answered ({u.input_tokens} tokens in, {u.output_tokens} out, {money(cost, known, free)}, "
+                    f"{latency / 1000:.1f}s)", "answer", provider=provider, model=model, locality=loc, outcome="ok",
+                    tokens_in=u.input_tokens, tokens_out=u.output_tokens, cost_usd=cost, cost_known=known, position=cand["position"],
+                    took_over_from=took, call_id=aic)
                 if conn["state"] != "ok":
                     self.connections.set_state(cid, "ok")
-                return CallResult(resp, cid, provider, model, cost, known, aic, attempts, adv)
+                self.connections.mark_model(cid, model, "ok")
+                return CallResult(resp, cid, provider, model, cost, known, aic, attempts, adv, config_revision=rev, policy_hash=phash,
+                                  took_over_from=took, locality=loc, position=cand["position"])
+        exc_final: Exception
         if unpriced and len(unpriced) == len(usable):
-            raise ApprovalRequired(unpriced)
-        if budget_err is not None and not provider_failed:
-            raise budget_err
-        raise AllCandidatesFailed(task, attempts, last_exc) from last_exc
+            exc_final = ApprovalRequired(unpriced)
+            exc_final.attempts = attempts  # type: ignore[attr-defined]
+        elif budget_err is not None and not provider_failed:
+            exc_final = budget_err
+        else:
+            exc_final = AllCandidatesFailed(task, attempts, last_exc)
+        rec = recovery_action(attempts)
+        say(("; ".join(pending) + "; no other model is left to try. " if pending else "No model answered. ") + rec,
+            "stopped", outcome=attempts[-1]["outcome"] if attempts else None, fallback_reason=pending[-1] if pending else None)
+        if isinstance(exc_final, AllCandidatesFailed):
+            raise exc_final from last_exc
+        raise exc_final
 
     @staticmethod
     def _cost(price: Price, usage: Usage, reserved: float) -> tuple[float, bool]:
@@ -288,3 +560,14 @@ class AIClient:
         if usage.known:
             return price.cost(usage), bool(price.known)
         return reserved, False     # usage never reported: assume the ceiling was spent
+
+
+def _took_over(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The candidates that failed (or were skipped) before the winner, one per ladder position (its final outcome)."""
+    by_pos: dict[Any, dict[str, Any]] = {}
+    for a in attempts:
+        if a["outcome"] == "ok":
+            continue
+        by_pos[a["position"]] = {"position": a["position"], "connection_id": a["connection_id"], "provider": a["provider"],
+                                 "model": a["model"], "outcome": a["outcome"], "reason": a["reason"]}
+    return [by_pos[k] for k in sorted(by_pos, key=lambda p: (p is None, p))]

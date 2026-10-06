@@ -68,10 +68,23 @@ class UsageLimit(ProviderError):
         super().__init__(message, **kw)
 
 
+class CreditsExhausted(UsageLimit):
+    """Prepaid credits / free tier used up (HTTP 402, OpenAI ``insufficient_quota``, OpenRouter credit errors). Nothing was
+    processed; retrying will not help until credit is added."""
+
+
 class InvalidRequest(ProviderError):
     def __init__(self, message: str, **kw: Any):
         kw.setdefault("retry_safe", True)
         super().__init__(message, **kw)
+
+
+class ModelUnavailable(InvalidRequest):
+    """The model id is unknown, deprecated or (for local servers) not pulled. Nothing was processed."""
+
+    def __init__(self, message: str, *, model: str | None = None, **kw: Any):
+        super().__init__(message, **kw)
+        self.model = model
 
 
 class CapabilityError(InvalidRequest):
@@ -80,6 +93,10 @@ class CapabilityError(InvalidRequest):
     def __init__(self, message: str, **kw: Any):
         kw.setdefault("request_sent", False)
         super().__init__(message, **kw)
+
+
+class ContextWindowExceeded(CapabilityError):
+    """The request does not fit the model's context window (known before the call, or reported by the provider)."""
 
 
 class Unreachable(ProviderError):
@@ -319,10 +336,20 @@ def new_capabilities() -> dict[str, Any]:
 
 
 # ======================================================================================= error classification
-_USAGE_RE = re.compile(r"(?i)(insufficient[_ ]quota|exceeded your current quota|credit balance|usage limit|quota exceeded|"
-                       r"billing|out of credits|spend limit|spending limit|plan limit|limit reached|resource_exhausted.*quota)")
+_CREDITS_RE = re.compile(r"(?i)(insufficient[_ ]quota|exceeded your current quota|credit balance|insufficient[_ ]credits|"
+                         r"more credits|out of credits|no credits|credits? (are |is )?(exhausted|depleted)|requires more credits|"
+                         r"payment required|add (more )?credits|billing)")
+_USAGE_RE = re.compile(r"(?i)(usage limit|quota exceeded|spend limit|spending limit|plan limit|limit reached|daily limit|"
+                       r"monthly limit|resource_exhausted.*quota)")
 _AUTH_RE = re.compile(r"(?i)(api[_ ]key (is )?(not valid|invalid)|API_KEY_INVALID|invalid x-api-key|incorrect api key|"
                       r"invalid api key|authentication)")
+_MODEL_RE = re.compile(r"(?i)(model_not_found|model[ _]?not[ _]?found|model .{0,80}(not found|does not exist|is not supported|"
+                       r"has been deprecated|was deprecated|is deprecated|decommissioned|no longer (available|supported))|"
+                       r"(unknown|invalid|no such) model|not a valid model|models/\S+ is not found|try pulling it first|"
+                       r"no endpoints found for)")
+_CONTEXT_RE = re.compile(r"(?i)(context[_ ]length[_ ]exceeded|maximum context length|context window|prompt is too long|"
+                         r"too many (input )?tokens|exceeds the (model'?s? )?(context|maximum)|input is too long|"
+                         r"string_above_max_length|reduce the length)")
 
 
 def _error_fields(body_text: str) -> tuple[str, str]:
@@ -359,10 +386,21 @@ def classify_error(provider: str, status: int, body_text: str, headers: Mapping[
     msg, code = _error_fields(body_text)
     text = f"{provider} HTTP {status}: {msg}" + (f" [{code}]" if code else "")
     kw = {"provider": provider, "status": status}
+    both = f"{msg} {code}"
     if status in (401, 403) or _AUTH_RE.search(msg) or _AUTH_RE.search(code):
+        if status == 403 and _CREDITS_RE.search(both):
+            return CreditsExhausted(text, **kw)       # OpenRouter: "key limit exceeded / requires more credits" can come as 403
         return AuthError(text, **kw)
-    if status == 402 or (status in (400, 429) and (_USAGE_RE.search(msg) or _USAGE_RE.search(code))):
+    if status == 402 or (status in (400, 429) and _CREDITS_RE.search(both)):
+        return CreditsExhausted(text, **kw)
+    if status in (400, 429) and _USAGE_RE.search(both):
         return UsageLimit(text, **kw)
+    if status in (404, 400, 410, 422) and _MODEL_RE.search(both):
+        return ModelUnavailable(text, **kw)
+    if status == 404 and re.search(r"(?i)\bmodel\b", both) and re.search(r"(?i)not[ _]found|not_found_error", both):
+        return ModelUnavailable(text, **kw)
+    if status in (400, 413, 422) and _CONTEXT_RE.search(both):
+        return ContextWindowExceeded(text, request_sent=True, **kw)
     if status == 429:
         return RateLimit(text, retry_after=_retry_after(headers), **kw)
     if status in (408, 504):

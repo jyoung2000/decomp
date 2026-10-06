@@ -1,11 +1,12 @@
 import threading
-from rebuild_controller.store.db import Database
+from rebuild_controller.store.db import MIGRATIONS, Database
 
 
 def test_migrations_idempotent(settings):
     d1 = Database(settings.db_path); d1.close()
     d2 = Database(settings.db_path)
-    assert d2.query_one("SELECT value FROM meta WHERE key='schema_version'")["value"] == "1"
+    assert d2.query_one("SELECT value FROM meta WHERE key='schema_version'")["value"] == str(MIGRATIONS[-1][0])
+    assert d2.query_one("SELECT COUNT(*) AS n FROM ai_config_revisions")["n"] == 0      # migration 2 (AI ladder) applied once
     d2.close()
 
 

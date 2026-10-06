@@ -1,0 +1,84 @@
+{
+  "fixture": "tinycalc",
+  "launcher": [
+    "wine",
+    "{ORIG}/tinycalc.exe"
+  ],
+  "oracle": {
+    "certifying": false,
+    "runner": "native",
+    "note": "outputs recorded from the correct reference implementation"
+  },
+  "observable_on": "windows_native",
+  "newline_policy": "compare stdout/stderr CRLF-normalised",
+  "scenarios": [
+    {
+      "id": "sum_basic",
+      "feature": "tinycalc.sum",
+      "description": "sum of three numbers",
+      "setup_files": {},
+      "final_files": {},
+      "steps": [
+        {
+          "args": [
+            "sum",
+            "3",
+            "4",
+            "5"
+          ],
+          "exit_code": 0,
+          "stdin": null,
+          "stdout": "sum = 12\n",
+          "stderr": "",
+          "stdout_normalized": "sum = 12\n",
+          "stderr_normalized": ""
+        }
+      ]
+    },
+    {
+      "id": "max_basic",
+      "feature": "tinycalc.max",
+      "description": "maximum of three numbers",
+      "setup_files": {},
+      "final_files": {},
+      "steps": [
+        {
+          "args": [
+            "max",
+            "3",
+            "9",
+            "4"
+          ],
+          "exit_code": 0,
+          "stdin": null,
+          "stdout": "max = 9\n",
+          "stderr": "",
+          "stdout_normalized": "max = 9\n",
+          "stderr_normalized": ""
+        }
+      ]
+    },
+    {
+      "id": "err_not_a_number",
+      "feature": "tinycalc.errors",
+      "description": "a non-numeric argument is rejected with exit code 2",
+      "setup_files": {},
+      "final_files": {},
+      "steps": [
+        {
+          "args": [
+            "sum",
+            "1",
+            "x"
+          ],
+          "exit_code": 2,
+          "stdin": null,
+          "stdout": "",
+          "stderr": "error: not a number: x\n",
+          "stdout_normalized": "",
+          "stderr_normalized": "error: not a number: x\n"
+        }
+      ]
+    }
+  ]
+}

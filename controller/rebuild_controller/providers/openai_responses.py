@@ -20,10 +20,10 @@ from typing import Any, Mapping
 
 import httpx
 
-from .base import (AmbiguousCompletion, AuthError, CapabilityError, ImagePart, InvalidRequest, Message, ModelDiscovery,
-                   ModelInfo, OnText, ProviderAdapter, ProviderError, ProviderUnavailable, RateLimit, Request, Response,
-                   TextPart, ToolCall, ToolResultPart, ToolUsePart, Unreachable, Usage, UsageLimit, classify_error,
-                   iter_sse, parse_json_args)
+from .base import (_CONTEXT_RE, _CREDITS_RE, _MODEL_RE, AmbiguousCompletion, AuthError, CapabilityError, ContextWindowExceeded,
+                   CreditsExhausted, ImagePart, InvalidRequest, Message, ModelDiscovery, ModelInfo, ModelUnavailable, OnText,
+                   ProviderAdapter, ProviderError, ProviderUnavailable, RateLimit, Request, Response, TextPart, ToolCall,
+                   ToolResultPart, ToolUsePart, Unreachable, Usage, UsageLimit, classify_error, iter_sse, parse_json_args)
 
 DEFAULT_ENDPOINTS = {
     "openai": "https://api.openai.com/v1",
@@ -281,8 +281,12 @@ class OpenAIResponsesAdapter(ProviderAdapter):
         pu = self._usage_responses(usage) if usage else None
         txt = f"{self.provider_name} stream error {code}: {msg}"
         low = (code + " " + msg).lower()
-        if "insufficient_quota" in low or "quota" in low and "exceed" in low:
-            return UsageLimit(txt, provider=self.provider_name)
+        if _CREDITS_RE.search(low) or "quota" in low and "exceed" in low:
+            return CreditsExhausted(txt, provider=self.provider_name)
+        if _MODEL_RE.search(low):
+            return ModelUnavailable(txt, provider=self.provider_name)
+        if _CONTEXT_RE.search(low):
+            return ContextWindowExceeded(txt, provider=self.provider_name, request_sent=True)
         if "rate_limit" in low:
             return RateLimit(txt, provider=self.provider_name)
         if "invalid_api_key" in low or "authentication" in low:

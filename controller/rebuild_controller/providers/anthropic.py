@@ -26,7 +26,8 @@ import httpx
 
 from .base import (AmbiguousCompletion, AuthError, CapabilityError, ImagePart, InvalidRequest, Message, ModelDiscovery,
                    ModelInfo, OnText, ProviderAdapter, ProviderError, ProviderUnavailable, RateLimit, Request, Response,
-                   TextPart, ToolCall, ToolResultPart, ToolUsePart, Usage, UsageLimit, iter_sse, parse_json_args)
+                   TextPart, ToolCall, ToolResultPart, ToolUsePart, Usage, UsageLimit, iter_sse, parse_json_args,
+                   ContextWindowExceeded, CreditsExhausted, ModelUnavailable)
 
 DEFAULT_ENDPOINT = "https://api.anthropic.com"
 API_VERSION = "2023-06-01"
@@ -239,9 +240,15 @@ class AnthropicAdapter(ProviderAdapter):
             return AuthError(txt, provider="anthropic")
         if et == "rate_limit_error":
             return RateLimit(txt, provider="anthropic")
+        if et == "not_found_error" and re.search(r"(?i)model", em):
+            return ModelUnavailable(txt, provider="anthropic")
         if et == "invalid_request_error":
-            if re.search(r"(?i)credit balance|usage limit", em):
+            if re.search(r"(?i)credit balance", em):
+                return CreditsExhausted(txt, provider="anthropic")
+            if re.search(r"(?i)usage limit", em):
                 return UsageLimit(txt, provider="anthropic")
+            if re.search(r"(?i)prompt is too long|context window|too many tokens", em):
+                return ContextWindowExceeded(txt, provider="anthropic", request_sent=True)
             return InvalidRequest(txt, provider="anthropic")
         # overloaded_error / api_error mid-stream: tokens may already have been generated and billed
         return AmbiguousCompletion(txt, provider="anthropic", partial_usage=usage)

@@ -19,7 +19,7 @@ import httpx
 
 from .base import (AmbiguousCompletion, CapabilityError, ImagePart, InvalidRequest, ModelDiscovery, ModelInfo, OnText,
                    ProviderAdapter, ProviderError, Request, Response, TextPart, ToolCall, ToolResultPart, ToolUsePart,
-                   Usage, iter_sse)
+                   Usage, iter_sse, classify_error)
 
 DEFAULT_ENDPOINT = "https://generativelanguage.googleapis.com"
 _FINISH = {"STOP": "end_turn", "MAX_TOKENS": "max_tokens", "SAFETY": "content_filter", "RECITATION": "content_filter",
@@ -180,6 +180,9 @@ class GeminiAdapter(ProviderAdapter):
         for c in chunks:
             if c.get("error"):
                 e = c["error"]
+                if isinstance(e, dict) and isinstance(e.get("code"), int) and e["code"] in (400, 402, 404, 429) and not parts:
+                    # an error envelope before any content: the provider refused the request (quota / model / credits)
+                    raise classify_error("gemini", int(e["code"]), json.dumps({"error": e}))
                 raise AmbiguousCompletion(f"gemini stream error {e.get('status', '')}: {e.get('message', '')}", provider="gemini")
             rid = c.get("responseId", rid)
             model = c.get("modelVersion", model)

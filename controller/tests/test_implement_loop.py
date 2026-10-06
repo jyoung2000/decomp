@@ -52,8 +52,8 @@ class Reply:
 
 
 class Status:
-    def __init__(self, code: int, retry_after: str | None = None):
-        self.code, self.retry_after = code, retry_after
+    def __init__(self, code: int, retry_after: str | None = None, body: dict | None = None):
+        self.code, self.retry_after, self.body = code, retry_after, body
 
 
 class Hook:
@@ -97,7 +97,7 @@ class FakeOpenAI:
                 if isinstance(item, Hook):
                     item = item.fn(body)
                 if isinstance(item, Status):
-                    self._send(item.code, {"error": {"message": f"scripted {item.code}", "type": "server_error"}},
+                    self._send(item.code, item.body or {"error": {"message": f"scripted {item.code}", "type": "server_error"}},
                                {"retry-after": item.retry_after} if item.retry_after is not None else None)
                     return
                 self._send(200, {"id": "chatcmpl-fake", "model": "gpt-fake",
@@ -504,6 +504,60 @@ def test_job_retry_after_worker_crash_reuses_stored_answers(studio, servers, tmp
     assert len(srv.requests) == 2 and res["verified"] is True and [a["attempt"] for a in res["attempts"]] == [1, 2]
     assert "cargo build failed" in srv.user_text(1)            # attempt 1's recorded build failure became attempt 2's feedback after the restart
     assert len(attempts(studio, cid)) == 2                     # attempt 1 was not duplicated
+
+
+# ----------------------------------------------------------------------------------------- AI ladder (docs/AI_LADDER.md)
+CREDITS_BODY = {"error": {"message": "Insufficient credits. Add more using https://openrouter.ai/credits", "code": 402}}
+MISSING_BODY = {"error": {"message": "model \"gpt-fake\" not found, try pulling it first", "type": "api_error"}}
+
+
+def feed(studio, cid) -> list[str]:
+    from rebuild_controller.providers.ladder import activity
+    return [a["text"] for a in activity(studio.events, cid)]
+
+
+def test_ladder_failover_inside_the_implement_loop_with_activity_feed(studio, servers, tmp_path):
+    from rebuild_controller.providers.ladder import put_ladder
+    s402, s404, sok = servers([Status(402, body=CREDITS_BODY)]), servers([Status(404, body=MISSING_BODY)]), servers([Reply(files_json(GOOD_MAIN))])
+    c1, c2, c3 = (connect(studio, s, label=l, route=False) for s, l in ((s402, "Credits"), (s404, "Missing"), (sok, "Works")))
+    rev = put_ladder(studio.connections, "interpretation", [{"connection_id": c["connection_id"], "model": "gpt-fake"} for c in (c1, c2, c3)])["config_revision"]
+    cid = make_case(studio, tmp_path, {})
+    drain(studio)
+    res = job(studio, cid, "implement_loop").result
+    assert res["verified"] is True and len(s402.requests) == len(s404.requests) == len(sok.requests) == 1
+    call = attempts(studio, cid)[0]["call"]
+    assert [(r["position"], r["outcome"]) for r in call["router_attempts"]] == [(1, "credits_exhausted"), (2, "model_unavailable"), (3, "ok")]
+    assert call["config_revision"] == rev and call["position"] == 3 and [t["position"] for t in call["took_over_from"]] == [1, 2]
+    assert studio.connections.get(c1["connection_id"])["state"] == "no_credits"
+    assert studio.budgets.get(f"case:{cid}")["spent_usd"] == pytest.approx(cost_of(1200, 800))          # the failures cost nothing
+    texts = feed(studio, cid)
+    i = texts.index(next(t for t in texts if t.startswith("Interpreting pecli (attempt 1 of 3) with local model gpt-fake")))
+    assert texts[i + 1] == "Credits has run out of credits for gpt-fake; trying gpt-fake (runs on this PC)"
+    assert texts[i + 2] == "gpt-fake is not available on Missing (model not found); trying gpt-fake (runs on this PC)"
+    assert texts[i + 3].startswith("gpt-fake answered (1200 tokens in, 800 out")
+    assert texts[i + 4].startswith("gpt-fake proposed 2 files (candidate r")
+    assert texts[i + 5:i + 8] == ["Build passed", "Verifier: 8 of 8 declared scenarios passed",
+                                  "Verified: every declared scenario matches the original; no further attempts needed"]
+
+
+def test_every_ladder_option_failing_preserves_work_and_blocks_with_a_recovery_action(studio, servers, tmp_path):
+    from rebuild_controller.providers.ladder import put_ladder
+    s402, s404 = servers([Status(402, body=CREDITS_BODY)]), servers([Status(404, body=MISSING_BODY)])
+    c1, c2 = connect(studio, s402, label="Credits", route=False), connect(studio, s404, label="Missing", route=False)
+    put_ladder(studio.connections, "interpretation", [{"connection_id": c["connection_id"], "model": "gpt-fake"} for c in (c1, c2)])
+    cid = make_case(studio, tmp_path, {})
+    drain(studio)
+    res = job(studio, cid, "implement_loop").result
+    assert res["stop_reason"] == "provider_failed" and res["verified"] is False and res["final_kind"] == "scaffold"
+    assert "To continue: add credits to Credits" in res["blocker"] and "choose a current model instead of gpt-fake on Missing" in res["blocker"]
+    impl = studio.plan.get_item(studio.plan.milestone_id(cid, "M-IMPL"))
+    assert impl["status"] == "blocked" and "To continue:" in impl["blockers"][0]
+    stopped = [e for e in studio.cases.list_evidence(cid, kind="ai_attempt") if not e["meta"].get("counted")]
+    assert stopped and studio.cases.evidence_body(stopped[0]["evidence_id"])["money_possibly_spent"] is False
+    assert studio.budgets.get(f"case:{cid}")["spent_usd"] == 0
+    d = job(studio, cid, "deliver")
+    assert d.state == JobState.COMPLETED and d.result["scaffold_only"] is True                            # work preserved and delivered honestly
+    assert any(t.startswith("Stopped before attempt 1 finished") and "To continue:" in t for t in feed(studio, cid))
 
 
 # ----------------------------------------------------------------------------------------- live (opt-in)
