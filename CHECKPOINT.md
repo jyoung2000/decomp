@@ -1,5 +1,10 @@
 # CHECKPOINT
 
+## 2026-10-06 ~12:50 UTC — all workers integrated; final validation running
+- Integrated: Windows packaging/CI handoff (20 gates), UI e2e + real-controller run, Cutter plugin (20 tests), dotnetapp→Rust demo (9/9).
+- Controller changes from worker findings: validation errors in the documented error shape (400), `/capabilities`, `POST /cases/{id}/modules/{mid}/briefing`, feedback requires existing case, package-data for schema/harness, build artifacts untracked, OS-aware test skips, screenshot settle wait in the web harness.
+- Known open items: UI does not yet call `deliver`/`review` endpoints (documented); screenshot `pixel:exact` can differ between runs if the page is captured before settling (settle wait added; cross-host comparisons need a declared tolerance); Windows gates W1–W20 and Hermes G1–G9 unexecuted; Cutter plugin unexercised inside Cutter.
+
 ## 2026-10-06 ~12:25 UTC — demos complete, doctor verified
 - `rebuildctl doctor --verify --smoke`: rizin, ilspy, gdre, jsweb **verified** (fixture regressions recorded in <data>/backend-verification.json, bound to tool versions); ghidra missing (optional).
 - Demos: pecli→Rust 8/8 (MCP external client), dotnetapp→Rust 9/9 (MCP external client, worker), webapp→PWA 4/4 (deterministic), godotgame→Bevy scaffold (recovery only, honest no-parity). Records under `examples/`.
