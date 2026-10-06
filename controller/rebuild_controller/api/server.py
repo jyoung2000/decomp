@@ -16,7 +16,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from .. import __version__
@@ -24,6 +24,18 @@ from ..ids import now_iso
 from ..services import StudioServices
 
 ALLOWED_ORIGIN_PREFIXES = ("http://localhost", "http://127.0.0.1", "tauri://localhost", "https://tauri.localhost", "http://tauri.localhost")
+_ALLOWED_ORIGINS = {("http", "localhost"), ("http", "127.0.0.1"), ("tauri", "localhost"), ("https", "tauri.localhost"), ("http", "tauri.localhost")}
+
+
+def origin_allowed(origin: str) -> bool:
+    """Exact scheme+host match (any port). A prefix test would also accept e.g. http://localhost.evil.example."""
+    from urllib.parse import urlsplit
+    try:
+        u = urlsplit(origin)
+        _ = u.port  # raises on a malformed port
+    except ValueError:
+        return False
+    return (u.scheme, (u.hostname or "")) in _ALLOWED_ORIGINS and not u.path.strip("/") and not u.username
 
 
 def _err(code: str, message: str, status: int = 400, affected: str | None = None, next_action: str | None = None) -> HTTPException:
@@ -39,6 +51,11 @@ class CaseCreate(BaseModel):
     ai_policy: dict[str, Any] = Field(default_factory=lambda: {"mode": "no_ai"})
     launch_profile: dict[str, Any] = Field(default_factory=lambda: {"execute_original": False})
     settings: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConsentSet(BaseModel):
+    allow: bool
+    note: str = Field(default="", max_length=500)
 
 
 class FeedbackCreate(BaseModel):
@@ -76,6 +93,15 @@ class RouteSet(BaseModel):
     allow_unlisted: bool = False
 
 
+def _outcome(studio: StudioServices, case_id: str) -> dict[str, Any] | None:
+    """Derived outcome summary (pipeline vs measured behaviour). Never fails the response: the UI has a pure fallback."""
+    from ..outcome import case_outcome
+    try:
+        return case_outcome(studio, case_id)
+    except Exception:
+        return None
+
+
 def create_app(studio: StudioServices, token: str) -> FastAPI:
     app = FastAPI(title="Rebuild Studio controller", version=__version__, docs_url=None, redoc_url=None)
     started_at = now_iso()
@@ -90,16 +116,32 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
             loop.call_soon_threadsafe(q.put_nowait, ev)
     studio.events.subscribe(fanout)
 
+    def _cors(resp, origin: str | None):
+        # The packaged UI runs on its own origin (http://tauri.localhost on Windows, tauri://localhost elsewhere) and
+        # calls this loopback port cross-origin, so allowed origins must get CORS headers or the webview blocks
+        # every response. The bearer token, not the origin, is the authorization.
+        if origin:
+            resp.headers["Access-Control-Allow-Origin"] = origin
+            resp.headers["Vary"] = "Origin"
+        return resp
+
     @app.middleware("http")
     async def auth(request: Request, call_next):
         origin = request.headers.get("origin")
-        if origin and not origin.startswith(ALLOWED_ORIGIN_PREFIXES):
+        if origin and not origin_allowed(origin):
             return JSONResponse({"error": {"code": "origin", "message": "origin not allowed"}}, status_code=403)
+        if request.method == "OPTIONS" and origin and request.headers.get("access-control-request-method"):
+            # CORS preflight never carries credentials; answer it before the token check.
+            return _cors(Response(status_code=204, headers={
+                "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "authorization, content-type",
+                "Access-Control-Max-Age": "600",
+            }), origin)
         if request.url.path not in ("/health",):
             hdr = request.headers.get("authorization", "")
             if not secrets.compare_digest(hdr, f"Bearer {token}"):
-                return JSONResponse({"error": {"code": "auth", "message": "missing or invalid token"}}, status_code=401)
-        return await call_next(request)
+                return _cors(JSONResponse({"error": {"code": "auth", "message": "missing or invalid token"}}, status_code=401), origin)
+        return _cors(await call_next(request), origin)
 
     @app.exception_handler(HTTPException)
     async def http_exc(request: Request, exc: HTTPException):
@@ -147,7 +189,7 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     @app.websocket("/ws")
     async def ws(websocket: WebSocket, token_q: str = Query(default="", alias="token"), since: int = 0):
         origin = websocket.headers.get("origin")
-        if (origin and not origin.startswith(ALLOWED_ORIGIN_PREFIXES)) or not secrets.compare_digest(token_q, token):
+        if (origin and not origin_allowed(origin)) or not secrets.compare_digest(token_q, token):
             await websocket.close(code=4401)
             return
         await websocket.accept()
@@ -190,7 +232,10 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
 
     @app.get("/cases")
     def cases():
-        return studio.cases.list_cases()
+        rows = studio.cases.list_cases()
+        for c in rows:
+            c["outcome"] = _outcome(studio, c["case_id"])
+        return rows
 
     @app.post("/cases")
     def create_case(body: CaseCreate):
@@ -205,7 +250,21 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         c["counts"] = {"jobs": studio.jobs.counts(case_id), "features": studio.ledger.summary(case_id), "candidates": len(studio.candidates.list(case_id)),
                        "previews": len(studio.previews.list(case_id)), "open_feedback": sum(1 for f in studio.feedback.list(case_id) if f["status"] not in ("resolved",))}
         c["stalled_jobs"] = [j.job_id for j in studio.jobs.stalled() if j.case_id == case_id]
+        c["outcome"] = _outcome(studio, case_id)
         return c
+
+    @app.get("/cases/{case_id}/consent/original-execution")
+    def consent_get(case_id: str):
+        return studio.cases.original_execution_consent(case_id)
+
+    @app.put("/cases/{case_id}/consent/original-execution")
+    def consent_put(case_id: str, body: ConsentSet):
+        return studio.cases.set_original_execution_consent(case_id, body.allow, via="api", note=body.note)
+
+    @app.get("/isolation")
+    def isolation():
+        from ..sandbox import describe_host
+        return describe_host()
 
     @app.post("/cases/{case_id}/start")
     def start(case_id: str):
@@ -283,7 +342,8 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         items = studio.plan.items(case_id)
         prog = studio.plan.progress(case_id)
         return {"revision": studio.plan.current_revision(case_id), "items": items, "progress": prog, "eta": prog["eta"],
-                "unknown_scope": [i for i in items if i["kind"] in ("discovery", "deferred", "unsupported")]}
+                "unknown_scope": [i for i in items if i["kind"] in ("discovery", "deferred", "unsupported")],
+                "outcome": _outcome(studio, case_id)}
 
     @app.get("/cases/{case_id}/plan/revisions")
     def plan_revisions(case_id: str):

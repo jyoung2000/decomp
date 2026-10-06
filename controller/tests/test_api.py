@@ -29,6 +29,30 @@ def test_auth_and_origin(client, src_out):
     assert r.status_code == 403
 
 
+@pytest.mark.parametrize("origin", ["http://tauri.localhost", "https://tauri.localhost", "tauri://localhost", "http://localhost:5173"])
+def test_packaged_ui_origin_gets_cors(client, origin):
+    """The installed Windows app calls the controller from http://tauri.localhost (cross-origin). Regression: the
+    preflight used to hit the token check (401, no CORS headers) so the packaged UI showed 'Disconnected'."""
+    c, st = client
+    pre = c.options("/cases", headers={"Origin": origin, "Access-Control-Request-Method": "GET",
+                                       "Access-Control-Request-Headers": "authorization", "Authorization": ""})
+    assert pre.status_code == 204
+    assert pre.headers["access-control-allow-origin"] == origin
+    assert "authorization" in pre.headers["access-control-allow-headers"]
+    r = c.get("/cases", headers={"Origin": origin})
+    assert r.status_code == 200 and r.headers["access-control-allow-origin"] == origin
+    r = c.get("/cases", headers={"Origin": origin, "Authorization": "Bearer wrong"})
+    assert r.status_code == 401 and r.headers["access-control-allow-origin"] == origin  # UI can read the error
+
+
+@pytest.mark.parametrize("origin", ["http://localhost.evil.example", "http://127.0.0.1.evil.example:80", "https://evil.example", "null"])
+def test_lookalike_origins_are_refused(client, origin):
+    c, st = client
+    r = c.options("/cases", headers={"Origin": origin, "Access-Control-Request-Method": "GET"})
+    assert r.status_code == 403 and "access-control-allow-origin" not in r.headers
+    assert c.get("/cases", headers={"Origin": origin}).status_code == 403
+
+
 def test_case_lifecycle_plan_feedback_persist(client, src_out, settings):
     c, st = client
     src, out = src_out
@@ -40,6 +64,8 @@ def test_case_lifecycle_plan_feedback_persist(client, src_out, settings):
     plan = c.get(f"/cases/{cid}/plan").json()
     assert plan["revision"] == 1 and any(i["kind"] == "discovery" for i in plan["items"])
     assert plan["progress"]["groups"]["discovery"]["total"] is None  # unknown denominator before scheduling
+    assert plan["outcome"]["state"] == "untested" and plan["outcome"]["verification"]["declared"] == 0 and not plan["outcome"]["can_claim_complete"]
+    assert c.get(f"/cases/{cid}").json()["outcome"]["state"] == "untested"
     fb = c.post(f"/cases/{cid}/feedback", json={"target_kind": "milestone", "target_id": plan["items"][0]["item_id"], "classification": "bug", "priority": "high",
                                                 "comment": "button broken sk-abcdefghijklmnop1234", "attachments": [{"name": "../../x.png", "bytes_b64": "aGVsbG8="}]}).json()
     assert fb["status"] == "received" and "[redacted]" in fb["comment"] and fb["attachments"][0]["name"] == "x.png" and fb["plan_revision"] == 1
