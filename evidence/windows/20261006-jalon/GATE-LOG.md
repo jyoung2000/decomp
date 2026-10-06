@@ -15,3 +15,11 @@ Driven by Claude Code through Windows UI Automation (real mouse clicks / double-
 | Double-click desktop icon → full UI, no console | PARTIAL: UI window opened, no console/terminal/dev server; processes: rebuild-studio.exe + rebuild-controller.exe (PyInstaller onefile bootloader + child). Controller ready ≈5.3 s after spawn (cold, first run). **UI showed "Disconnected"** | screenshot; controller.log |
 | Root cause | Controller answered the CORS preflight with 401 (token check ran first) and sent no `Access-Control-Allow-Origin`; the packaged webview origin `http://tauri.localhost` is cross-origin to `127.0.0.1:<port>`. Never seen before because UI e2e ran via the Vite dev server. Fixed in server.py + tests (`test_packaged_ui_origin_gets_cors`, `test_lookalike_origins_are_refused`) | |
 | Normal close (window X) | PASS: all rebuild-* processes exited within 4 s; controller.json removed | tasklist |
+
+## Run 2 — build after commit 9774d49 work tree (installer sha256 7c9c3e5e4aaedca41a82f7d6a5e96d735a069cfef92b937a702375bd9257f276, UNSIGNED)
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| Update over existing install (`setup.exe /P`, passive) | PASS: exit 0 in 5 s; binaries replaced; desktop shortcut kept; `%LOCALAPPDATA%\RebuildStudio` (store, cases, logs) preserved | ls before/after |
+| Start-menu launch | NOT RUN: this machine uses a third-party classic Start menu; the owner was actively typing in another window, so desktop automation was stopped to avoid interfering (one mistaken keystroke burst went into another app's text box and was removed character-for-character; nothing was sent) | — |
+| Pin to taskbar / relaunch from pin | NOT RUN (needs the desktop; Windows also blocks programmatic pinning by design, so this is a human step) | — |

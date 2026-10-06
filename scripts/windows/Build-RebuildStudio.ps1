@@ -247,13 +247,28 @@ function Get-PyiDataArgs {
     return $args2
 }
 
+# Every controller module by file name. --collect-submodules silently drops any module that fails to import at
+# analysis time, and backends are imported by name at runtime, so a transient import error once shipped a
+# controller with no recovery backends. Listing the files makes the bundle independent of build-time imports.
+function Get-PyiHiddenImportArgs {
+    $args2 = @()
+    $pkgRoot = Join-RsPath @($ControllerDir, 'rebuild_controller')
+    foreach ($f in (Get-ChildItem -LiteralPath $pkgRoot -Recurse -File -Filter '*.py' | Where-Object { $_.FullName -notmatch '__pycache__' })) {
+        $rel = $f.FullName.Substring($ControllerDir.TrimEnd('\', '/').Length).TrimStart('\', '/') -replace '\.py$', '' -replace '[\\/]', '.'
+        $rel = $rel -replace '\.__init__$', ''
+        $args2 += @('--hidden-import', $rel)
+    }
+    return $args2
+}
+
 function Invoke-Pyinstaller([string]$Name, [string]$EntryScript, [string[]]$Extra) {
     $pyiArgs = @('-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', '--noupx', '--name', $Name,
         '--distpath', $PyiDist, '--workpath', (Join-RsPath @($PyiRoot, 'work', $Name)), '--specpath', (Join-RsPath @($PyiRoot, 'spec')),
         '--paths', $ControllerDir, '--collect-submodules', 'rebuild_controller', '--collect-all', 'lief')
     if ($DryRun) {
         $pyiArgs += @('--add-data', "<each non-.py file under controller/rebuild_controller>$([System.IO.Path]::PathSeparator)<its package dir>")
-    } else { $pyiArgs += (Get-PyiDataArgs) }
+        $pyiArgs += @('--hidden-import', '<every module under controller/rebuild_controller>')
+    } else { $pyiArgs += (Get-PyiDataArgs); $pyiArgs += (Get-PyiHiddenImportArgs) }
     $pyiArgs += $Extra
     $pyiArgs += $EntryScript
     Invoke-Native $pyVenvBuild $pyiArgs $RepoRoot
@@ -332,6 +347,11 @@ function Test-Sidecar([string]$Exe) {
         $h = Invoke-RestMethod -Uri "http://127.0.0.1:$($c.port)/health" -Headers @{ Authorization = "Bearer $($c.token)" } -TimeoutSec 15
         if (-not $h.ok) { throw "/health did not report ok: $($h | ConvertTo-Json -Compress)" }
         Write-RsLog "sidecar smoke ok: port $($c.port), pid $($h.pid), version $($h.version)" 'INFO'
+        # Every backend module must load inside the frozen build (tools may be missing; the code may not).
+        $doc = (Get-NativeLines $Exe @('doctor', '--data-dir', $tmp, '--json')) -join "`n" | ConvertFrom-Json
+        $broken = @($doc.backends | Where-Object { $_.title -like '*(failed to load)*' } | ForEach-Object { "$($_.backend_id): $($_.tools[0].detail)" })
+        if ($broken.Count -gt 0) { throw "frozen controller cannot load backends: $($broken -join '; ')" }
+        Write-RsLog "sidecar doctor ok: $(@($doc.backends).Count) backends load in the frozen build" 'INFO'
     } finally {
         Stop-RsProcessTree $proc.Id
         if ($null -ne $prevData) { $env:REBUILD_STUDIO_DATA = $prevData } else { Remove-Item Env:\REBUILD_STUDIO_DATA -ErrorAction SilentlyContinue }
