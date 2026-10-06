@@ -150,7 +150,7 @@ Costs and limits of this mode:
 
 - New session and process group per run; timeout, cancel and main-process exit `killpg(SIGKILL)` the group.
   A child that calls `setsid()` itself can escape the group (no cgroup is used).
-- `RLIMIT_DATA` (memory, from the same `memory` setting), `RLIMIT_CORE=0`, `RLIMIT_FSIZE` (4 GiB), optional `RLIMIT_CPU`.
+- `RLIMIT_DATA` (memory, from the same `memory` setting), `RLIMIT_CORE=0`, optional `RLIMIT_FSIZE` (not set by default: .NET's double-mapped memfd on Linux trips any cap), optional `RLIMIT_CPU`.
   Memory exhaustion shows up as the program's own allocation failure; it is not separately reported in `triggered`.
 - The same allow-listed environment (`PATH` = program dir + `/usr/local/bin:/usr/bin:/bin`, `HOME`/`TMPDIR`/`XDG_*`
   redirected) and output/wall-time caps.

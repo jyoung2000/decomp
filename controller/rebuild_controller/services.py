@@ -107,11 +107,19 @@ class StudioServices:
     def create_case(self, **kwargs: Any) -> dict[str, Any]:
         case = self.cases.create_case(**kwargs)
         self.plan.initialize(case["case_id"], case)
+        case["implementation_forecast"] = self.implementation_forecast(case)
         return case
+
+    def implementation_forecast(self, case: dict[str, Any]) -> dict[str, Any]:
+        """Plain-language statement, before the case starts, of whether an implementation can be produced for this profile/target/AI mode."""
+        from .implement import forecast_for_case
+        return forecast_for_case(self, case)
 
     def start_rebuild(self, case_id: str) -> dict[str, Any]:
         from .pipeline import schedule_rebuild
-        return schedule_rebuild(self, case_id)
+        out = schedule_rebuild(self, case_id)
+        out["implementation_forecast"] = self.implementation_forecast(self.cases.get_case(case_id))
+        return out
 
     def doctor(self, smoke: bool = False, verify: bool = False) -> dict[str, Any]:
         return self.registry.doctor(smoke=smoke, verify=verify)

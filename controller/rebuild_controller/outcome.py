@@ -130,7 +130,7 @@ def collect_facts(studio: Any, case_id: str) -> dict[str, Any]:
     by_short = {i["item_id"].split(":", 1)[-1]: i for i in items}
     milestones = [i for i in items if i["kind"] == "milestone"]
     cands = studio.candidates.list(case_id)
-    cand = cands[-1] if cands else None
+    cand = next((c for c in reversed(cands) if (c.get("meta") or {}).get("final")), None) or (cands[-1] if cands else None)   # the implement loop marks the one it delivers
     meta = (cand or {}).get("meta") or {}
     scaffold_only = bool(cand and meta.get("origin") == "scaffold" and not meta.get("proposed_files") and not meta.get("author"))
 

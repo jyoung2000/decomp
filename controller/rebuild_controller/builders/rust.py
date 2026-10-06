@@ -21,7 +21,10 @@ def build_rust(ctx: StageContext, source_dir: Path, dist_dir: Path, *, bevy: boo
     manifest = source_dir / "Cargo.toml"
     if not manifest.exists():
         raise StageError("candidate has no Cargo.toml")
-    meta = tomllib.loads(manifest.read_text())
+    try:
+        meta = tomllib.loads(manifest.read_text("utf-8"))
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError) as e:
+        raise StageError(f"Cargo.toml is not valid TOML: {e}") from e
     name = meta.get("package", {}).get("name")
     if not name:
         raise StageError("Cargo.toml has no package name")

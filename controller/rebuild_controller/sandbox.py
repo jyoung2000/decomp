@@ -67,7 +67,9 @@ class IsolationPolicy:
     extra_path: tuple[str, ...] = ()
     redirect_profile: bool = True           # TEMP/TMP/HOME/USERPROFILE/APPDATA/LOCALAPPDATA -> work dir
     cpu_seconds: int | None = None          # POSIX RLIMIT_CPU
-    max_file_bytes: int | None = 4 * GiB    # POSIX RLIMIT_FSIZE
+    # POSIX RLIMIT_FSIZE, off by default: .NET on Linux ftruncates a W^X double-mapping memfd to a size tied to its
+    # address-space reservation, so any default cap kills managed originals with SIGXFSZ (seen in Linux CI).
+    max_file_bytes: int | None = None
 
     def __post_init__(self) -> None:
         if self.integrity not in ("low", "medium", "appcontainer"):
@@ -330,7 +332,7 @@ def _posix_preexec(policy: IsolationPolicy):
 def _posix_isolation(policy: IsolationPolicy) -> dict[str, Any]:
     return {"platform": sys.platform, "mode": "posix_rlimits", "integrity": None, "job_object": False,
             "process_group": True, "env": "allowlist", "network": NETWORK_OPEN, "filesystem": "not confined (runs as the current user)",
-            "downgrade": None, "rlimits": ["RLIMIT_DATA", "RLIMIT_CORE=0", "RLIMIT_FSIZE"] + (["RLIMIT_CPU"] if policy.cpu_seconds else [])}
+            "downgrade": None, "rlimits": ["RLIMIT_DATA", "RLIMIT_CORE=0"] + (["RLIMIT_FSIZE"] if policy.max_file_bytes else []) + (["RLIMIT_CPU"] if policy.cpu_seconds else [])}
 
 
 def _killpg(pid: int) -> None:

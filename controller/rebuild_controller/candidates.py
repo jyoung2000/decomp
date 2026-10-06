@@ -45,7 +45,10 @@ class CandidateStore:
         src = root / "source"
         src.mkdir(parents=True, exist_ok=True)
         if source_dir is not None:
-            shutil.copytree(source_dir, src, dirs_exist_ok=True)
+            def _skip(d: str, names: list[str]) -> set[str]:   # cargo's build dir is never source (can be gigabytes)
+                top = Path(d) == Path(source_dir)
+                return {n for n in names if n in ("node_modules", ".git") or (top and n == "target")}
+            shutil.copytree(source_dir, src, dirs_exist_ok=True, ignore=_skip)
         self.db.insert("candidates", {"candidate_id": cid, "case_id": case_id, "revision": rev, "target_language": target_language,
                                       "output_type": output_type, "source_dir": str(src), "dist_dir": None, "build_hash": None,
                                       "manifest_sha": None, "plan_revision": plan_revision, "build_status": "pending",

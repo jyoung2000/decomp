@@ -172,6 +172,9 @@ class AiPolicyIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mode: Literal["no_ai", "assist_on_failure", "assisted"] = "no_ai"
     budget_usd: Optional[float] = Field(default=None, ge=0, le=100)
+    max_attempts: Optional[int] = Field(default=None, ge=1, le=10)
+    max_output_tokens: Optional[int] = Field(default=None, ge=256, le=200_000)
+    approve_unknown_pricing: Optional[bool] = None
 
 
 class LaunchProfileIn(BaseModel):

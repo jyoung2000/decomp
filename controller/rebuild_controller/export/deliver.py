@@ -16,7 +16,11 @@ from .report import write_reports
 def deliver(ctx: StageContext) -> dict[str, Any]:
     st = ctx.services["studio"]
     case = st.cases.get_case(ctx.job.case_id)
-    cid = ctx.job.inputs["candidate_id"]
+    cid = ctx.job.inputs.get("candidate_id")
+    if not cid and ctx.job.inputs.get("candidate_from_job"):
+        cid = (st.jobs.get(ctx.job.inputs["candidate_from_job"]).result or {}).get("final_candidate")
+    if not cid:
+        raise StageError("no candidate to deliver", blocker="the implementation step produced no candidate")
     cand = st.candidates.get(cid)
     out_root = Path(case["output_root"])
     assert_output_not_in_source(out_root, Path(case["source_root"]))
@@ -30,7 +34,19 @@ def deliver(ctx: StageContext) -> dict[str, Any]:
         shutil.copytree(cand["dist_dir"], staging / "dist", dirs_exist_ok=True)
     else:
         (staging / "dist").mkdir()
-        (staging / "dist" / "NOT_BUILT.txt").write_text(f"candidate {cid} build status: {cand['build_status']}\n")
+        (staging / "dist" / "NOT_BUILT.txt").write_text(f"candidate {cid} build status: {cand['build_status']}\n", encoding="utf-8")
+    from ..outcome import case_outcome
+    try:
+        outcome = case_outcome(st, case["case_id"])
+    except Exception:  # noqa: BLE001 - never fail a delivery on the summary
+        outcome = None
+    scaffold = bool(cand["meta"].get("origin") == "scaffold" and not cand["meta"].get("proposed_files") and not cand["meta"].get("author"))
+    if scaffold:
+        note = ("THIS IS A SCAFFOLD, NOT A WORKING REMAKE.\n\nRebuild Studio could not produce an implementation for this project (no AI was connected, or every AI attempt "
+                "failed to build). The program in dist/ exits immediately with 'unimplemented'. See reports/parity-report.md and evidence/ for what was recovered and "
+                "what blocked the implementation.\n")
+        (staging / "SCAFFOLD_NOT_IMPLEMENTED.txt").write_text(note, encoding="utf-8")
+        (staging / "dist" / "SCAFFOLD_NOT_IMPLEMENTED.txt").write_text(note, encoding="utf-8")
     ev_dir = staging / "evidence"; ev_dir.mkdir()
     _export_evidence(st, case["case_id"], ev_dir)
     rep_dir = staging / "reports"; rep_dir.mkdir()
@@ -43,13 +59,17 @@ def deliver(ctx: StageContext) -> dict[str, Any]:
         if p.is_file():
             files.append({"path": p.relative_to(staging).as_posix(), "size": p.stat().st_size, "sha256": sha256_file(p)})
     manifest = {"case_id": case["case_id"], "candidate_id": cid, "build_hash": cand["build_hash"], "published_at": now_iso(), "files": files,
-                "note": "manifest.json itself is listed without a hash", "verification": st.candidates.get(cid)["verification"]}
+                "note": "manifest.json itself is listed without a hash", "verification": st.candidates.get(cid)["verification"],
+                "scaffold_only": scaffold, "outcome": {"state": outcome["state"], "label": outcome["label"]} if outcome else None}
     files.append({"path": "manifest.json", "size": None, "sha256": None})
-    (staging / "manifest.json").write_text(json.dumps(manifest, indent=1))
+    (staging / "manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     # publish: new output directory; preserve unrelated existing files, report conflicts
     out_root.mkdir(parents=True, exist_ok=True)
+    stale_marker = out_root / "SCAFFOLD_NOT_IMPLEMENTED.txt"
+    if not scaffold and stale_marker.exists() and _previous_manifest(out_root) is not None:
+        stale_marker.unlink()          # an earlier scaffold delivery must not mislabel a later real implementation
     conflicts = []
-    for sub in ("source", "dist", "evidence", "reports", "manifest.json"):
+    for sub in ("source", "dist", "evidence", "reports", "manifest.json") + (("SCAFFOLD_NOT_IMPLEMENTED.txt",) if scaffold else ()):
         dest = out_root / sub
         if dest.exists():
             prev = _previous_manifest(out_root)
@@ -67,7 +87,8 @@ def deliver(ctx: StageContext) -> dict[str, Any]:
     st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-PACKAGE"), status="completed" if cand["build_status"] == "built" else "failed", files=[str(out_root / "dist")])
     st.cases.set_case_status(case["case_id"], "delivered")
     st.plan.revise(case["case_id"], "delivered output")
-    return {"output_root": str(out_root), "files": len(files), "report": report.get("summary"), "verification": manifest["verification"]}
+    return {"output_root": str(out_root), "files": len(files), "report": report.get("summary"), "verification": manifest["verification"], "candidate_id": cid,
+            "scaffold_only": scaffold, "outcome": manifest["outcome"]}
 
 
 def _previous_manifest(out_root: Path) -> dict[str, Any] | None:
@@ -90,8 +111,8 @@ def _export_evidence(st, case_id: str, ev_dir: Path) -> None:
             p = st.cases.blobs.path_for(ev["blob_sha"])
             if p.exists() and p.stat().st_size < 50_000_000:
                 shutil.copyfile(p, ev_dir / f"{ev['evidence_id']}.json")
-    (ev_dir / "index.json").write_text(json.dumps(index, indent=1, default=str))
-    (ev_dir / "features.json").write_text(json.dumps(st.ledger.list(case_id), indent=1, default=str))
-    (ev_dir / "comparisons.json").write_text(json.dumps(st.verifier.comparisons(case_id), indent=1, default=str))
-    (ev_dir / "modules.json").write_text(json.dumps(st.cases.modules(case_id), indent=1, default=str))
-    (ev_dir / "provenance.json").write_text(json.dumps({"backends": st.doctor(), "exported_at": now_iso()}, indent=1, default=str))
+    (ev_dir / "index.json").write_text(json.dumps(index, indent=1, default=str), encoding="utf-8")
+    (ev_dir / "features.json").write_text(json.dumps(st.ledger.list(case_id), indent=1, default=str), encoding="utf-8")
+    (ev_dir / "comparisons.json").write_text(json.dumps(st.verifier.comparisons(case_id), indent=1, default=str), encoding="utf-8")
+    (ev_dir / "modules.json").write_text(json.dumps(st.cases.modules(case_id), indent=1, default=str), encoding="utf-8")
+    (ev_dir / "provenance.json").write_text(json.dumps({"backends": st.doctor(), "exported_at": now_iso()}, indent=1, default=str), encoding="utf-8")

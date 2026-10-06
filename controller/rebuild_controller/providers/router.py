@@ -150,7 +150,12 @@ class AIClient:
     # ------------------------------------------------------------------ the call
     def call(self, task: str, request: Request, *, job_id: str | None = None, case_id: str | None = None,
              budget: str | None = None, approve_unknown_pricing: bool = False, request_key: str | None = None,
-             on_text: OnText | None = None) -> CallResult:
+             on_text: OnText | None = None, max_retries: int | None = None, retry_unavailable: bool = False,
+             backoff_base_s: float = 1.0) -> CallResult:
+        """``max_retries``/``retry_unavailable``/``backoff_base_s`` opt in to the unattended-loop policy: up to
+        ``max_retries`` re-sends per route with exponential backoff (``Retry-After`` wins when the provider sends it) on
+        429 and, with ``retry_unavailable``, on 5xx. 5xx reservations are released (provider processed nothing), so a
+        retry never double-reserves. Without them the conservative default (one re-send, 429/connect only) applies."""
         usable, skipped = self.connections.resolve_detailed(task, request.needs())
         if not usable:
             raise NoRoute(task, skipped)
@@ -236,10 +241,12 @@ class AIClient:
                         self.connections.set_state(cid, "limited")
                     elif isinstance(e, Unreachable):
                         self.connections.set_state(cid, "unreachable")
-                    resend = (tries <= self.MAX_RESEND and e.retry_safe
-                              and isinstance(e, (RateLimit, Timeout, Unreachable)))
+                    limit = self.MAX_RESEND if max_retries is None else max(0, int(max_retries))
+                    resend = tries <= limit and ((e.retry_safe and isinstance(e, (RateLimit, Timeout, Unreachable)))
+                                                 or (retry_unavailable and isinstance(e, ProviderUnavailable) and release))
                     if resend:
-                        wait = min(e.retry_after if e.retry_after is not None else 1.0, self.max_retry_wait_s)
+                        default_wait = 1.0 if max_retries is None else float(backoff_base_s) * (2 ** (tries - 1))
+                        wait = min(e.retry_after if e.retry_after is not None else default_wait, self.max_retry_wait_s)
                         self._sleep(max(0.0, wait))
                         continue
                     if not release and not self.fallback_on_ambiguous:

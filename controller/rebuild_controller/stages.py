@@ -12,13 +12,13 @@ from .backends.inventory import build_dependency_graph, inventory_root
 from .jobs.runner import StageContext, StageError, StageRegistry
 
 PROFILE_STAGE = {"native_pe": "analyze_module", "native_elf": "analyze_module", "dotnet": "recover_managed", "unity_mono": "recover_managed",
-                 "godot": "recover_engine", "electron": "recover_web", "web": "recover_web"}
-UNSUPPORTED_PROFILES = {"unity_il2cpp": "Unity IL2CPP: Cpp2IL profile is experimental/unverified in this build",
-                        "gamemaker": "GameMaker: UndertaleModTool profile is experimental/unverified in this build",
-                        "android": "Android: jadx/Apktool profile is experimental/unverified in this build",
-                        "unreal": "Unreal: CUE4Parse profile is experimental/unverified in this build",
-                        "jvm": "JVM: jadx profile is experimental/unverified in this build",
-                        "native_macho": "Mach-O: no backend in this build"}
+                 "godot": "recover_engine", "electron": "recover_web", "web": "recover_web", "jvm": "recover_jvm", "android": "recover_jvm"}
+UNSUPPORTED_PROFILES = {
+    "unity_il2cpp": "Unity IL2CPP: detected only. Game code is compiled to native code; no IL2CPP dumper is integrated (see the support statement).",
+    "gamemaker": "GameMaker: detected only. No data.win decompiler is integrated (see the support statement).",
+    "unreal": "Unreal: detected only. No pak/IoStore extractor or uasset parser is integrated (see the support statement).",
+    "native_macho": "Mach-O (macOS/iOS): detected only. No verified analysis path and macOS programs cannot run on this host.",
+}
 
 
 def studio_of(ctx: StageContext):
@@ -38,6 +38,8 @@ def register_stages(reg: StageRegistry) -> None:
     reg.add("build_candidate", stage_build_candidate)
     reg.add("compare_candidate", stage_compare_candidate)
     reg.add("repair", stage_repair)
+    reg.add("implement_loop", stage_implement_loop)
+    reg.add("recover_jvm", stage_recover_jvm)
     reg.add("deliver", stage_deliver)
     from .pipeline import stage_barrier
     reg.add("barrier", stage_barrier)
@@ -62,6 +64,9 @@ def stage_inventory(ctx: StageContext) -> dict[str, Any]:
     created = []
     for mid, rel, profile in modules:
         stage = PROFILE_STAGE.get(profile)
+        if stage == "analyze_module" and (st.cases.get_module(mid).get("meta") or {}).get("flags", {}).get("engine_binary") == "unity":
+            unsupported.append({"module": rel, "profile": profile, "reason": "Unity engine runtime (UnityPlayer.dll): the engine, not the game's code; not analysed"})
+            continue
         if stage is None:
             unsupported.append({"module": rel, "profile": profile, "reason": UNSUPPORTED_PROFILES.get(profile, f"no backend for profile {profile}")})
             continue
@@ -177,6 +182,32 @@ def stage_recover_managed(ctx: StageContext) -> dict[str, Any]:
     ev = st.cases.add_evidence(case["case_id"], "module_report", f"Managed recovery: {mod['rel_path']}", body=out, module_id=mod["module_id"],
                                inputs={"module_sha": mod["sha256"], "backend": "ilspy"}, producer="ilspy")
     st.plan.add_evidence(st.plan.milestone_id(case["case_id"], "M-RECOVERY"), ev["evidence_id"])
+    return out
+
+
+def stage_recover_jvm(ctx: StageContext) -> dict[str, Any]:
+    """Java (.jar/.class) via CFR, Android (.apk/.dex) via jadx. The tool-free inspection (manifest, main class, dex
+    inventory) is always recorded first, so a missing decompiler still leaves useful evidence and a precise blocker."""
+    st = studio_of(ctx)
+    mod = st.cases.get_module(ctx.job.inputs["module_id"])
+    case = st.cases.get_case(ctx.job.case_id)
+    path = Path(case["source_root"]) / mod["rel_path"]
+    try:
+        b = st.registry.get("jvm")
+    except KeyError:
+        raise StageError("backend jvm not registered", blocker="install the Java decompiler (Tools page)")
+    out_dir = st.cases.case_root(case["case_id"]) / "recovered" / mod["module_id"]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ins = _result(b.call("inspect", ctx, case_id=case["case_id"], module_id=mod["module_id"], module_path=str(path)), "jvm inspect")
+    dec = b.call("decompile", ctx, case_id=case["case_id"], module_id=mod["module_id"], module_path=str(path), out_dir=str(out_dir))
+    out = {"module_id": mod["module_id"], "out_dir": str(out_dir), "inspect": ins["data"], "decompile": dec.data if dec.ok else None,
+           "evidence_ids": ins["evidence_ids"] + list(dec.evidence_ids or [])}
+    ev = st.cases.add_evidence(case["case_id"], "module_report", f"JVM recovery: {mod['rel_path']}", body=out, module_id=mod["module_id"],
+                               inputs={"module_sha": mod["sha256"], "backend": "jvm"}, producer="jvm")
+    st.plan.add_evidence(st.plan.milestone_id(case["case_id"], "M-RECOVERY"), ev["evidence_id"])
+    if not dec.ok:
+        data = dec.data or {}
+        raise StageError(f"jvm decompile: {dec.error}", blocker=f"{data.get('blocker') or dec.error}. Next: {data.get('next_action') or 'install the Java decompiler on the Tools page'}")
     return out
 
 
@@ -349,10 +380,15 @@ def stage_reconstruct(ctx: StageContext) -> dict[str, Any]:
 
 
 def stage_build_candidate(ctx: StageContext) -> dict[str, Any]:
+    return build_candidate_impl(ctx, ctx.job.inputs["candidate_id"])
+
+
+def build_candidate_impl(ctx: StageContext, cid: str) -> dict[str, Any]:
+    """Staged build + atomic dist publication. Raises StageError on build failure (candidate marked failed, log kept).
+    Shared by the build_candidate stage and the AI implement loop."""
     from .builders import build
     st = studio_of(ctx)
     case = st.cases.get_case(ctx.job.case_id)
-    cid = ctx.job.inputs["candidate_id"]
     cand = st.candidates.get(cid)
     st.candidates.mark_building(cid)
     src = Path(cand["source_dir"])
@@ -390,11 +426,11 @@ def stage_build_candidate(ctx: StageContext) -> dict[str, Any]:
     return {"candidate_id": cid, "dist": str(final), "build_hash": c["build_hash"], "launch": launch, "pwa": info.get("pwa")}
 
 
-def stage_compare_candidate(ctx: StageContext) -> dict[str, Any]:
+def compare_candidate_impl(ctx: StageContext, cid: str, feature_ids: list[str] | None = None) -> dict[str, Any]:
+    """Run the verifier against the frozen baseline and mirror the verdicts into plan items. Returns the verification report."""
     st = studio_of(ctx)
     case = st.cases.get_case(ctx.job.case_id)
-    cid = ctx.job.inputs["candidate_id"]
-    rep = st.verifier.verify_candidate(case["case_id"], cid, feature_ids=ctx.job.inputs.get("feature_ids") or None, progress=lambda p: ctx.progress(**p))
+    rep = st.verifier.verify_candidate(case["case_id"], cid, feature_ids=feature_ids or None, progress=lambda p: ctx.progress(**p))
     st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-COMPARE"), status="completed" if rep["summary"]["errors"] == 0 else "failed",
                         evidence_ids=[rep["evidence_id"]])
     for fid, verdict in rep["feature_verdicts"].items():
@@ -403,6 +439,14 @@ def stage_compare_candidate(ctx: StageContext) -> dict[str, Any]:
             st.plan.update_item(iid, status="completed" if verdict == "verified" else "failed", evidence_ids=[rep["evidence_id"]])
         except KeyError:
             pass
+    return rep
+
+
+def stage_compare_candidate(ctx: StageContext) -> dict[str, Any]:
+    st = studio_of(ctx)
+    case = st.cases.get_case(ctx.job.case_id)
+    cid = ctx.job.inputs["candidate_id"]
+    rep = compare_candidate_impl(ctx, cid, ctx.job.inputs.get("feature_ids") or None)
     failed = rep["summary"]["failed"] + rep["summary"]["errors"]
     if failed:
         policy = case.get("ai_policy", {})
@@ -417,6 +461,11 @@ def stage_compare_candidate(ctx: StageContext) -> dict[str, Any]:
     else:
         st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-FIX"), status="completed")
     return {"candidate_id": cid, "summary": rep["summary"], "feature_verdicts": rep["feature_verdicts"], "evidence_id": rep["evidence_id"]}
+
+
+def stage_implement_loop(ctx: StageContext) -> dict[str, Any]:
+    from .implement import implement_loop
+    return implement_loop(ctx)
 
 
 def stage_repair(ctx: StageContext) -> dict[str, Any]:

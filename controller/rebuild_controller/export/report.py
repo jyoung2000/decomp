@@ -19,7 +19,22 @@ def build_report(st, case_id: str, candidate_id: str | None) -> dict[str, Any]:
     unresolved = [{"feature": f["title"], "impl": f["impl_status"], "verify": f["verify_status"], "critical": f["critical"]} for f in feats if f["verify_status"] != "verified" or f["impl_status"] in ("blocked", "unsupported")]
     blockers = [{"job": j.title, "blocker": j.blocker} for j in jobs if j.blocker]
     ai = st.db.query("SELECT provider, model, task, COUNT(*) AS calls, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(cost_usd) AS cost_usd, SUM(1-cost_known) AS unknown_cost FROM ai_calls WHERE case_id=? GROUP BY provider, model, task", (case_id,))
+    from ..outcome import case_outcome
+    try:
+        outcome = case_outcome(st, case_id)
+    except Exception:  # noqa: BLE001
+        outcome = None
+    attempts = []
+    for ev in st.cases.list_evidence(case_id, kind="ai_attempt"):
+        if (ev.get("meta") or {}).get("counted"):
+            b = st.cases.evidence_body(ev["evidence_id"]) or {}
+            c = b.get("call") or {}
+            attempts.append({"attempt": b.get("attempt"), "candidate_id": b.get("candidate_id"), "model": c.get("model"), "prompt_sha256": c.get("prompt_sha256"), "tokens": c.get("usage"),
+                             "cost_usd": c.get("cost_usd"), "cost_known": c.get("cost_known"), "build": (b.get("build") or {}).get("status"), "verdict": (b.get("verdict") or {}).get("state"),
+                             "passed": (b.get("verdict") or {}).get("passed"), "scenarios": (b.get("verdict") or {}).get("scenarios"), "evidence_id": ev["evidence_id"]})
     return {
+        "outcome": ({"state": outcome["state"], "label": outcome["label"], "scaffold_only": outcome["scaffold_only"], "scope_statement": outcome["scope_statement"],
+                     "outstanding": outcome["outstanding"]} if outcome else None), "ai_attempts": attempts,
         "generated_at": now_iso(), "case": {k: case[k] for k in ("case_id", "name", "source_root", "output_root", "target_language", "output_type", "status", "ai_policy")},
         "candidate": ({k: cand[k] for k in ("candidate_id", "revision", "build_hash", "build_status", "verification", "last_known_good")} | {"author": cand["meta"].get("author"), "origin": cand["meta"].get("origin")}) if cand else None,
         "parity": {"full_parity": summary["full_parity"], "features_total": summary["total"], "verified": summary["verify"]["verified"], "partial": summary["verify"]["partial"],
@@ -42,9 +57,9 @@ def _trim(d: Any) -> Any:
 def write_reports(st, case_id: str, candidate_id: str | None, rep_dir: Path) -> dict[str, Any]:
     rep = build_report(st, case_id, candidate_id)
     rep_dir.mkdir(parents=True, exist_ok=True)
-    (rep_dir / "parity-report.json").write_text(json.dumps(rep, indent=1, default=str))
-    (rep_dir / "parity-report.md").write_text(render_markdown(rep))
-    (rep_dir / "unresolved.json").write_text(json.dumps({"unresolved": rep["unresolved"], "blockers": rep["blockers"]}, indent=1))
+    (rep_dir / "parity-report.json").write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
+    (rep_dir / "parity-report.md").write_text(render_markdown(rep), encoding="utf-8")
+    (rep_dir / "unresolved.json").write_text(json.dumps({"unresolved": rep["unresolved"], "blockers": rep["blockers"]}, indent=1), encoding="utf-8")
     rep["summary"] = rep["parity"]
     return rep
 
@@ -52,6 +67,12 @@ def write_reports(st, case_id: str, candidate_id: str | None, rep_dir: Path) -> 
 def render_markdown(rep: dict[str, Any]) -> str:
     p = rep["parity"]
     lines = [f"# Parity report — {rep['case']['name']}", "", f"Generated {rep['generated_at']}. Target: {rep['case']['target_language']} / {rep['case']['output_type']}.", ""]
+    o = rep.get("outcome")
+    if o:
+        lines += [f"**Outcome: {o['label']}** (`{o['state']}`). {o['scope_statement']}"]
+        if o["scaffold_only"]:
+            lines += ["", "> **SCAFFOLD ONLY.** The delivered program does not implement the original's behaviour; it exits as 'unimplemented'. It is not a remake."]
+        lines += [f"- {x}" for x in o["outstanding"]] + [""]
     lines.append(f"**Full parity:** {'YES' if p['full_parity'] else 'NO'}  — features: {p['features_total']} total, {p['verified']} verified, {p['partial']} partial, {p['failed']} failed, {p['untested']} untested, {p['stale']} stale.")
     lines.append(f"_{p['scope_note']}_")
     if p["critical_incomplete"]:
@@ -74,6 +95,13 @@ def render_markdown(rep: dict[str, Any]) -> str:
         lines += ["", "## Unresolved"] + [f"- {u['feature']}: impl {u['impl']}, verify {u['verify']}{' (critical)' if u['critical'] else ''}" for u in rep["unresolved"]]
     if rep["blockers"]:
         lines += ["", "## Blockers"] + [f"- {b['job']}: {b['blocker']}" for b in rep["blockers"]]
+    if rep.get("ai_attempts"):
+        lines += ["", "## AI attempts", "", "| # | Candidate | Model | Prompt sha256 | Tokens in/out | Cost | Build | Verdict |", "|---|---|---|---|---|---|---|---|"]
+        for a in rep["ai_attempts"]:
+            t = a.get("tokens") or {}
+            lines.append(f"| {a['attempt']} | {a.get('candidate_id') or ''} | {a.get('model') or ''} | {(a.get('prompt_sha256') or '')[:12]} | {t.get('input_tokens', '?')}/{t.get('output_tokens', '?')} | "
+                         f"${a.get('cost_usd') or 0:.4f}{'' if a.get('cost_known') else ' (est.)'} | {a.get('build')} | {a.get('verdict') or 'n/a'}"
+                         f"{' ' + str(a['passed']) + '/' + str(a['scenarios']) if a.get('scenarios') else ''} |")
     lines += ["", "## AI usage"]
     if rep["ai_usage"]:
         lines += [f"- {a['provider']}/{a['model']} ({a['task']}): {a['calls']} calls, {a['input_tokens']} in / {a['output_tokens']} out / {a['cached_tokens']} cached tokens, cost ${a['cost_usd'] or 0:.4f}" + (" (some costs unknown)" if a['unknown_cost'] else "") for a in rep["ai_usage"]]
@@ -89,8 +117,8 @@ def export_plan(st, case_id: str, rep_dir: Path) -> dict[str, str]:
     plan["feedback"] = st.feedback.list(case_id)
     plan["previews"] = st.previews.list(case_id)
     plan["features"] = st.ledger.list(case_id)
-    (rep_dir / "project-plan.json").write_text(json.dumps(plan, indent=1, default=str))
-    (rep_dir / "project-plan.html").write_text(render_plan_html(plan))
+    (rep_dir / "project-plan.json").write_text(json.dumps(plan, indent=1, default=str), encoding="utf-8")
+    (rep_dir / "project-plan.html").write_text(render_plan_html(plan), encoding="utf-8")
     return {"json": str(rep_dir / "project-plan.json"), "html": str(rep_dir / "project-plan.html")}
 
 
