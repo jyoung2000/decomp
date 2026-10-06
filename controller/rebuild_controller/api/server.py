@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import os
 import secrets
 import threading
@@ -231,6 +232,13 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     @app.get("/cases/{case_id}/modules")
     def modules(case_id: str):
         return studio.cases.modules(case_id)
+
+    @app.post("/cases/{case_id}/modules/{module_id}/briefing")
+    def module_briefing(case_id: str, module_id: str, body: dict[str, Any]):
+        fn = body.get("function") or body.get("address")
+        if not isinstance(fn, str) or not re.fullmatch(r"[A-Za-z0-9_.$?@:<>~\-]{1,200}|0x[0-9a-fA-F]{1,16}", fn):
+            raise _err("validation", "function must be a symbol name or 0x-hex address", 400)
+        return studio.get_function_briefing(case_id, module_id, fn)
 
     @app.get("/cases/{case_id}/evidence")
     def evidence(case_id: str, kind: str | None = None, module_id: str | None = None):

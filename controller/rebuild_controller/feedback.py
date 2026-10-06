@@ -29,6 +29,7 @@ class FeedbackStore:
                expected: str = "", actual: str = "", candidate_id: str | None = None, attachments: list[dict[str, Any]] | None = None,
                context: dict[str, Any] | None = None) -> dict[str, Any]:
         assert classification in CLASSES
+        self.cases.get_case(case_id)  # unknown case → KeyError (404), never an orphan row
         fid = new_id("fb")
         ts = now_iso()
         stored = []
