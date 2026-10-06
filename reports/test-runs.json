@@ -9,24 +9,6 @@
   "log_tail": "counted from pytest progress output (log: scratchpad/fullsuite.log); includes real rizin+rz-ghidra, ILSpy, GDRE, Playwright, wine runs"
  },
  {
-  "name": "ui vitest",
-  "command": "cd ui && npm test",
-  "passed": 53,
-  "failed": 0,
-  "skipped": 0,
-  "when": "2026-10-06T12:15:19+00:00",
-  "log_tail": "Test Files 3 passed (3); Tests 53 passed (53)"
- },
- {
-  "name": "desktop cargo check (Linux)",
-  "command": "cd desktop/src-tauri && cargo check",
-  "passed": 1,
-  "failed": 0,
-  "skipped": 0,
-  "when": "2026-10-06T12:15:19+00:00",
-  "log_tail": "Finished `dev` profile"
- },
- {
   "name": "controller e2e pipelines (pecli full + crash/resume, web preview/feedback cycle)",
   "command": "cd controller && pytest -q tests -m e2e",
   "passed": 3,
@@ -43,5 +25,41 @@
   "skipped": 1,
   "when": "2026-10-06T12:20:17+00:00",
   "log_tail": "rizin, ilspy, gdre, jsweb verified; ghidra missing (optional, not installed)"
+ },
+ {
+  "name": "desktop shell cargo test (Linux; Windows-only tests compiled out)",
+  "command": "cd desktop && sh scripts/check.sh test",
+  "passed": 24,
+  "failed": 0,
+  "skipped": 0,
+  "when": "2026-10-06T12:28:37+00:00",
+  "log_tail": "test result: ok. 24 passed; 0 failed"
+ },
+ {
+  "name": "ui playwright e2e vs mock controller",
+  "command": "cd ui && npm run e2e",
+  "passed": 18,
+  "failed": 0,
+  "skipped": 4,
+  "when": "2026-10-06T12:29:00+00:00",
+  "log_tail": ":3 \u203a no horizontal overflow at 1920x1080 (959ms)\n  \u2713  21 [chromium] \u203a e2e/views.spec.ts:112:1 \u203a no horizontal overflow at 200% scaling (1280x720 CSS px, DPR 2) (1.4s)\n  \u2713  22 [chromium] \u203a e2e/views.spec.ts:124:1 \u203a dark mode switches to the dark tokens (790ms)\n\n  4 skipped\n  18 passed (32.2s)\nexit 0\n"
+ },
+ {
+  "name": "ui vitest",
+  "command": "cd ui && npm test",
+  "passed": 68,
+  "failed": 0,
+  "skipped": 0,
+  "when": "2026-10-06T12:29:00+00:00",
+  "log_tail": "Test Files 4 passed (4); Tests 68 passed (68)"
+ },
+ {
+  "name": "ui playwright real-controller spec (worker run, web fixture end to end)",
+  "command": "cd ui && REAL_CONTROLLER=1 REAL_CONTROLLER_DATA=<data> npx playwright test real-controller",
+  "passed": 4,
+  "failed": 0,
+  "skipped": 0,
+  "when": "2026-10-06T12:40:00+00:00",
+  "log_tail": "runs 2-4 passed after controller fix 46db2fc; run 1 failed on the pre-fix controller (duplicate recover_web jobs)"
  }
 ]
