@@ -1,5 +1,13 @@
 # CHECKPOINT
 
+## 2026-10-06 ~12:30 UTC — all four fixture pipelines run; native + web demos verified
+- Full controller suite: 598 passed / 1 skipped. e2e set running. UI vitest 53. cargo check ok.
+- Demos: `examples/pecli-rust-from-evidence` (Rust from rz-ghidra evidence via MCP: verifier 8/8, independent harness 8/8, delivered);
+  web fixture pipeline 4/4 verified + independent harness exact; dotnetapp pipeline recovers C# (Rust demo via MCP in progress by worker);
+  godotgame: GDRE recovery + Bevy scaffold builds (303 s), no gameplay parity claims.
+- Demo controller for pecli still running on port 8766 (data: scratchpad/pecli-demo); kill via pid in controller.json before packaging runs.
+- Workers in flight: Windows packaging/CI (Build/Install/Uninstall ps1, workflows, gates doc), UI e2e + real-controller spec, dotnetapp→Rust demo, Cutter plugin.
+
 ## 2026-10-06 ~12:00 UTC — vertical slice working on pecli; other fixtures running
 Branch `ccr-4dbe9b92-nyzsa8`. Commits so far: bootstrap → core → fixtures/verifier → rizin/API → worker output → jobs fan-in → pipeline fixes.
 

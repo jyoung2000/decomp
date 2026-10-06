@@ -242,7 +242,8 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
 
     @app.get("/evidence/{evidence_id}")
     def evidence_get(evidence_id: str, max_bytes: int | None = None):
-        return studio.get_evidence(evidence_id, max_bytes)
+        cap = 16 * 1024 * 1024
+        return studio.get_evidence(evidence_id, min(max_bytes or studio.settings.limits.max_context_bytes, cap))
 
     @app.get("/cases/{case_id}/features")
     def features(case_id: str):
