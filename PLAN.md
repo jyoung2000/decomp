@@ -77,6 +77,7 @@ Baseline on this host (before changes): controller 503 passed / 30 failed / 90 s
 | P9 | Packaged browser comparator (Playwright/Chromium) in frozen build: fix or restrict claims | inline | done | packaged-app test result recorded | — packaged doctor showed all backends failed to load (fixed in build); browser comparator unavailable in packaged build — restrict claims
 | P10 | Packaged UI walk (first run → project → plan → preview → feedback → results → reopen), keyboard/DPI/narrow width | inline | partial | evidence/windows/<run>/ screenshots + notes | — first packaged walk found 'Disconnected' (CORS) — fixed; full walk pending interactive time; consent + scenario authoring UI in progress (subagent)
 | P12 | Rust toolchain acquirable via guided setup (no admin, GNU host) so Rust remakes build on a clean machine | subagent: rust-tools | in-progress | live test builds the pecli remake with PATH=System32 |
+| P13 | AI model ladder (presets, local/cloud, project override, No AI never calls), failure taxonomy incl. credits/model-unavailable/capability, config revisions, plan AI ownership, activity feed; local Ollama proof | subagents: ladder-ctl (Opus), ladder-ui (Sonnet) | in-progress | docs/AI_LADDER.md; scripted failover integration test; live Ollama probe + repair task |
 | P11 | Final report separating local / Linux / Windows CI / interactive Windows; user install guide | inline | in-progress | reports/final-report.md, docs/INSTALL.md |
 
 Revision history
