@@ -19,7 +19,8 @@ Kinds: `case.created|case.status`, `job.created|started|progress|log|retry|unblo
 - `GET /health` → `{ok, version, pid, heartbeat_seconds, latest_seq, started_at}`
 - `GET /events?since=N&case_id=` → `[event]` (same shape as WS; bounded 5000)
 - `GET /doctor?smoke=0|1` → backend availability report (`missing|detected|installed|usable|verified` per tool)
-- `GET /capabilities` → `{output_combinations:[{target_language, output_type, state: supported|unsupported, reason}], profiles_with_backends}`
+- `GET /capabilities` → `{output_combinations:[{target_language, output_type, state: supported|unsupported, reason}], profiles_with_backends, implementation:{ai_connected, summary, route}}`
+- `POST /implementation/forecast` `{target_language, output_type, ai_policy, launch_profile, profile?}` → plain-language answer, before a case exists, to "can an implementation be produced?": `{state: scaffold_only|ai_ready|ai_blocked|deterministic_port|unsupported, can_produce_implementation, will_use_ai, verifiable, summary, details[], blockers[], max_attempts, budget_usd, route}`. The same `implementation_forecast` is on `POST /cases`, `GET /cases/{id}`, `GET /cases/{id}/plan` and `POST /cases/{id}/start`. AI policy keys: `mode` (no_ai|assist_on_failure|assisted), `budget_usd`, `max_attempts` (default 3, max 10; total model attempts), `max_output_tokens` (cap per call; also the bound that allows an unpriced model), `approve_unknown_pricing`, `max_retries`, `retry_backoff_s`. With a usable route the `implement_loop` job runs interpret -> write Rust -> cargo build -> verify -> repair; every attempt is `ai_attempt`/`ai_response` evidence.
 - `GET /cases` / `POST /cases` body `{name, source_root, output_root, target_language: rust|rust_bevy|web|auto, output_type: exe|installer|portable|web|pwa, ai_policy:{mode: no_ai|assist_on_failure|assisted, budget_usd?, max_repairs?, approve_unknown_pricing?}, launch_profile, settings?:{decompile_limit?}}`
   - `launch_profile` = `{execute_original: bool, kind: cli|web, launch: {type: exe|dotnet|command|web, path?|command?|root?, entry?}, scenarios: [{id (required), feature_id?, title?, critical?, steps?: [{args, stdin?}] (cli), actions?: [{type: click|fill|press|goto|wait|wait_for|offline|online|reload|eval|wait_sw, ...}] (web), text_selectors?, channels?, normalize?, ignore_files?, setup_files?}], tolerance?: {screenshot_max_diff_fraction?, screenshot_channel_delta?}, baseline_file?}`
   - validation errors → 400 `{"error": {code: "validation", message, affected, next_action}}`
@@ -47,3 +48,16 @@ Kinds: `case.created|case.status`, `job.created|started|progress|log|retry|unblo
 - `GET /settings` / `PUT /settings` (dependency manager, storage, concurrency, capture, network/output policies)
 - `GET /hermes/status`; `POST /hermes/pair` `{profile_path?}`; `POST /hermes/register_mcp` `{dry_run}`
 - `POST /fs/pick-folder` is NOT an HTTP endpoint: native pickers are Tauri commands (`pick_folder`). In browser dev mode the UI shows a text input.
+
+## User-declared scenarios (command-line programs)
+
+Implemented in `controller/rebuild_controller/api/scenario_routes.py` (+ `user_scenarios.py`). Errors use the standard `{error:{code,message,affected,next_action}}` body.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/cases/{id}/scenarios` | `{scenarios[], counts, consent}`; each scenario has `status`: `no_baseline`, `changed` (edited after recording), `not_run`, `passed`, `failed` |
+| POST | `/cases/{id}/scenarios` | create `{title, feature_id?, steps:[{args:[..], stdin}], compare:{exit_code,output,files}, normalize:{line_endings,trailing_spaces,trim,ignore_timestamps}, timeout?}` |
+| GET / PUT / DELETE | `/cases/{id}/scenarios/{sid}` | read / replace / delete (a frozen baseline is never edited) |
+| POST | `/cases/{id}/scenarios/record` | `{scenario_ids?, program?}`: runs the ORIGINAL through the isolated runner and freezes a NEW baseline revision that carries earlier scenarios over. 409 `original_execution_not_permitted` ("Original execution needs your permission: ...") without recorded consent |
+
+`{work}` in an argument is replaced by the run's private scratch folder; the folder path is masked as `{work}` in recorded and compared output. Recording a new revision marks earlier verification results stale.

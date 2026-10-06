@@ -3,6 +3,7 @@ import type {
   AiCall, ApiErrorBody, Budget, Candidate, Capabilities, Case, Comparison, Connection, ControllerEvent, DoctorReport,
   Evidence, Feature, Feedback, Health, HermesStatus, Job, KnowledgeEntry, Module, NewCaseBody, NewFeedbackBody, Plan,
   PlanRevision, Preview, PreviewOpenResult, TaskRoute, ToolSetupEntry, ToolSetupSnapshot,
+  IsolationInfo, OriginalConsent, RecordResult, ScenarioList, UserScenario, UserScenarioBody,
 } from './types';
 
 /** Error with the controller's three-part explanation: what happened, what is affected, what to do next. */
@@ -103,6 +104,14 @@ export class Api {
   pauseCase = (id: string) => this.post<unknown>(`/cases/${enc(id)}/pause`);
   resumeCase = (id: string) => this.post<unknown>(`/cases/${enc(id)}/resume`);
   cancelCase = (id: string) => this.post<unknown>(`/cases/${enc(id)}/cancel`);
+  consent = (id: string) => this.get<OriginalConsent>(`/cases/${enc(id)}/consent/original-execution`);
+  setConsent = (id: string, allow: boolean, note = '') => this.put<OriginalConsent>(`/cases/${enc(id)}/consent/original-execution`, { allow, note });
+  isolation = () => this.get<IsolationInfo>('/isolation');
+  scenarios = (id: string) => this.get<ScenarioList>(`/cases/${enc(id)}/scenarios`);
+  createScenario = (id: string, b: UserScenarioBody) => this.post<UserScenario>(`/cases/${enc(id)}/scenarios`, b);
+  updateScenario = (id: string, sid: string, b: UserScenarioBody) => this.put<UserScenario>(`/cases/${enc(id)}/scenarios/${enc(sid)}`, b);
+  deleteScenario = (id: string, sid: string) => this.del<{ deleted: string }>(`/cases/${enc(id)}/scenarios/${enc(sid)}`);
+  recordScenarios = (id: string, scenarioIds?: string[]) => this.post<RecordResult>(`/cases/${enc(id)}/scenarios/record`, scenarioIds ? { scenario_ids: scenarioIds } : {});
   jobs = (id: string) => this.get<Job[]>(`/cases/${enc(id)}/jobs`);
   cancelJob = (id: string) => this.post<unknown>(`/jobs/${enc(id)}/cancel`);
   resumeJob = (id: string) => this.post<unknown>(`/jobs/${enc(id)}/resume`);

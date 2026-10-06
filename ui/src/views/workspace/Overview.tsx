@@ -3,16 +3,18 @@ import { useStaleness } from '../../components/ConnectionBanner';
 import { Empty } from '../../components/Empty';
 import { CountsProgress, PhaseProgressRow } from '../../components/Progress';
 import { OutcomePanel, useOutcome } from '../../components/Outcome';
+import { ConsentCard, GrantInline, PERMISSION_RE } from '../../components/ConsentCard';
 import { StatusChip } from '../../components/StatusChip';
 import { useToast } from '../../components/Toasts';
 import { describeEvent, describeScopeNote, jobCounts, phaseViews, values } from '../../lib/derive';
 import { clockTime, duration, itemLabel, parseTime, timeAgo, usd } from '../../lib/format';
-import { useApi, useCaseState, useResource, useStoreSelector } from '../../lib/store';
+import { useApi, useCaseState, useResource, useStore, useStoreSelector } from '../../lib/store';
 import { openPath } from '../../lib/tauri';
 import type { Job } from '../../lib/types';
 
 export function OverviewTab({ caseId }: { caseId: string }) {
   const api = useApi();
+  const store = useStore();
   const toast = useToast();
   const cs = useCaseState(caseId);
   const outcome = useOutcome(caseId);
@@ -93,6 +95,7 @@ export function OverviewTab({ caseId }: { caseId: string }) {
       </section>
 
       {outcome && <OutcomePanel outcome={outcome} />}
+      <ConsentCard caseId={caseId} onlyWhenGranted />
 
       {(blocked.length > 0 || failed.length > 0 || planBlocked.length > 0) && (
         <section className="card" aria-label="Blockers" data-testid="blockers">
@@ -101,6 +104,7 @@ export function OverviewTab({ caseId }: { caseId: string }) {
             {blocked.map((j) => (
               <li key={j.job_id} className="row">
                 <StatusChip status={j.state} /> <strong>{j.title}</strong> <span className="muted">{j.blocker ?? 'waiting on a dependency'}</span>
+                {PERMISSION_RE.test(j.blocker ?? '') && <GrantInline caseId={caseId} onChanged={() => void store.refresh(caseId, 'jobs')} />}
               </li>
             ))}
             {failed.map((j) => (

@@ -114,6 +114,13 @@ def run_steps(launch: dict[str, Any], root: Path, steps: list[dict[str, Any]], w
     return results
 
 
+def mask_work_path(text: str, work: Path) -> str:
+    """Replace the run's scratch folder (either slash style) with the literal ``{work}`` so original and candidate outputs line up."""
+    for variant in sorted({str(work), work.as_posix(), str(work).replace("\\", "\\\\")}, key=len, reverse=True):
+        text = text.replace(variant, "{work}")
+    return text
+
+
 def snapshot_work(work: Path, *, crlf_text_files: set[str] | frozenset[str] = frozenset()) -> dict[str, str]:
     """sha256 per file. Files named in ``crlf_text_files`` are hashed with CRLF -> LF (declared text files only)."""
     out = {}
@@ -132,13 +139,18 @@ def compare_cli_scenario(scenario: dict[str, Any], baseline: dict[str, Any], can
     cand_runs = run_steps(candidate_launch, candidate_root, steps, work, timeout=timeout, setup_files=scenario.get("setup_files"),
                           role="candidate", isolation=scenario.get("isolation"))
     base_runs = baseline["steps"]
+    if scenario.get("user_declared"):   # programs often echo the scratch path they were given; compare it as the {work} token
+        for c in cand_runs:
+            for ch in ("stdout", "stderr"):
+                c[ch] = mask_work_path(c[ch], work)
     out: list[ComparisonResult] = []
     cmd = " && ".join(" ".join(r["args"]) for r in cand_runs)
     for i, (b, c) in enumerate(zip(base_runs, cand_runs)):
         rule_exit = "exact"
-        out.append(ComparisonResult("exit_code", rule_exit, "pass" if b["exit_code"] == c["exit_code"] else "fail",
-                                    {"step": i, "expected": b["exit_code"], "actual": c["exit_code"], "timed_out": c["timed_out"], "runner": c["runner"],
-                                     "limits_triggered": c.get("triggered", []), "isolation": c.get("isolation")}, command=cmd))
+        if "exit_code" in scenario.get("channels", ["exit_code", "stdout", "files"]):   # user scenarios may opt out of the exit code
+            out.append(ComparisonResult("exit_code", rule_exit, "pass" if b["exit_code"] == c["exit_code"] else "fail",
+                                        {"step": i, "expected": b["exit_code"], "actual": c["exit_code"], "timed_out": c["timed_out"], "runner": c["runner"],
+                                         "limits_triggered": c.get("triggered", []), "isolation": c.get("isolation")}, command=cmd))
         for ch in ("stdout", "stderr"):
             if ch not in scenario.get("channels", ["exit_code", "stdout", "files"]):
                 continue

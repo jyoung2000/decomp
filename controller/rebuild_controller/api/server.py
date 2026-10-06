@@ -102,6 +102,29 @@ def _outcome(studio: StudioServices, case_id: str) -> dict[str, Any] | None:
         return None
 
 
+class ForecastRequest(BaseModel):
+    target_language: str = Field(default="auto", pattern="^(rust|rust_bevy|web|auto)$")
+    output_type: str = Field(default="exe", pattern="^(exe|installer|portable|web|pwa)$")
+    ai_policy: dict[str, Any] = Field(default_factory=lambda: {"mode": "no_ai"})
+    launch_profile: dict[str, Any] = Field(default_factory=dict)
+    profile: str | None = None
+
+
+def _forecast(studio: StudioServices, case: dict[str, Any]) -> dict[str, Any] | None:
+    try:
+        return studio.implementation_forecast(case)
+    except Exception:
+        return None
+
+
+def _implementation_summary(studio: StudioServices) -> dict[str, Any] | None:
+    from ..implement import global_forecast
+    try:
+        return global_forecast(studio)
+    except Exception:
+        return None
+
+
 def create_app(studio: StudioServices, token: str) -> FastAPI:
     app = FastAPI(title="Rebuild Studio controller", version=__version__, docs_url=None, redoc_url=None)
     started_at = now_iso()
@@ -228,7 +251,15 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
                 reason = None if lang == "auto" else _unsupported_combo("unknown", lang, out)
                 combos.append({"target_language": lang, "output_type": out, "state": "unsupported" if reason else "supported", "reason": reason})
         return {"output_combinations": combos, "profiles_with_backends": sorted(set(sum([studio.registry.info(b).profiles for b in studio.registry.ids()], []))),
-                "note": "native profiles cannot target web; web target cannot produce exe/installer/portable"}
+                "note": "native profiles cannot target web; web target cannot produce exe/installer/portable",
+                "implementation": _implementation_summary(studio)}
+
+    @app.post("/implementation/forecast")
+    def implementation_forecast(body: ForecastRequest):
+        """What will this selection produce? Plain-language answer before a case is created or started."""
+        from ..implement import forecast
+        return forecast(studio, target_language=body.target_language, output_type=body.output_type, ai_policy=body.ai_policy,
+                        launch_profile=body.launch_profile, profile=body.profile)
 
     @app.get("/cases")
     def cases():
@@ -251,6 +282,7 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
                        "previews": len(studio.previews.list(case_id)), "open_feedback": sum(1 for f in studio.feedback.list(case_id) if f["status"] not in ("resolved",))}
         c["stalled_jobs"] = [j.job_id for j in studio.jobs.stalled() if j.case_id == case_id]
         c["outcome"] = _outcome(studio, case_id)
+        c["implementation_forecast"] = _forecast(studio, c)
         return c
 
     @app.get("/cases/{case_id}/consent/original-execution")
@@ -343,7 +375,7 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         prog = studio.plan.progress(case_id)
         return {"revision": studio.plan.current_revision(case_id), "items": items, "progress": prog, "eta": prog["eta"],
                 "unknown_scope": [i for i in items if i["kind"] in ("discovery", "deferred", "unsupported")],
-                "outcome": _outcome(studio, case_id)}
+                "outcome": _outcome(studio, case_id), "implementation_forecast": _forecast(studio, studio.cases.get_case(case_id))}
 
     @app.get("/cases/{case_id}/plan/revisions")
     def plan_revisions(case_id: str):
@@ -524,6 +556,7 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         return HermesBridge(studio.settings.data_dir).register_mcp(dry_run=bool((body or {}).get("dry_run", True)))
 
     from .tools_routes import mount_tools_routes; mount_tools_routes(app, studio)  # guided tool setup
+    from .scenario_routes import mount_scenario_routes; mount_scenario_routes(app, studio)  # user-declared scenarios
     return app
 
 

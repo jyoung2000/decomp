@@ -607,6 +607,38 @@ async function handle(req, res) {
       return send(res, 200, [...S.evidence.values()].filter((x) => x.case_id === cid && (x.title.toLowerCase().includes(q) || String(x.body).toLowerCase().includes(q))).map(({ body: _b, ...e }) => e));
     }
     if (sub === 'features') return send(res, 200, [...S.features.values()].filter((x) => x.case_id === cid));
+    if (sub === 'consent/original-execution') {
+      const cc = (MOCK_CONSENT[cid] ??= { allowed: !!S.cases.get(cid)?.launch_profile?.execute_original, at: S.cases.get(cid)?.launch_profile?.execute_original ? now() : null, via: S.cases.get(cid)?.launch_profile?.execute_original ? 'create_case' : null, history: [] });
+      if (m === 'PUT') Object.assign(cc, { allowed: !!body.allow, at: now(), via: 'api' }, { history: [...cc.history, { allowed: !!body.allow, at: now(), via: 'api', note: body.note ?? '' }] });
+      return send(res, 200, cc);
+    }
+    if (sub === 'scenarios' || sub.startsWith('scenarios/')) {
+      const list = (MOCK_SCENARIOS[cid] ??= []);
+      const cc = (MOCK_CONSENT[cid] ??= { allowed: false, at: null, via: null, history: [] });
+      const view = () => ({ scenarios: list, consent: cc, counts: { declared: list.length, no_baseline: list.filter((x) => x.status === 'no_baseline').length, changed: 0, recorded: list.filter((x) => x.status !== 'no_baseline').length, passed: 0, failed: 0, not_run: list.filter((x) => x.status === 'not_run').length } });
+      if (sub === 'scenarios/record' && m === 'POST') {
+        if (!cc.allowed) return err(res, 409, 'original_execution_not_permitted', 'Original execution needs your permission: Rebuild Studio wants to run the original program to record its behaviour. The network is NOT blocked and the program can still read your files.', 'Nothing was run.', 'Allow running the original for this project, or supply a baseline file.');
+        const rec = list.filter((x) => x.status === 'no_baseline' || x.status === 'changed');
+        rec.forEach((x) => Object.assign(x, { status: 'not_run', recorded_at: now() }));
+        return send(res, 200, { ...view(), evidence_id: id('ev'), baseline_revision: 1, recorded: rec.map((x) => x.scenario_id), scenarios_in_baseline: list.length });
+      }
+      const sid = sub.split('/')[1];
+      if (m === 'GET' && !sid) return send(res, 200, view());
+      if (m === 'POST' && !sid) {
+        if (!String(body.title ?? '').trim()) return err(res, 400, 'scenario_title', 'The scenario has no title.', 'title', 'Give it a short name.');
+        const sc = { ...body, scenario_id: id('usc'), case_id: cid, status: 'no_baseline', recorded_at: null, recorded_evidence: null, updated_at: now() };
+        list.push(sc);
+        return send(res, 200, sc);
+      }
+      const sc = list.find((x) => x.scenario_id === sid);
+      if (!sc) return err(res, 404, 'scenario_not_found', 'There is no such scenario.', sid, 'Refresh the list.');
+      if (m === 'PUT') return send(res, 200, Object.assign(sc, body, { status: sc.status === 'no_baseline' ? 'no_baseline' : 'changed', updated_at: now() }));
+      if (m === 'DELETE') {
+        list.splice(list.indexOf(sc), 1);
+        return send(res, 200, { deleted: sid });
+      }
+      return send(res, 200, sc);
+    }
     if (sub === 'plan') return send(res, 200, casePlan(cid));
     if (sub === 'plan/revisions') return send(res, 200, S.plans.get(cid).revisions);
     if (sub === 'plan/prioritize' && m === 'POST') {
@@ -778,6 +810,7 @@ async function handle(req, res) {
     S.settings = body;
     return send(res, 200, S.settings);
   }
+  if (p === '/isolation') return send(res, 200, { platform: 'win32', network_default: 'open: not blocked', default_mode: 'low', network_blocking: 'not available without administrator rights', modes: { low: { available: true } } });
   if (p === '/hermes/status') return send(res, 200, S.hermes);
   if (p === '/hermes/pair' && m === 'POST') {
     S.hermes = { ...S.hermes, paired: true, state: 'paired', profile_path: body.profile_path ?? '~/.hermes/profiles/default (demo)' };
@@ -790,6 +823,9 @@ async function handle(req, res) {
   }
   return notFound(res, `Endpoint ${m} ${p}`);
 }
+
+const MOCK_CONSENT = {};
+const MOCK_SCENARIOS = {};
 
 function createCase(res, b) {
   const missing = ['name', 'source_root', 'output_root', 'target_language', 'output_type'].filter((k) => !b[k]);

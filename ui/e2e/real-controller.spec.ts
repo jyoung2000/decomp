@@ -45,7 +45,7 @@ test('create a web project through the form, start it and watch live events', as
   await page.getByRole('radio', { name: /^HTML \/ CSS \/ JS/ }).check();
   await page.getByTestId('output-web').getByRole('radio').check();
   await page.getByRole('radio', { name: /^No AI/ }).check();
-  await page.getByLabel('Execute the original program to capture its behaviour').check();
+  await page.getByLabel('Yes, allow Rebuild Studio to run it').check();
   await page.getByTestId('launch-web').check();
   await expect(page.getByLabel('Entry page')).toHaveValue('index.html');
   await shot(page, 'real-00-new-project');

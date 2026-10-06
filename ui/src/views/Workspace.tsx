@@ -16,6 +16,8 @@ import { PreviewTab } from './workspace/Preview';
 import { FeedbackTab } from './workspace/Feedback';
 import { ComparisonsTab } from './workspace/Comparisons';
 import { AdvancedTab } from './workspace/Advanced';
+import { ScenariosTab } from './workspace/Scenarios';
+import { ConsentCard, PERMISSION_RE } from '../components/ConsentCard';
 
 const TARGET: Record<string, string> = { rust: 'Rust', rust_bevy: 'Rust + Bevy', web: 'HTML/CSS/JS', auto: 'Auto' };
 
@@ -78,6 +80,11 @@ export function WorkspaceView() {
   const openFeedback = cs ? values(cs.feedback).filter((f) => f.status !== 'resolved').length : 0;
   const previews = cs ? Object.keys(cs.previews).length : 0;
   const base = `/projects/${encodeURIComponent(caseId)}`;
+  // the plan needs the original's behaviour but running it has not been allowed
+  const needsOriginal =
+    !!cs &&
+    (values(cs.jobs).some((j) => j.state !== 'completed' && PERMISSION_RE.test(j.blocker ?? '')) ||
+      values(cs.planItems).some((i) => i.status === 'blocked' && i.blockers.some((b) => PERMISSION_RE.test(b))));
 
   return (
     <div>
@@ -120,18 +127,21 @@ export function WorkspaceView() {
             { to: `${base}/plan`, label: 'Plan', testId: 'tab-plan' },
             { to: `${base}/preview`, label: 'Preview & Test', badge: previews || null, testId: 'tab-preview' },
             { to: `${base}/feedback`, label: 'Feedback', badge: openFeedback || null, testId: 'tab-feedback' },
+            { to: `${base}/scenarios`, label: 'Scenarios', testId: 'tab-scenarios' },
             { to: `${base}/comparisons`, label: 'Comparisons', testId: 'tab-comparisons' },
             { to: `${base}/advanced`, label: 'Advanced', testId: 'tab-advanced' },
           ]}
         />
       </header>
       <div className="page">
+        {needsOriginal && <ConsentCard caseId={caseId} variant="banner" />}
         <Routes>
           <Route index element={<Navigate to={`${base}/overview`} replace />} />
           <Route path="overview" element={<OverviewTab caseId={caseId} />} />
           <Route path="plan" element={<PlanTab caseId={caseId} />} />
           <Route path="preview" element={<PreviewTab caseId={caseId} />} />
           <Route path="feedback" element={<FeedbackTab caseId={caseId} />} />
+          <Route path="scenarios" element={<ScenariosTab caseId={caseId} />} />
           <Route path="comparisons" element={<ComparisonsTab caseId={caseId} />} />
           <Route path="advanced" element={<AdvancedTab caseId={caseId} />} />
           <Route path="*" element={<Navigate to={`${base}/overview`} replace />} />

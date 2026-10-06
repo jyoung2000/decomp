@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { OriginalRunExplainer, useIsolation } from '../components/ConsentCard';
 import { ErrorCallout } from '../components/ErrorCallout';
 import { PathField } from '../components/PathField';
 import { useToast } from '../components/Toasts';
@@ -36,6 +37,7 @@ export function NewProjectView() {
   const toast = useToast();
   const nav = useNavigate();
   const caps = useResource(() => api.capabilities(), [api]);
+  const isolation = useIsolation();
   const [f, setF] = useState<NewProjectForm>(emptyForm);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -87,6 +89,13 @@ export function NewProjectView() {
     setBusy(true);
     try {
       const c = await api.createCase(body);
+      // the choice is recorded as the project's consent; make sure what the controller stored is what the user chose
+      try {
+        const rec = await api.consent(c.case_id);
+        if (rec.allowed !== f.execute_original) await api.setConsent(c.case_id, f.execute_original, 'Chosen in the New project form');
+      } catch (e) {
+        toast.error('The choice about running the original could not be confirmed', e);
+      }
       setSelectedCase(c.case_id);
       toast.success('Project created', `${c.name} is ready. Press Start to begin discovery.`);
       nav(`/projects/${encodeURIComponent(c.case_id)}/overview`);
@@ -188,11 +197,32 @@ export function NewProjectView() {
         <fieldset>
           <legend>Original launch configuration</legend>
           <div className="stack-lg">
-            <label className="check">
-              <input type="checkbox" checked={f.execute_original} onChange={(e) => set('execute_original', e.target.checked)} />
-              Execute the original program to capture its behaviour
-            </label>
-            <p className="small muted">When enabled, the original runs in a bounded sandbox for each scenario; its exit code, output, files and screens become the reference for comparisons. When disabled, only static analysis is used and behaviour comparisons are skipped.</p>
+            <div className="stack" role="radiogroup" aria-label="Run the original program to record its behaviour?" aria-describedby="np-run-why">
+              <span className="field-label">Run the original program to record its behaviour?</span>
+              <div className="choice-grid">
+                <label className="choice">
+                  <input type="radio" name="run_original" value="no" checked={!f.execute_original} onChange={() => set('execute_original', false)} data-testid="run-original-no" />
+                  <span>
+                    <span className="choice-title">No, do not run it</span>
+                    <span className="choice-sub">Default. Only the files are analysed; nothing is executed and behaviour comparisons are skipped.</span>
+                  </span>
+                </label>
+                <label className="choice">
+                  <input type="radio" name="run_original" value="yes" checked={f.execute_original} onChange={() => set('execute_original', true)} data-testid="run-original-yes" />
+                  <span>
+                    <span className="choice-title">Yes, allow Rebuild Studio to run it</span>
+                    <span className="choice-sub">Your permission is recorded with the project. You can revoke it at any time.</span>
+                  </span>
+                </label>
+              </div>
+              <div id="np-run-why" className="small">
+                <OriginalRunExplainer isolation={isolation} compact />
+              </div>
+              <details className="small">
+                <summary>Full details about the protection</summary>
+                <OriginalRunExplainer isolation={isolation} />
+              </details>
+            </div>
             {f.execute_original && (
               <>
                 <div className="stack" role="radiogroup" aria-label="How the original runs">

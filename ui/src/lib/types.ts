@@ -585,3 +585,64 @@ export interface ToolSetupSnapshot {
   required_missing: string[];
   busy: boolean;
 }
+
+
+/** GET /cases/{id}/consent/original-execution */
+export interface OriginalConsent {
+  allowed: boolean;
+  at: string | null;
+  via: string | null;
+  history: { allowed: boolean; at: string; via: string; note?: string }[];
+}
+
+/** GET /isolation: what this computer offers (probed by the controller). */
+export interface IsolationInfo {
+  platform: string;
+  network_default?: string;
+  network_blocking?: string;
+  default_mode?: string;
+  modes?: Record<string, { available?: boolean; [k: string]: unknown }>;
+}
+
+export type ScenarioStatus = 'no_baseline' | 'changed' | 'not_run' | 'passed' | 'failed';
+
+export interface UserScenarioBody {
+  title: string;
+  feature_id?: string | null;
+  steps: { args: string[]; stdin: string }[];
+  compare: { exit_code: boolean; output: boolean; files: boolean };
+  normalize: { line_endings: boolean; trailing_spaces: boolean; trim: boolean; ignore_timestamps: boolean };
+  timeout?: number;
+}
+
+export interface UserScenario extends UserScenarioBody {
+  scenario_id: string;
+  case_id: string;
+  status: ScenarioStatus;
+  recorded_at: string | null;
+  recorded_evidence: string | null;
+  updated_at: string;
+}
+
+export interface ScenarioCounts {
+  declared: number;
+  no_baseline: number;
+  changed: number;
+  recorded: number;
+  passed: number;
+  failed: number;
+  not_run: number;
+}
+
+export interface ScenarioList {
+  scenarios: UserScenario[];
+  counts: ScenarioCounts;
+  consent: OriginalConsent;
+}
+
+export interface RecordResult extends ScenarioList {
+  evidence_id: string;
+  baseline_revision: number;
+  recorded: string[];
+  scenarios_in_baseline: number;
+}
