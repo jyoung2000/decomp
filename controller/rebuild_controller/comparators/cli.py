@@ -39,9 +39,18 @@ def host_launcher(launch: dict[str, Any], root: Path) -> tuple[list[str], dict[s
 
 
 def run_steps(launch: dict[str, Any], root: Path, steps: list[dict[str, Any]], work: Path, *, timeout: float = 60,
-              stdin_mode: str = "pipe") -> list[dict[str, Any]]:
+              stdin_mode: str = "pipe", setup_files: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Run steps sequentially in `work` (fresh dir). Each step: {args:[..], stdin?: str, env?: {}} with `{work}` templating."""
     work.mkdir(parents=True, exist_ok=True)
+    for name, spec in (setup_files or {}).items():
+        dest = work / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(spec, dict) and "hex" in spec:
+            dest.write_bytes(bytes.fromhex(spec["hex"]))
+        elif isinstance(spec, dict) and "text" in spec:
+            dest.write_text(spec["text"], encoding="utf-8", newline="")
+        elif isinstance(spec, str):
+            dest.write_text(spec, encoding="utf-8", newline="")
     prefix, env, runner = host_launcher(launch, root)
     results = []
     for st in steps:
@@ -75,7 +84,7 @@ def compare_cli_scenario(scenario: dict[str, Any], baseline: dict[str, Any], can
     """Compare a candidate run against the frozen baseline for one scenario. Baseline is never modified."""
     steps = scenario["steps"]
     norm = scenario.get("normalize", {})
-    cand_runs = run_steps(candidate_launch, candidate_root, steps, work, timeout=timeout)
+    cand_runs = run_steps(candidate_launch, candidate_root, steps, work, timeout=timeout, setup_files=scenario.get("setup_files"))
     base_runs = baseline["steps"]
     out: list[ComparisonResult] = []
     cmd = " && ".join(" ".join(r["args"]) for r in cand_runs)
@@ -98,6 +107,10 @@ def compare_cli_scenario(scenario: dict[str, Any], baseline: dict[str, Any], can
         expected_files = baseline.get("files", {})
         actual_files = snapshot_work(work)
         ignore = set(scenario.get("ignore_files", []))
+        # setup files the oracle does not list as final are expected to be unchanged: compare against their setup content
+        for name, spec in (scenario.get("setup_files") or {}).items():
+            if name not in expected_files and isinstance(spec, dict) and spec.get("sha256"):
+                expected_files = {**expected_files, name: spec["sha256"]}
         exp = {k: v for k, v in expected_files.items() if k not in ignore}
         act = {k: v for k, v in actual_files.items() if k not in ignore}
         mism = {k: {"expected": exp.get(k), "actual": act.get(k)} for k in sorted(set(exp) | set(act)) if exp.get(k) != act.get(k)}

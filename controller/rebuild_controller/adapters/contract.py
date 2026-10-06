@@ -36,6 +36,7 @@ class ToolProbe:
     pinned: str = ""          # pinned release/commit
     integrity: str = ""       # sha256 of downloaded artifact if known
     integration: str = "cli"  # cli|library|plugin|service
+    optional: bool = False    # optional tools never lower the backend's overall availability
 
     def to_dict(self) -> dict[str, Any]:
         d = self.__dict__.copy()
@@ -76,10 +77,11 @@ class BackendInfo:
 
     @property
     def availability(self) -> Availability:
-        if not self.tools:
+        required = [t for t in self.tools if not t.optional]
+        if not required:
             return Availability.USABLE
         order = list(Availability)
-        return min((t.availability for t in self.tools), key=order.index)
+        return min((t.availability for t in required), key=order.index)
 
     def to_dict(self) -> dict[str, Any]:
         return {

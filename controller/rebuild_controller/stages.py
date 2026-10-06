@@ -255,7 +255,8 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
     case = st.cases.get_case(ctx.job.case_id)
     lp = case.get("launch_profile", {})
     if lp.get("baseline_file"):
-        bl = json.loads(Path(lp["baseline_file"]).read_text("utf-8"))
+        from .fixture_oracle import load_baseline_file
+        bl = load_baseline_file(Path(lp["baseline_file"]), Path(case["source_root"]))
         bl = _import_screenshots(st, case["case_id"], bl, Path(lp["baseline_file"]).parent)
         ev = st.verifier.freeze_baseline(case["case_id"], bl, producer="fixture_oracle", title="Fixture oracle baseline")
         return {"evidence_id": ev["evidence_id"], "source": "fixture_oracle", "scenarios": len(bl.get("scenarios", []))}
@@ -292,7 +293,7 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
         from .comparators.cli import run_steps, snapshot_work
         for i, sc in enumerate(scenarios):
             w = work_root / sc["id"]
-            runs = run_steps(launch, root, sc["steps"], w, timeout=float(sc.get("timeout", 60)))
+            runs = run_steps(launch, root, sc["steps"], w, timeout=float(sc.get("timeout", 60)), setup_files=sc.get("setup_files"))
             bl["scenarios"].append({**sc, "expected": {"steps": runs, "files": snapshot_work(w)}})
             ctx.progress(scenarios_done=i + 1, scenarios_total=len(scenarios))
     ev = st.verifier.freeze_baseline(case["case_id"], bl, producer="capture_original", title="Captured original baseline")

@@ -84,6 +84,13 @@ class StudioServices:
         except Exception:
             pass
         self.runner.stop()
+        for bid in self.registry.ids():
+            b = self.registry.get(bid)
+            if hasattr(b, "close"):
+                try:
+                    b.close()
+                except Exception:
+                    pass
         self.db.close()
 
     # ------------------------------------------------------------------ typed operations (MCP/CLI/API share these)
