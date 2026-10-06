@@ -23,3 +23,21 @@ Driven by Claude Code through Windows UI Automation (real mouse clicks / double-
 | Update over existing install (`setup.exe /P`, passive) | PASS: exit 0 in 5 s; binaries replaced; desktop shortcut kept; `%LOCALAPPDATA%\RebuildStudio` (store, cases, logs) preserved | ls before/after |
 | Start-menu launch | NOT RUN: this machine uses a third-party classic Start menu; the owner was actively typing in another window, so desktop automation was stopped to avoid interfering (one mistaken keystroke burst went into another app's text box and was removed character-for-character; nothing was sent) | — |
 | Pin to taskbar / relaunch from pin | NOT RUN (needs the desktop; Windows also blocks programmatic pinning by design, so this is a human step) | — |
+
+## Run 3 — commit 80ff419 (installer sha256 b1c15bba9b17a0063eda218385e2f1cfe6a2d5adf3d1e31cb1bad929cef614c4, portable 21830bae…, UNSIGNED)
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| Build gate: every backend loads in the frozen controller | PASS: "sidecar doctor ok: 7 backends load in the frozen build" (Run 2's build had shipped with all backends '(failed to load)') | build log |
+| Guided tool setup (no PowerShell) into `%LOCALAPPDATA%\RebuildStudio\tools` | PASS: rizin (Cutter v2.5.0 build with rz-ghidra, installed via Install-from-file), GDRE 2.7.0, .NET 8.0.31, ILSpy 9.1.0.7988, Node 22.22.0, playwright-core 1.58.2 — all hash-verified | tool_setup status |
+| Installed controller doctor (--smoke) with those tools | rizin/ilspy/gdre/jsweb/triage USABLE; jvm missing (optional CFR not installed); ghidra (standalone) missing | doctor JSON |
+| Real fixture through the installed controller, PATH = System32 only, no Playwright Chromium | PASS ×3: fixtures/webapp → 10/10 jobs, outcome `fully_matched` within the 1 declared (automatic) scenario, browser = system Microsoft Edge, ≈8 s each | manifest.json |
+| .NET fixture through the installed controller, PATH = System32 only | BLOCKED (honest): "install Rust toolchain (rustup) to build Rust candidates" — guided setup had no Rust entry (being added) | result.json |
+| Ordinary uninstall (`uninstall.exe /S`) | PASS: program dir, desktop + Start-menu shortcuts, Apps entry removed; `%LOCALAPPDATA%\RebuildStudio` (cases, tools, logs, store) and Credential Manager entries kept | ls/reg/cmdkey |
+| Data-removal credential purge (`rebuild-studio.exe --remove-stored-credentials`, what the uninstaller runs when "Delete the application data" is ticked) | PASS: test credential `RebuildStudio:gate-test` removed, no window, no process left | cmdkey |
+| Uninstall with the "Delete the application data" checkbox ticked (GUI) | NOT RUN (needs the uninstaller GUI) | — |
+| Start-menu shortcut launch (shell-executed .lnk) | PASS: controller.json in 1.9 s; UI shows "Connected · up to date"; Tools entry present; no console window; taskbar shows one Rebuild Studio button | run3-startmenu-launch-connected.png |
+| Forced termination of the shell (`taskkill /F rebuild-studio.exe`, i.e. a crash) | PASS: both controller processes gone within 2 s (Job Object kill-on-close); stale controller.json left behind | tasklist |
+| Relaunch after the crash | PASS: stale controller.json replaced (new port/token), exactly one controller (PyInstaller bootloader + child), /health ok | controller.json, tasklist |
+| Normal close (WM_CLOSE to the main window) | PASS: 0 processes, controller.json removed | tasklist |
+| Pin to taskbar → close → relaunch from the pin | NOT RUN: Windows blocks programmatic pinning; needs a person (steps in docs/INSTALL.md) | — |
