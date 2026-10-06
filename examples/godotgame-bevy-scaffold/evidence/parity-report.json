@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-10-06T11:54:46.899Z",
+ "generated_at": "2026-10-06T12:27:07.045Z",
  "case": {
-  "case_id": "case_01a1110c53e20db71d8c36",
+  "case_id": "case_01a11128f21c2ca4860107",
   "name": "godotgame",
   "source_root": "/home/user/decomp/fixtures/godotgame/original",
-  "output_root": "/tmp/pipe-godot-xipi2p95/out",
+  "output_root": "/tmp/pipe-godot-fcrmmz2m/out",
   "target_language": "rust_bevy",
   "output_type": "exe",
   "status": "running",
@@ -13,12 +13,14 @@
   }
  },
  "candidate": {
-  "candidate_id": "cand_01a1110c61d4f8ed89d124",
+  "candidate_id": "cand_01a11128ff9181146b55a2",
   "revision": 1,
-  "build_hash": "958b5d3511163011",
+  "build_hash": "cca2eb2c2bcf244a",
   "build_status": "built",
   "verification": "untested",
-  "last_known_good": false
+  "last_known_good": false,
+  "author": null,
+  "origin": "scaffold"
  },
  "parity": {
   "full_parity": false,
@@ -46,8 +48,8 @@
   "needs_retest": 0
  },
  "reproduction": {
-  "cli": "rebuildctl rebuild --source \"/home/user/decomp/fixtures/godotgame/original\" --output \"/tmp/pipe-godot-xipi2p95/out\" --language rust_bevy --type exe",
-  "verify": "rebuildctl verify case_01a1110c53e20db71d8c36 cand_01a1110c61d4f8ed89d124"
+  "cli": "rebuildctl rebuild --source \"/home/user/decomp/fixtures/godotgame/original\" --output \"/tmp/pipe-godot-fcrmmz2m/out\" --language rust_bevy --type exe",
+  "verify": "rebuildctl verify case_01a11128f21c2ca4860107 cand_01a11128ff9181146b55a2"
  },
  "host": null
 }

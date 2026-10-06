@@ -56,7 +56,12 @@ for (const a of spec.actions || []) {
   }
 }
 if (spec.capture && spec.capture.screenshot) {
-  await page.screenshot({ path: spec.capture.screenshot, fullPage: false, animations: 'disabled' });
+  // settle before capturing: network idle, fonts loaded, one animation frame, short quiet period (deterministic across runs on one host)
+  try { await page.waitForLoadState('networkidle', { timeout: 5000 }); } catch {}
+  try { await page.evaluate(() => document.fonts && document.fonts.ready); } catch {}
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await page.waitForTimeout(spec.settle_ms || 300);
+  await page.screenshot({ path: spec.capture.screenshot, fullPage: false, animations: 'disabled', caret: 'hide' });
   record.screenshot = spec.capture.screenshot;
 }
 await browser.close();

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -102,14 +103,21 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
 
     @app.exception_handler(HTTPException)
     async def http_exc(request: Request, exc: HTTPException):
-        d = exc.detail if isinstance(exc.detail, dict) else {"code": "error", "message": str(exc.detail)}
+        d = exc.detail if isinstance(exc.detail, dict) else {"code": "not_found" if exc.status_code == 404 else "error", "message": str(exc.detail)}
         return JSONResponse({"error": d}, status_code=exc.status_code)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exc(request: Request, exc: RequestValidationError):
+        errs = exc.errors()
+        where = ", ".join(".".join(str(x) for x in e.get("loc", [])[1:]) for e in errs[:5])
+        msg = "; ".join(f"{'.'.join(str(x) for x in e.get('loc', [])[1:])}: {e.get('msg')}" for e in errs[:5])
+        return JSONResponse({"error": {"code": "validation", "message": msg[:2000], "affected": where, "next_action": "correct the highlighted fields and retry"}}, status_code=400)
 
     @app.exception_handler(Exception)
     async def any_exc(request: Request, exc: Exception):
         name = type(exc).__name__
         code = {KeyError: 404, ValueError: 400, PermissionError: 403}.get(type(exc), 500)
-        next_action = None
+        next_action = "check that the id exists (it may belong to another data directory)" if isinstance(exc, KeyError) else None
         if name == "ApprovalRequired":
             code, next_action = 409, "approve unknown pricing for this model or set an explicit price on the connection"
         elif name in ("BudgetExhausted", "BudgetRequired", "DuplicateReservation"):
@@ -168,6 +176,17 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     @app.get("/doctor")
     def doctor(smoke: int = 0):
         return studio.doctor(smoke=bool(smoke))
+
+    @app.get("/capabilities")
+    def capabilities():
+        from ..reconstruct import _unsupported_combo
+        combos = []
+        for lang in ("rust", "rust_bevy", "web", "auto"):
+            for out in ("exe", "installer", "portable", "web", "pwa"):
+                reason = None if lang == "auto" else _unsupported_combo("unknown", lang, out)
+                combos.append({"target_language": lang, "output_type": out, "state": "unsupported" if reason else "supported", "reason": reason})
+        return {"output_combinations": combos, "profiles_with_backends": sorted(set(sum([studio.registry.info(b).profiles for b in studio.registry.ids()], []))),
+                "note": "native profiles cannot target web; web target cannot produce exe/installer/portable"}
 
     @app.get("/cases")
     def cases():
