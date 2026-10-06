@@ -220,7 +220,16 @@ def stage_discover_features(ctx: StageContext) -> dict[str, Any]:
     case = st.cases.get_case(ctx.job.case_id)
     lp = case.get("launch_profile", {})
     added = []
-    for sc in lp.get("scenarios", []):
+    scenarios = list(lp.get("scenarios", []))
+    if lp.get("baseline_file"):
+        from .fixture_oracle import load_baseline_file
+        try:
+            for sc in load_baseline_file(Path(lp["baseline_file"]), Path(case["source_root"])).get("scenarios", []):
+                if sc.get("feature_id") and sc["feature_id"] not in {x.get("feature_id") for x in scenarios}:
+                    scenarios.append({"id": sc["id"], "feature_id": sc["feature_id"], "title": sc.get("title", sc["id"]), "description": "declared by frozen oracle"})
+        except Exception as e:
+            ctx.log(f"baseline file could not be read for feature discovery: {e}")
+    for sc in scenarios:
         fid = sc.get("feature_id") or f"scenario.{sc['id']}"
         f = st.ledger.add(case["case_id"], sc.get("title", fid), description=sc.get("description", ""), origin="user", critical=bool(sc.get("critical")),
                           impl_status="planned", feature_id=fid)

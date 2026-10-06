@@ -110,7 +110,15 @@ class Verifier:
             if fid in known:
                 self.ledger.set_verification(fid, verdict, candidate_id=candidate_id, evidence_id=report_ev["evidence_id"], writer=self.writer)
         all_pass = bool(scenario_results) and all(s["verdict"] == "pass" for s in scenario_results)
-        self.candidates.set_verification(candidate_id, "verified" if all_pass else ("partial" if any(s["verdict"] == "pass" for s in scenario_results) else "failed"), writer=self.writer)
+        if not scenario_results:
+            verdict = "untested"   # no scenarios declared: nothing was measured, never 'verified'
+        elif all_pass:
+            verdict = "verified"
+        elif any(s["verdict"] == "pass" for s in scenario_results):
+            verdict = "partial"
+        else:
+            verdict = "failed"
+        self.candidates.set_verification(candidate_id, verdict, writer=self.writer)
         self.events.emit("verification.completed", {"candidate_id": candidate_id, "summary": report["summary"], "evidence_id": report_ev["evidence_id"]}, case_id=case_id)
         report["evidence_id"] = report_ev["evidence_id"]
         return report

@@ -35,6 +35,8 @@ def deliver(ctx: StageContext) -> dict[str, Any]:
     _export_evidence(st, case["case_id"], ev_dir)
     rep_dir = staging / "reports"; rep_dir.mkdir()
     report = write_reports(st, case["case_id"], cid, rep_dir)
+    from .report import export_plan
+    export_plan(st, case["case_id"], rep_dir)   # project-plan.json/html ship inside the manifest
     # manifest covering every shipped file (written last, includes itself as 'manifest.json' entry without hash)
     files = []
     for p in sorted(staging.rglob("*")):
@@ -65,8 +67,6 @@ def deliver(ctx: StageContext) -> dict[str, Any]:
     st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-PACKAGE"), status="completed" if cand["build_status"] == "built" else "failed", files=[str(out_root / "dist")])
     st.cases.set_case_status(case["case_id"], "delivered")
     st.plan.revise(case["case_id"], "delivered output")
-    from .report import export_plan
-    export_plan(st, case["case_id"], out_root / "reports")
     return {"output_root": str(out_root), "files": len(files), "report": report.get("summary"), "verification": manifest["verification"]}
 
 

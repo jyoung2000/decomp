@@ -66,7 +66,7 @@ def test_pecli_full_pipeline_no_ai_is_honest(studio, tmp_path):
     assert "**Full parity:** NO" in md and "no AI calls were made" in md
     # progress is exact: known denominators for jobs, features counted separately
     prog = studio.plan.progress(cid)
-    assert prog["groups"]["recovery"]["total"] == 1 and prog["groups"]["verification"]["total"] == 1
+    assert prog["groups"]["recovery"]["total"] == 1 and prog["groups"]["verification"]["total"] == 8
     # task packet exists for external clients and is bounded
     pk = studio.cases.list_evidence(cid, kind="ai_task_packet")
     assert pk and pk[0]["meta"]["bytes"] <= 200_000 + 2000

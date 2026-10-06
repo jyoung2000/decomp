@@ -38,7 +38,7 @@ for (const a of spec.actions || []) {
     if (a.type === 'click') await page.click(a.selector, { timeout: 5000 });
     else if (a.type === 'fill') await page.fill(a.selector, a.value, { timeout: 5000 });
     else if (a.type === 'press') await page.press(a.selector || 'body', a.key, { timeout: 5000 });
-    else if (a.type === 'goto') await page.goto(a.url, { waitUntil: 'load' });
+    else if (a.type === 'goto') await page.goto(String(a.url).replace('{url}', spec.url), { waitUntil: 'load' });
     else if (a.type === 'wait') await page.waitForTimeout(a.ms || 200);
     else if (a.type === 'wait_for') await page.waitForSelector(a.selector, { timeout: a.timeout || 10000 });
     else if (a.type === 'offline') await context.setOffline(true);
