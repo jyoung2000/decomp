@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AiLine, OriginBadge } from '../../components/ai/PlanAiChip';
 import { Dialog } from '../../components/Dialog';
 import { Empty } from '../../components/Empty';
 import { ErrorCallout } from '../../components/ErrorCallout';
@@ -10,7 +11,7 @@ import { values } from '../../lib/derive';
 import { dateTime, itemLabel } from '../../lib/format';
 import { useApi, useCaseState, useResource, useStore } from '../../lib/store';
 import { openPath } from '../../lib/tauri';
-import type { AcceptanceCheck, Feedback, PlanItem, UnknownScopeEntry } from '../../lib/types';
+import type { AcceptanceCheck, Feedback, Job, PlanItem, UnknownScopeEntry } from '../../lib/types';
 
 const TREE_KINDS = new Set(['milestone', 'deliverable', 'feature']);
 
@@ -42,6 +43,7 @@ export function PlanTab({ caseId }: { caseId: string }) {
     return m;
   }, [items]);
   const feedback = cs ? values(cs.feedback) : [];
+  const jobList = cs ? values(cs.jobs) : [];
 
   if (!cs) return <Empty title="Loading plan…" />;
 
@@ -87,7 +89,7 @@ export function PlanTab({ caseId }: { caseId: string }) {
     return (
       <li key={it.item_id}>
         <ItemRow it={it} expanded={open.has(it.item_id)} onToggle={() => toggle(it.item_id)} />
-        {open.has(it.item_id) && <ItemDetails caseId={caseId} it={it} feedback={feedback} onReveal={reveal} onPrioritize={() => prioritize(it)} onChange={() => setChangeFor(it)} />}
+        {open.has(it.item_id) && <ItemDetails caseId={caseId} it={it} feedback={feedback} jobs={jobList} onReveal={reveal} onPrioritize={() => prioritize(it)} onChange={() => setChangeFor(it)} />}
         {kids.length > 0 && <ul className="tree">{kids.map(renderItem)}</ul>}
       </li>
     );
@@ -143,7 +145,7 @@ export function PlanTab({ caseId }: { caseId: string }) {
               {special('discovery').map((it) => (
                 <li key={it.item_id}>
                   <ItemRow it={it} expanded={open.has(it.item_id)} onToggle={() => toggle(it.item_id)} />
-                  {open.has(it.item_id) && <ItemDetails caseId={caseId} it={it} feedback={feedback} onReveal={reveal} onPrioritize={() => prioritize(it)} onChange={() => setChangeFor(it)} />}
+                  {open.has(it.item_id) && <ItemDetails caseId={caseId} it={it} feedback={feedback} jobs={jobList} onReveal={reveal} onPrioritize={() => prioritize(it)} onChange={() => setChangeFor(it)} />}
                 </li>
               ))}
               {cs.unknownScope.map((u, i) => (
@@ -164,7 +166,7 @@ export function PlanTab({ caseId }: { caseId: string }) {
                 {special(k).map((it) => (
                   <li key={it.item_id}>
                     <ItemRow it={it} expanded={open.has(it.item_id)} onToggle={() => toggle(it.item_id)} />
-                    {open.has(it.item_id) && <ItemDetails caseId={caseId} it={it} feedback={feedback} onReveal={reveal} onPrioritize={() => prioritize(it)} onChange={() => setChangeFor(it)} />}
+                    {open.has(it.item_id) && <ItemDetails caseId={caseId} it={it} feedback={feedback} jobs={jobList} onReveal={reveal} onPrioritize={() => prioritize(it)} onChange={() => setChangeFor(it)} />}
                   </li>
                 ))}
               </ul>
@@ -219,6 +221,7 @@ function UnknownScope({ u }: { u: UnknownScopeEntry }) {
 
 function ItemRow({ it, expanded, onToggle }: { it: PlanItem; expanded: boolean; onToggle: () => void }) {
   return (
+    <>
     <div className="tree-row" data-testid={`plan-item-${it.item_id}`}>
       <button type="button" className="disclosure" id={`plan-${it.item_id}`} aria-expanded={expanded} aria-controls={`plan-details-${it.item_id}`} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${itemLabel(it.item_id)} ${it.title}`} onClick={onToggle}>
         {expanded ? '▼' : '▶'}
@@ -230,9 +233,12 @@ function ItemRow({ it, expanded, onToggle }: { it: PlanItem; expanded: boolean; 
       </span>
       <span className="meta">
         {it.owner && <span className="small muted">{it.owner}</span>}
+        <OriginBadge origin={it.origin} />
         <StatusChip status={it.status} />
       </span>
     </div>
+    {it.ai && <AiLine id={it.item_id} ai={it.ai} />}
+    </>
   );
 }
 
@@ -241,7 +247,7 @@ function checkText(a: AcceptanceCheck): { text: string; status?: string } {
   return { text: [a.id, a.description ?? a.command].filter(Boolean).join(' — '), status: a.status };
 }
 
-function ItemDetails({ caseId, it, feedback, onReveal, onPrioritize, onChange }: { caseId: string; it: PlanItem; feedback: Feedback[]; onReveal: (id: string) => void; onPrioritize: () => void; onChange: () => void }) {
+function ItemDetails({ caseId, it, feedback, jobs, onReveal, onPrioritize, onChange }: { caseId: string; it: PlanItem; feedback: Feedback[]; jobs: Job[]; onReveal: (id: string) => void; onPrioritize: () => void; onChange: () => void }) {
   const base = `/projects/${encodeURIComponent(caseId)}`;
   const linked = feedback.filter((f) => f.target_id === it.item_id || f.linked_items?.includes(it.item_id));
   return (
@@ -329,7 +335,19 @@ function ItemDetails({ caseId, it, feedback, onReveal, onPrioritize, onChange }:
         {it.job_ids?.length > 0 && (
           <>
             <dt>Jobs</dt>
-            <dd className="mono small">{it.job_ids.join(', ')}</dd>
+            <dd>
+              <div className="mono small">{it.job_ids.join(', ')}</div>
+              {jobs
+                .filter((j) => it.job_ids.includes(j.job_id) && j.ai)
+                .map((j) => (
+                  <div key={j.job_id} className="stack" style={{ gap: 2 }}>
+                    <span className="small muted">
+                      {j.title} <OriginBadge origin={j.origin} />
+                    </span>
+                    <AiLine id={j.job_id} ai={j.ai!} />
+                  </div>
+                ))}
+            </dd>
           </>
         )}
         {it.updated_at && (

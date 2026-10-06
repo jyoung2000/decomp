@@ -3,7 +3,7 @@
 // newer state. Nothing here reads a clock: progress only moves when the controller reports it.
 import type {
   Budget, Candidate, Case, ControllerEvent, Eta, Feature, Feedback, Job, JobState, Phase, Plan, PlanItem, PhaseProgress,
-  Outcome, Preview, UnknownScopeEntry,
+  Outcome, Preview, UnknownScopeEntry, AiActivity,
 } from './types';
 
 export interface Tracked<T> {
@@ -42,6 +42,8 @@ export interface CaseState {
   previews: Record<string, Tracked<Preview>>;
   feedback: Record<string, Tracked<Feedback>>;
   budget: Budget | null;
+  /** live `ai.activity` lines (newest last), capped */
+  aiActivity: AiActivity[];
   latestEvent: ControllerEvent | null;
   latestMeaningful: ControllerEvent | null;
   /** last N non-heartbeat events for this case (raw log view) */
@@ -59,6 +61,7 @@ export interface StudioState {
 }
 
 export const LOG_LIMIT = 500;
+export const ACTIVITY_LIMIT = 500;
 
 export function emptyStudio(): StudioState {
   return { cases: {}, workersActive: null, lastHeartbeat: null, versions: {} };
@@ -84,6 +87,7 @@ export function emptyCase(caseId: string): CaseState {
     previews: {},
     feedback: {},
     budget: null,
+    aiActivity: [],
     latestEvent: null,
     latestMeaningful: null,
     log: [],
@@ -263,6 +267,38 @@ function reduceJob(cs: CaseState, ev: ControllerEvent): { cs: CaseState; needJob
   return { cs: { ...cs, jobs }, needJobs: !known };
 }
 
+const str = (x: unknown) => (typeof x === 'string' && x ? x : undefined);
+const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined);
+
+/** Whitelist of `ai.activity` fields (docs/AI_LADDER.md section 5). Anything else, notably prompt text, is dropped. */
+export function pickActivity(p: Record<string, unknown>, ev?: ControllerEvent): AiActivity | null {
+  const text = str(p.text);
+  if (!text) return null;
+  const loc = p.locality === 'local' || p.locality === 'cloud' ? p.locality : undefined;
+  return {
+    at: str(p.at) ?? ev?.ts ?? '',
+    kind: str(p.kind),
+    text,
+    plan_item_id: str(p.plan_item_id) ?? null,
+    job_id: str(p.job_id) ?? ev?.job_id ?? null,
+    candidate_id: str(p.candidate_id) ?? null,
+    evidence_ids: Array.isArray(p.evidence_ids) ? p.evidence_ids.filter((x): x is string => typeof x === 'string') : [],
+    task: str(p.task) ?? null,
+    provider: str(p.provider) ?? null,
+    model: str(p.model) ?? null,
+    locality: loc ?? null,
+    outcome: str(p.outcome) ?? null,
+    tokens_in: num(p.tokens_in) ?? null,
+    tokens_out: num(p.tokens_out) ?? null,
+    cost_usd: num(p.cost_usd) ?? null,
+    cost_known: typeof p.cost_known === 'boolean' ? p.cost_known : null,
+    fallback_reason: str(p.fallback_reason) ?? null,
+    config_revision: num(p.config_revision) ?? null,
+    origin: p.origin === 'deterministic' || p.origin === 'model_proposed' || p.origin === 'verifier_decided' ? p.origin : null,
+    seq: ev?.seq,
+  };
+}
+
 export function applyEvent(state: StudioState, ev: ControllerEvent): ApplyResult {
   const refresh: ApplyResult['refresh'] = [];
   const p = ev.payload ?? {};
@@ -360,6 +396,10 @@ export function applyEvent(state: StudioState, ev: ControllerEvent): ApplyResult
     s = { ...s, versions: bump(s.versions, 'budgets') };
   } else if (k === 'ai.call') {
     cs = { ...cs, versions: bump(cs.versions, 'aiCalls') };
+  } else if (k === 'ai.activity') {
+    // only the documented, whitelisted fields are kept; a raw prompt can never reach the UI state
+    const a = pickActivity(p, ev);
+    if (a && !cs.aiActivity.some((x) => x.seq === ev.seq)) cs = { ...cs, aiActivity: [...cs.aiActivity, a].slice(-ACTIVITY_LIMIT) };
   } else if (k === 'verification.completed' || k === 'verification.invalidated') {
     // not in docs/API.md; emitted by the controller's verifier — verdicts live on candidates, features and previews
     cs = { ...cs, versions: bump(cs.versions, 'comparisons') };

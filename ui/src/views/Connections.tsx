@@ -1,12 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { ConfirmDialog } from '../components/Dialog';
 import { Empty, Loading } from '../components/Empty';
 import { ErrorCallout } from '../components/ErrorCallout';
+import { LadderSection } from '../components/ai/LadderSection';
 import { StatusChip } from '../components/StatusChip';
 import { useToast } from '../components/Toasts';
 import { dateTime, humanize, usd } from '../lib/format';
 import { useApi, useResource, useStoreSelector } from '../lib/store';
-import type { Connection, HermesStatus, TaskRoute } from '../lib/types';
+import type { Connection, HermesStatus } from '../lib/types';
 
 export const PROVIDERS: { id: string; label: string; endpoint?: string; needsEndpoint?: boolean }[] = [
   { id: 'openai', label: 'OpenAI', endpoint: 'https://api.openai.com/v1' },
@@ -120,7 +121,7 @@ export function ConnectionsView() {
       </section>
 
       <AddConnection onAdded={conns.reload} />
-      <Routes connections={conns.data ?? []} />
+      <LadderSection connections={conns.data ?? []} />
       <Costs />
       <Hermes />
 
@@ -211,6 +212,7 @@ function AddConnection({ onAdded }: { onAdded: () => void }) {
             <label htmlFor="ac-endpoint">Endpoint{p.needsEndpoint ? ' *' : ''}</label>
             <input id="ac-endpoint" type="url" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder={p.endpoint ?? 'https://…'} aria-invalid={!!errs.endpoint} />
             {errs.endpoint && <span className="field-error">{errs.endpoint}</span>}
+            {provider === 'local_openai' && <span className="hint">Runs on this PC and costs nothing. Ollama: http://127.0.0.1:11434/v1 · LM Studio: http://127.0.0.1:1234/v1. Probe it to discover installed models.</span>}
           </div>
         </div>
         <div className="field-row">
@@ -243,124 +245,6 @@ function AddConnection({ onAdded }: { onAdded: () => void }) {
         </div>
       </form>
     </section>
-  );
-}
-
-function Routes({ connections }: { connections: Connection[] }) {
-  const api = useApi();
-  const routes = useResource(() => api.routes(), [api]);
-  return (
-    <section className="card" aria-labelledby="routes-h">
-      <h3 id="routes-h">Models per task</h3>
-      <p className="small muted" style={{ marginBottom: 12 }}>
-        The primary is tried first; fallbacks are used in order when it is unavailable or over its limit.
-      </p>
-      {routes.error ? (
-        <ErrorCallout error={routes.error} onRetry={routes.reload} />
-      ) : (
-        <div className="stack-lg">
-          {TASKS.map((t) => (
-            <RouteEditor key={t.id} task={t} route={routes.data?.find((r) => r.task === t.id)} connections={connections} onSaved={routes.reload} />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function RouteEditor({ task, route, connections, onSaved }: { task: { id: string; label: string; sub: string }; route?: TaskRoute; connections: Connection[]; onSaved: () => void }) {
-  const api = useApi();
-  const toast = useToast();
-  const [primary, setPrimary] = useState({ connection: route?.primary_connection ?? '', model: route?.primary_model ?? '' });
-  const [fallbacks, setFallbacks] = useState(route?.fallbacks ?? []);
-  useEffect(() => {
-    setPrimary({ connection: route?.primary_connection ?? '', model: route?.primary_model ?? '' });
-    setFallbacks(route?.fallbacks ?? []);
-  }, [route]);
-  const modelsOf = (cid: string) => connections.find((c) => c.connection_id === cid)?.models ?? [];
-  const save = async () => {
-    try {
-      await api.putRoute(task.id, { primary_connection: primary.connection || null, primary_model: primary.model || null, fallbacks: fallbacks.filter((f) => f.connection) });
-      toast.success(`${task.label} route saved`);
-      onSaved();
-    } catch (e) {
-      toast.error('Route was not saved', e);
-    }
-  };
-  const move = (i: number, d: number) => {
-    const n = [...fallbacks];
-    const j = i + d;
-    if (j < 0 || j >= n.length) return;
-    [n[i], n[j]] = [n[j], n[i]];
-    setFallbacks(n);
-  };
-  const Picker = ({ value, onChange, idp }: { value: { connection: string; model: string }; onChange: (v: { connection: string; model: string }) => void; idp: string }) => (
-    <div className="field-row" style={{ flex: 1 }}>
-      <div className="field">
-        <label htmlFor={`${idp}-c`} className="small">
-          Connection
-        </label>
-        <select id={`${idp}-c`} value={value.connection} onChange={(e) => onChange({ connection: e.target.value, model: '' })}>
-          <option value="">None</option>
-          {connections.map((c) => (
-            <option key={c.connection_id} value={c.connection_id}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label htmlFor={`${idp}-m`} className="small">
-          Model
-        </label>
-        <input id={`${idp}-m`} type="text" list={`${idp}-ml`} value={value.model} onChange={(e) => onChange({ ...value, model: e.target.value })} />
-        <datalist id={`${idp}-ml`}>
-          {modelsOf(value.connection).map((m) => (
-            <option key={m} value={m} />
-          ))}
-        </datalist>
-      </div>
-    </div>
-  );
-  return (
-    <fieldset data-testid={`route-${task.id}`}>
-      <legend>
-        {task.label} <span className="small muted">— {task.sub}</span>
-      </legend>
-      <div className="stack">
-        <span className="small" style={{ fontWeight: 600 }}>
-          Primary
-        </span>
-        {Picker({ value: primary, onChange: setPrimary, idp: `rt-${task.id}-p` })}
-        {fallbacks.map((f, i) => (
-          <div key={i} className="row" style={{ alignItems: 'flex-end' }}>
-            <span className="small" style={{ fontWeight: 600, width: 84 }}>
-              Fallback {i + 1}
-            </span>
-            {Picker({ value: f, onChange: (v) => setFallbacks(fallbacks.map((x, j) => (j === i ? v : x))), idp: `rt-${task.id}-f${i}` })}
-            <div className="btn-group">
-              <button type="button" className="btn sm icon" aria-label={`Move fallback ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)}>
-                ↑
-              </button>
-              <button type="button" className="btn sm icon" aria-label={`Move fallback ${i + 1} down`} disabled={i === fallbacks.length - 1} onClick={() => move(i, 1)}>
-                ↓
-              </button>
-              <button type="button" className="btn sm" aria-label={`Remove fallback ${i + 1}`} onClick={() => setFallbacks(fallbacks.filter((_, j) => j !== i))}>
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
-        <div className="row">
-          <button type="button" className="btn sm" onClick={() => setFallbacks([...fallbacks, { connection: '', model: '' }])}>
-            Add fallback
-          </button>
-          <button type="button" className="btn sm primary" onClick={save}>
-            Save route
-          </button>
-        </div>
-      </div>
-    </fieldset>
   );
 }
 

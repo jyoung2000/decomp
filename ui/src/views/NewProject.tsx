@@ -2,11 +2,12 @@ import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { OriginalRunExplainer, useIsolation } from '../components/ConsentCard';
 import { ErrorCallout } from '../components/ErrorCallout';
+import { AiPolicyEditor, formToPolicy } from '../components/ai/AiPolicyEditor';
 import { PathField } from '../components/PathField';
 import { useToast } from '../components/Toasts';
 import { setSelectedCase } from '../lib/selection';
 import { useApi, useResource } from '../lib/store';
-import type { AiMode, LaunchKind, NewCaseBody, OutputType, TargetLanguage } from '../lib/types';
+import type { LaunchKind, NewCaseBody, OutputType, TargetLanguage } from '../lib/types';
 import { buildLaunchProfile, comboState, emptyForm, validateNewProject, type FieldError, type NewProjectForm } from '../lib/validate';
 
 const TARGETS: { id: TargetLanguage; label: string; sub: string }[] = [
@@ -26,17 +27,12 @@ const LAUNCH_KINDS: { id: LaunchKind; label: string; sub: string }[] = [
   { id: 'cli', label: 'Program or command', sub: 'Runs a command per scenario' },
   { id: 'web', label: 'Web app', sub: 'Serves the site and records it in a browser' },
 ];
-const AI: { id: AiMode; label: string; sub: string }[] = [
-  { id: 'no_ai', label: 'No AI', sub: 'Deterministic tools only' },
-  { id: 'assist_on_failure', label: 'Assist on failure', sub: 'Only when a step fails' },
-  { id: 'assisted', label: 'AI-assisted', sub: 'Interpretation and repair' },
-];
-
 export function NewProjectView() {
   const api = useApi();
   const toast = useToast();
   const nav = useNavigate();
   const caps = useResource(() => api.capabilities(), [api]);
+  const conns = useResource(() => api.connections(), [api]);
   const isolation = useIsolation();
   const [f, setF] = useState<NewProjectForm>(emptyForm);
   const [errors, setErrors] = useState<FieldError[]>([]);
@@ -82,7 +78,7 @@ export function NewProjectView() {
       output_root: f.output_root.trim(),
       target_language: f.target_language as TargetLanguage,
       output_type: f.output_type as OutputType,
-      ai_policy: f.ai_mode === 'no_ai' ? { mode: 'no_ai' } : { mode: f.ai_mode, budget_usd: Number(f.budget_usd) },
+      ai_policy: formToPolicy({ mode: f.ai_mode, locality: f.ai_locality ?? 'any', budget_usd: f.budget_usd, approve_unknown_pricing: !!f.ai_approve_unknown, overrides: f.ai_overrides ?? {} }),
       launch_profile: buildLaunchProfile(f),
       ...(Object.keys(limits).length ? { settings: { limits } } : {}),
     };
@@ -308,23 +304,18 @@ export function NewProjectView() {
         <fieldset>
           <legend>AI policy</legend>
           <div className="stack-lg">
-            <div className="choice-grid" role="radiogroup" aria-label="AI policy">
-              {AI.map((a) => (
-                <label className="choice" key={a.id}>
-                  <input type="radio" name="ai_mode" value={a.id} checked={f.ai_mode === a.id} onChange={() => set('ai_mode', a.id)} />
-                  <span>
-                    <span className="choice-title">{a.label}</span>
-                    <span className="choice-sub">{a.sub}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div className="field" style={{ maxWidth: 260 }}>
-              <label htmlFor="np-budget">Per-job budget (USD){f.ai_mode !== 'no_ai' && ' *'}</label>
-              <input id="np-budget" type="number" min="0" step="0.01" inputMode="decimal" value={f.budget_usd} disabled={f.ai_mode === 'no_ai'} onChange={(e) => set('budget_usd', e.target.value)} aria-invalid={!!err('budget_usd')} />
-              <span className="hint">AI never writes verification verdicts; it only proposes changes that the verifier checks.</span>
-              {err('budget_usd') && <span className="field-error">{errText('budget_usd')}</span>}
-            </div>
+            <AiPolicyEditor
+              idp="np-ai"
+              connections={conns.data ?? []}
+              value={{ mode: f.ai_mode, locality: f.ai_locality ?? 'any', budget_usd: f.budget_usd, approve_unknown_pricing: !!f.ai_approve_unknown, overrides: f.ai_overrides ?? {} }}
+              onChange={(v) => {
+                const next = { ...f, ai_mode: v.mode, ai_locality: v.locality, budget_usd: v.budget_usd, ai_approve_unknown: v.approve_unknown_pricing, ai_overrides: v.overrides };
+                setF(next);
+                if (submitted) setErrors(validateNewProject(next, caps.data));
+              }}
+              budgetErr={errText('budget_usd')}
+            />
+            <p className="hint muted small">AI never writes verification verdicts; it only proposes changes that the verifier checks. You can change this later in the project’s AI tab.</p>
           </div>
         </fieldset>
 

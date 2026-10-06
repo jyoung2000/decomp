@@ -3,6 +3,7 @@ import type {
   AiCall, ApiErrorBody, Budget, Candidate, Capabilities, Case, Comparison, Connection, ControllerEvent, DoctorReport,
   Evidence, Feature, Feedback, Health, HermesStatus, Job, KnowledgeEntry, Module, NewCaseBody, NewFeedbackBody, Plan,
   PlanRevision, Preview, PreviewOpenResult, TaskRoute, ToolSetupEntry, ToolSetupSnapshot,
+  AiActivity, AiPolicy, Ladder, LadderPresetId, ModelCatalogItem, PresetResult,
   IsolationInfo, OriginalConsent, RecordResult, ScenarioList, UserScenario, UserScenarioBody,
 } from './types';
 
@@ -163,6 +164,20 @@ export class Api {
   budgets = async () => {
     const r = await this.get<Budget[] | { budgets?: Budget[] }>('/budgets');
     return Array.isArray(r) ? r : Array.isArray(r?.budgets) ? r.budgets : [];
+  };
+  ladder = () => this.get<Ladder>('/ai/ladder');
+  putLadder = (task: string, entries: { connection_id: string; model: string }[]) => this.put<unknown>(`/ai/ladder/${enc(task)}`, { entries });
+  /** `{models: [...]}` and a bare array are both accepted. */
+  aiModels = async (q: string, task?: string) => {
+    const r = await this.get<ModelCatalogItem[] | { models?: ModelCatalogItem[] }>(`/ai/models${qs({ q, task })}`);
+    return Array.isArray(r) ? r : Array.isArray(r?.models) ? r.models : [];
+  };
+  ladderPreset = (preset: LadderPresetId, apply: boolean) => this.post<PresetResult>('/ai/ladder/preset', { preset, apply });
+  aiPolicy = (id: string) => this.get<AiPolicy>(`/cases/${enc(id)}/ai-policy`);
+  putAiPolicy = (id: string, p: AiPolicy) => this.put<AiPolicy>(`/cases/${enc(id)}/ai-policy`, p);
+  aiActivity = async (id: string) => {
+    const r = await this.get<AiActivity[] | { activity?: AiActivity[]; items?: AiActivity[] }>(`/cases/${enc(id)}/ai/activity`);
+    return Array.isArray(r) ? r : Array.isArray(r?.activity) ? r.activity : Array.isArray(r?.items) ? r.items : [];
   };
   aiCalls = (caseId?: string) => this.get<AiCall[]>(`/ai/calls${qs({ case_id: caseId })}`);
   knowledge = () => this.get<KnowledgeEntry[]>('/knowledge');

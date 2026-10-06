@@ -58,6 +58,8 @@ export interface Job {
   started_at?: string | null;
   finished_at?: string | null;
   error?: string | null;
+  ai?: PlanAi | null;
+  origin?: WorkOrigin | null;
   milestone_id?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -65,7 +67,7 @@ export interface Job {
 
 export type TargetLanguage = 'rust' | 'rust_bevy' | 'web' | 'auto';
 export type OutputType = 'exe' | 'installer' | 'portable' | 'web' | 'pwa';
-export type AiMode = 'no_ai' | 'assist_on_failure' | 'assisted';
+export type AiMode = 'no_ai' | 'assist_on_failure' | 'assisted' | 'inherit' | 'custom';
 
 export interface LaunchScenario {
   /** controller key (required by the real controller's capture/feature stages) */
@@ -158,7 +160,7 @@ export interface Case {
   output_root: string;
   target_language: TargetLanguage;
   output_type: OutputType;
-  ai_policy: { mode: AiMode; budget_usd?: number | null };
+  ai_policy: AiPolicy;
   launch_profile: LaunchProfile;
   status: string;
   created_at: string;
@@ -180,7 +182,7 @@ export interface NewCaseBody {
   output_root: string;
   target_language: TargetLanguage;
   output_type: OutputType;
-  ai_policy: { mode: AiMode; budget_usd?: number };
+  ai_policy: AiPolicy;
   launch_profile: LaunchProfile;
   /** stored in cases.settings by the controller */
   settings?: { limits?: Record<string, number> };
@@ -225,6 +227,10 @@ export interface PlanItem {
   job_ids: string[];
   sort_order: number;
   updated_at?: string;
+  /** docs/AI_LADDER.md section 4: present on items that may use AI */
+  ai?: PlanAi | null;
+  /** assumed field name: who produced or decided this work item */
+  origin?: WorkOrigin | null;
 }
 
 export type UnknownScopeEntry = string | { id?: string; title?: string; reason?: string };
@@ -647,4 +653,122 @@ export interface RecordResult extends ScenarioList {
   baseline_revision: number;
   recorded: string[];
   scenarios_in_baseline: number;
+}
+
+// ---- AI ladder / local AI / plan visibility / activity (docs/AI_LADDER.md) ------------------------------------------
+
+export type Locality = 'local' | 'cloud';
+export type WorkOrigin = 'deterministic' | 'model_proposed' | 'verifier_decided';
+export type LadderPresetId = 'local_first' | 'cloud_first' | 'all_local' | 'all_cloud' | 'no_ai';
+
+export interface ModelAvailability {
+  state: string;
+  probed_at?: string | null;
+  detail?: string | null;
+}
+export interface ModelCapabilities {
+  vision?: boolean | null;
+  tools?: boolean | null;
+  context_window?: number | null;
+}
+export interface ModelPrice {
+  known: boolean;
+  input_per_mtok?: number | null;
+  output_per_mtok?: number | null;
+  source?: string | null;
+}
+
+/** Ladder rung (GET /ai/ladder). Rungs sent to PUT only need `connection_id` and `model`. */
+export interface LadderEntry {
+  position?: number;
+  connection_id: string;
+  connection_label?: string;
+  provider?: string;
+  model: string;
+  locality?: Locality;
+  availability?: ModelAvailability | null;
+  capabilities?: ModelCapabilities | null;
+  price?: ModelPrice | null;
+  free?: boolean;
+}
+export interface LadderTask {
+  entries: LadderEntry[];
+  rationale?: string;
+}
+export interface Ladder {
+  config_revision: number;
+  tasks: Record<string, LadderTask>;
+}
+export interface ModelCatalogItem {
+  connection_id: string;
+  connection_label?: string;
+  provider: string;
+  model: string;
+  locality: Locality;
+  capabilities?: ModelCapabilities | null;
+  price?: ModelPrice | null;
+  free?: boolean;
+  availability?: ModelAvailability | null;
+}
+export interface PresetResult {
+  preset?: string;
+  applied?: boolean;
+  config_revision?: number;
+  /** the contract says "the proposed ladders"; tolerate `tasks` or `ladders`, each task as `{entries}` or a bare array */
+  tasks?: Record<string, LadderTask | LadderEntry[]>;
+  ladders?: Record<string, LadderTask | LadderEntry[]>;
+  warnings?: string[];
+}
+
+export type PolicyLocality = 'any' | 'local_only' | 'cloud_only';
+export interface AiPolicy {
+  mode: AiMode;
+  ladder_overrides?: Record<string, { connection_id: string; model: string }[]>;
+  locality?: PolicyLocality;
+  budget_usd?: number | null;
+  approve_unknown_pricing?: boolean;
+  max_attempts?: number | null;
+  max_output_tokens?: number | null;
+}
+
+export interface PlanAiModel {
+  provider?: string;
+  model: string;
+  locality?: Locality;
+  connection_id?: string;
+}
+export interface PlanAi {
+  task: string;
+  primary?: PlanAiModel | null;
+  fallbacks?: PlanAiModel[];
+  rationale?: string | null;
+  expected_cost?: { min_usd?: number | null; max_usd?: number | null; known?: boolean; unknown_price?: boolean } | null;
+  budget_usd?: number | null;
+  runs_without_ai?: boolean;
+  without_ai?: string | null;
+}
+
+/** One line of the AI activity feed (`ai.activity` event payload and GET /cases/{id}/ai/activity). */
+export interface AiActivity {
+  at: string;
+  kind?: string;
+  text: string;
+  plan_item_id?: string | null;
+  job_id?: string | null;
+  candidate_id?: string | null;
+  evidence_ids?: string[];
+  task?: string | null;
+  provider?: string | null;
+  model?: string | null;
+  locality?: Locality | null;
+  outcome?: string | null;
+  tokens_in?: number | null;
+  tokens_out?: number | null;
+  cost_usd?: number | null;
+  cost_known?: boolean | null;
+  fallback_reason?: string | null;
+  config_revision?: number | null;
+  origin?: WorkOrigin | null;
+  /** controller event seq when it arrived live */
+  seq?: number;
 }

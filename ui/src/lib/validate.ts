@@ -1,4 +1,4 @@
-import type { AiMode, Capabilities, LaunchKind, LaunchProfile, OutputType, TargetLanguage } from './types';
+import type { AiMode, Capabilities, LadderEntry, PolicyLocality, LaunchKind, LaunchProfile, OutputType, TargetLanguage } from './types';
 
 export interface FieldError {
   field: string;
@@ -24,6 +24,9 @@ export interface NewProjectForm {
   scenarios: { name: string; args: string; stdin: string }[];
   ai_mode: AiMode;
   budget_usd: string;
+  ai_locality?: PolicyLocality;
+  ai_approve_unknown?: boolean;
+  ai_overrides?: Record<string, LadderEntry[]>;
   max_workers: string;
   max_memory_mb: string;
   max_disk_gb: string;
@@ -98,9 +101,9 @@ export function validateNewProject(f: NewProjectForm, caps?: Capabilities | null
     });
   }
 
-  if (f.ai_mode !== 'no_ai') {
+  if (f.ai_mode !== 'no_ai' && f.ai_locality !== 'local_only') {
     const b = Number(f.budget_usd);
-    if (f.budget_usd.trim() === '' || !Number.isFinite(b) || b <= 0) e.push({ field: 'budget_usd', what: 'AI is enabled but no per-job budget is set.', affected: 'AI calls would be refused because spending must be bounded.', next: 'Enter a per-job budget in USD (for example 0.50), or choose “No AI”.' });
+    if (f.budget_usd.trim() === '' || !Number.isFinite(b) || b <= 0) e.push({ field: 'budget_usd', what: 'AI is enabled but no per-job budget is set.', affected: 'AI calls would be refused because spending must be bounded.', next: 'Enter a per-job budget in USD (for example 0.50), or choose “No AI” or “Local only”.' });
     else if (b > 1000) e.push({ field: 'budget_usd', what: 'The per-job budget is above $1000.', affected: 'Every AI-assisted job could spend up to this amount.', next: 'Enter a smaller budget.' });
   }
 
@@ -127,6 +130,9 @@ export function emptyForm(): NewProjectForm {
     scenarios: [],
     ai_mode: 'no_ai',
     budget_usd: '',
+    ai_locality: 'any',
+    ai_approve_unknown: false,
+    ai_overrides: {},
     max_workers: '',
     max_memory_mb: '',
     max_disk_gb: '',

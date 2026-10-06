@@ -16,6 +16,7 @@ import { PreviewTab } from './workspace/Preview';
 import { FeedbackTab } from './workspace/Feedback';
 import { ComparisonsTab } from './workspace/Comparisons';
 import { AdvancedTab } from './workspace/Advanced';
+import { AiTab } from './workspace/AiTab';
 import { ScenariosTab } from './workspace/Scenarios';
 import { ConsentCard, PERMISSION_RE } from '../components/ConsentCard';
 
@@ -102,7 +103,9 @@ export function WorkspaceView() {
                 {TARGET[c.target_language] ?? c.target_language} → {c.output_type}
               </span>
               <span aria-hidden="true">·</span>
-              <span>AI: {c.ai_policy?.mode === 'no_ai' ? 'off' : `${c.ai_policy?.mode?.replace(/_/g, ' ')}${c.ai_policy?.budget_usd ? ` ($${c.ai_policy.budget_usd}/job)` : ''}`}</span>
+              <span data-testid="ai-summary">
+                AI: {c.ai_policy?.mode === 'no_ai' ? 'off (No AI)' : `${c.ai_policy?.mode === 'custom' ? 'custom ladder' : c.ai_policy?.mode === 'inherit' ? 'app ladder' : c.ai_policy?.mode?.replace(/_/g, ' ')}${c.ai_policy?.locality && c.ai_policy.locality !== 'any' ? `, ${c.ai_policy.locality.replace('_', ' ')}` : ''}${c.ai_policy?.budget_usd ? ` ($${c.ai_policy.budget_usd}/job)` : ''}`}
+              </span>
             </div>
           </div>
           <div className="btn-group" role="group" aria-label="Run controls">
@@ -129,6 +132,7 @@ export function WorkspaceView() {
             { to: `${base}/feedback`, label: 'Feedback', badge: openFeedback || null, testId: 'tab-feedback' },
             { to: `${base}/scenarios`, label: 'Scenarios', testId: 'tab-scenarios' },
             { to: `${base}/comparisons`, label: 'Comparisons', testId: 'tab-comparisons' },
+            { to: `${base}/ai`, label: 'AI', testId: 'tab-ai' },
             { to: `${base}/advanced`, label: 'Advanced', testId: 'tab-advanced' },
           ]}
         />
@@ -143,6 +147,7 @@ export function WorkspaceView() {
           <Route path="feedback" element={<FeedbackTab caseId={caseId} />} />
           <Route path="scenarios" element={<ScenariosTab caseId={caseId} />} />
           <Route path="comparisons" element={<ComparisonsTab caseId={caseId} />} />
+          <Route path="ai" element={<AiTab caseId={caseId} />} />
           <Route path="advanced" element={<AdvancedTab caseId={caseId} />} />
           <Route path="*" element={<Navigate to={`${base}/overview`} replace />} />
         </Routes>

@@ -51,6 +51,9 @@ function freshState() {
     evidence: new Map(),
     connections: new Map(),
     routes: new Map(),
+    ladderRev: 7,
+    ladder: {},
+    activity: new Map(),
     budgets: new Map(),
     aiCalls: [],
     knowledge: new Map(),
@@ -74,6 +77,62 @@ function emit(kind, payload = {}, case_id = null, job_id = null) {
   const msg = JSON.stringify(ev);
   for (const ws of sockets) if (ws.readyState === 1) ws.send(msg);
   return ev;
+}
+
+// ------------------------------------------------------------------------------------------------ AI ladder (docs/AI_LADDER.md)
+const MODELS = [
+  { connection_id: 'conn_local', model: 'qwen2.5-coder:14b', capabilities: { vision: false, tools: true, context_window: 32768 }, price: { known: true, input_per_mtok: 0, output_per_mtok: 0 }, free: true },
+  { connection_id: 'conn_local', model: 'deepseek-coder-v2:16b', capabilities: { vision: false, tools: false, context_window: 16384 }, price: { known: true, input_per_mtok: 0, output_per_mtok: 0 }, free: true },
+  { connection_id: 'conn_local', model: 'llava:13b', capabilities: { vision: true, tools: false, context_window: 4096 }, price: { known: true, input_per_mtok: 0, output_per_mtok: 0 }, free: true },
+  { connection_id: 'conn_openai', model: 'gpt-demo-large', capabilities: { vision: true, tools: true, context_window: 128000 }, price: { known: true, input_per_mtok: 2.5, output_per_mtok: 10, source: 'provider price list (demo)' }, free: false },
+  { connection_id: 'conn_openai', model: 'gpt-demo-small', capabilities: { vision: true, tools: true, context_window: 128000 }, price: { known: true, input_per_mtok: 0.15, output_per_mtok: 0.6, source: 'provider price list (demo)' }, free: false },
+  { connection_id: 'conn_handoff', model: 'claude-demo', capabilities: { vision: true, tools: true, context_window: 200000 }, price: { known: false }, free: false },
+];
+const AI_TASK_IDS = ['interpretation', 'repair', 'visual_review', 'verification_assist', 'knowledge'];
+function catalogEntry(m, position) {
+  const c = S.connections.get(m.connection_id);
+  const local = c?.provider === 'local' || c?.provider === 'local_openai';
+  return {
+    ...(position ? { position } : {}), connection_id: m.connection_id, connection_label: c?.label ?? m.connection_id, provider: c?.provider ?? 'unknown', model: m.model,
+    locality: local ? 'local' : 'cloud',
+    availability: { state: c?.state === 'ok' || c?.state === 'usable' ? 'available' : c?.state ?? 'unprobed', probed_at: c?.last_probe ?? null, detail: null },
+    capabilities: m.capabilities ?? null, price: m.price ?? { known: false }, free: !!m.free,
+  };
+}
+function findModel(connection_id, model) {
+  return MODELS.find((m) => m.connection_id === connection_id && m.model === model) ?? { connection_id, model, capabilities: null, price: { known: false }, free: S.connections.get(connection_id)?.provider === 'local_openai' };
+}
+function ladderEntries(pairs) {
+  return pairs.map((p, i) => catalogEntry(findModel(p.connection_id, p.model), i + 1));
+}
+function currentLadder() {
+  return { config_revision: S.ladderRev, tasks: Object.fromEntries(AI_TASK_IDS.map((t) => [t, { entries: ladderEntries(S.ladder[t]?.entries ?? []), rationale: S.ladder[t]?.rationale ?? 'auto' }])) };
+}
+function presetPairs(preset) {
+  const local = MODELS.filter((m) => S.connections.get(m.connection_id)?.provider === 'local_openai');
+  const cloud = MODELS.filter((m) => S.connections.get(m.connection_id)?.provider !== 'local_openai');
+  const warnings = [];
+  const out = {};
+  for (const t of AI_TASK_IDS) {
+    const need = t === 'visual_review';
+    const pick = (list) => list.filter((m) => !need || m.capabilities?.vision).map((m) => ({ connection_id: m.connection_id, model: m.model }));
+    let l = pick(local), c = pick(cloud);
+    if (need && local.length && !l.length) warnings.push('No local model supports images; visual review has no local route.');
+    if (preset === 'local_first') out[t] = [...l, ...c];
+    else if (preset === 'cloud_first') out[t] = [...c, ...l];
+    else if (preset === 'all_local') out[t] = l;
+    else if (preset === 'all_cloud') out[t] = c;
+    else out[t] = [];
+    if (preset === 'all_local' && need && !l.length) warnings.push('All local: visual review has no route.');
+  }
+  return { out, warnings: [...new Set(warnings)] };
+}
+function activity(cid, a) {
+  const rec = { at: now(), kind: 'attempt', evidence_ids: [], config_revision: S.ladderRev, origin: 'model_proposed', ...a };
+  if (!S.activity.has(cid)) S.activity.set(cid, []);
+  S.activity.get(cid).push(rec);
+  emit('ai.activity', rec, cid, rec.job_id ?? null);
+  return rec;
 }
 
 // ------------------------------------------------------------------------------------------------ seed
@@ -100,12 +159,12 @@ function seed() {
   const items = [
     planItem({ item_id: 'M1', title: 'Inventory the original', outcome: 'Every file classified with format, profile and hash', sort_order: 1, owner: 'discovery', acceptance: [{ id: 'A1', command: 'rebuildctl inventory --check', status: 'untested' }] }),
     planItem({ item_id: 'M1.1', parent_id: 'M1', kind: 'deliverable', title: 'Module list with formats', outcome: 'modules table populated', sort_order: 1 }),
-    planItem({ item_id: 'M2', title: 'Recover program logic', outcome: 'Functions and data structures recovered with evidence', depends_on: ['M1'], sort_order: 2, owner: 'recovery' }),
+    planItem({ item_id: 'M2', title: 'Recover program logic', outcome: 'Functions and data structures recovered with evidence', depends_on: ['M1'], sort_order: 2, owner: 'recovery', origin: 'deterministic', ai: { task: 'interpretation', primary: { provider: 'local_openai', model: 'qwen2.5-coder:14b', locality: 'local' }, fallbacks: [{ provider: 'openai', model: 'gpt-demo-small', locality: 'cloud' }], rationale: 'Local first: free and private', expected_cost: { min_usd: 0, max_usd: 0.02, known: true }, budget_usd: 0.5, runs_without_ai: true, without_ai: 'Functions are still recovered deterministically; AI only adds explanations.' } }),
     planItem({ item_id: 'M2.1', parent_id: 'M2', kind: 'deliverable', title: 'Item list command', outcome: '`list` prints the same rows as the original', sort_order: 1, feature_id: 'F1' }),
     planItem({ item_id: 'M2.2', parent_id: 'M2', kind: 'deliverable', title: 'Add item dialog', outcome: 'Adding an item updates the saved file identically', sort_order: 2, feature_id: 'F2' }),
-    planItem({ item_id: 'M3', title: 'Implement the web rebuild', outcome: 'HTML/CSS/JS app with matching behaviour', depends_on: ['M2'], sort_order: 3, owner: 'implementation' }),
+    planItem({ item_id: 'M3', title: 'Implement the web rebuild', outcome: 'HTML/CSS/JS app with matching behaviour', depends_on: ['M2'], sort_order: 3, owner: 'implementation', origin: 'model_proposed', ai: { task: 'repair', primary: { provider: 'anthropic', model: 'claude-demo', locality: 'cloud' }, fallbacks: [{ provider: 'openai', model: 'gpt-demo-large', locality: 'cloud' }, { provider: 'local_openai', model: 'deepseek-coder-v2:16b', locality: 'local' }], rationale: null, expected_cost: { unknown_price: true }, budget_usd: 0.5, runs_without_ai: false, without_ai: 'A deterministic web port is attempted first; otherwise this becomes a scaffold.' } }),
     planItem({ item_id: 'M4', title: 'Build & package as PWA', outcome: 'Installable PWA in dist/', depends_on: ['M3'], sort_order: 4, owner: 'build' }),
-    planItem({ item_id: 'M5', title: 'Verify against the original', outcome: 'All critical features pass comparisons', depends_on: ['M4'], sort_order: 5, owner: 'verifier', acceptance: ['exit code equal', 'stdout equal', 'screens within declared tolerance'] }),
+    planItem({ item_id: 'M5', title: 'Verify against the original', outcome: 'All critical features pass comparisons', depends_on: ['M4'], sort_order: 5, owner: 'verifier', origin: 'verifier_decided', acceptance: ['exit code equal', 'stdout equal', 'screens within declared tolerance'] }),
     planItem({ item_id: 'D1', kind: 'discovery', title: 'Unknown plugin format in data/plugins', outcome: 'Decide whether plugins are needed', sort_order: 10 }),
     planItem({ item_id: 'X1', kind: 'deferred', title: 'Printing support', outcome: 'Deferred until core features verify', sort_order: 20 }),
     planItem({ item_id: 'U1', kind: 'unsupported', title: 'Windows registry integration', outcome: 'Not available to a web target', sort_order: 30, blockers: ['web target has no registry'] }),
@@ -124,10 +183,15 @@ function seed() {
     { feature_id: 'F3', title: 'Main window layout', critical: false },
   ]) S.features.set(f.feature_id, { case_id: DEMO, description: '', origin: 'static', impl_status: 'planned', verify_status: 'untested', verify_candidate: null, user_review: null, ...f });
 
+  S.connections.set('conn_local', { connection_id: 'conn_local', provider: 'local_openai', label: 'Ollama (this PC)', endpoint: 'http://127.0.0.1:11434/v1', auth_mode: 'local', models: ['qwen2.5-coder:14b', 'deepseek-coder-v2:16b', 'llava:13b'], capabilities: {}, limits: {}, state: 'ok', last_probe: now(), created_at: now() });
   S.connections.set('conn_openai', { connection_id: 'conn_openai', provider: 'openai', label: 'OpenAI (demo key)', endpoint: 'https://api.openai.com/v1', auth_mode: 'api_key', models: ['gpt-demo-large', 'gpt-demo-small'], capabilities: {}, limits: {}, state: 'ok', last_probe: now(), created_at: now() });
   S.connections.set('conn_handoff', { connection_id: 'conn_handoff', provider: 'anthropic', label: 'Claude desktop (handoff)', endpoint: '', auth_mode: 'subscription_handoff', models: ['claude-demo'], capabilities: {}, limits: { text: 'Uses the external client’s subscription limits; about 40 requests per 5 hours (demo value).' }, state: 'unprobed', last_probe: null, created_at: now() });
   for (const t of ['interpretation', 'repair', 'visual_review', 'verification_assist', 'knowledge'])
     S.routes.set(t, { task: t, primary_connection: t === 'visual_review' ? 'conn_handoff' : 'conn_openai', primary_model: t === 'visual_review' ? 'claude-demo' : 'gpt-demo-small', fallbacks: t === 'repair' ? [{ connection: 'conn_handoff', model: 'claude-demo' }] : [], updated_at: now() });
+  {
+    const lp = (t) => presetPairs('local_first').out[t];
+    for (const t of AI_TASK_IDS) S.ladder[t] = { entries: lp(t), rationale: 'preset:local_first' };
+  }
   S.budgets.set('b_case', { budget_id: 'b_case', scope: `case:${DEMO}`, limit_usd: 5, reserved_usd: 0, spent_usd: 0, currency: 'USD', updated_at: now() });
   S.budgets.set('b_jev', { budget_id: 'b_jev', scope: 'jev:monthly:2026-10', limit_usd: 1, reserved_usd: 0, spent_usd: 0.012, currency: 'USD', updated_at: now() });
 
@@ -358,6 +422,9 @@ const STEPS = [
     emit('budget.updated', { budget: b2 }, DEMO);
     S.aiCalls.push({ call_id: id('call'), case_id: DEMO, job_id: r.job_id, provider: 'openai', model: 'gpt-demo-small', task: 'interpretation', input_tokens: 5400, output_tokens: 800, cached_tokens: 0, cost_usd: 0.084, cost_known: true, outcome: 'ok', latency_ms: 2300, created_at: now() });
     emit('ai.call', { task: 'interpretation', cost_usd: 0.084 }, DEMO);
+    activity(DEMO, { text: 'Interpreting list_items with local model qwen2.5-coder:14b', plan_item_id: 'M2.1', job_id: r.job_id, task: 'interpretation', provider: 'local_openai', model: 'qwen2.5-coder:14b', locality: 'local', outcome: 'model_unavailable', fallback_reason: 'qwen2.5-coder:14b is not available (model not found); trying gpt-demo-small', origin: 'model_proposed' });
+    activity(DEMO, { text: 'gpt-demo-small explained 3 functions', plan_item_id: 'M2.1', job_id: r.job_id, task: 'interpretation', provider: 'openai', model: 'gpt-demo-small', locality: 'cloud', outcome: 'ok', tokens_in: 5400, tokens_out: 800, cost_usd: 0.084, cost_known: true, evidence_ids: ['ev_demo'], origin: 'model_proposed' });
+    activity(DEMO, { kind: 'note', text: 'Next: repair attempt 1 of 3', plan_item_id: 'M3', origin: 'deterministic' });
   },
   // 7: triage open feedback
   () => {
@@ -584,6 +651,17 @@ async function handle(req, res) {
       }
       return send(res, 200, { job_ids: [...S.jobs.values()].filter((j) => j.case_id === cid).map((j) => j.job_id) });
     }
+    if (sub === 'ai-policy') {
+      if (m === 'GET') return send(res, 200, { locality: 'any', approve_unknown_pricing: false, ladder_overrides: {}, ...c.ai_policy });
+      if (m === 'PUT') {
+        if (!['no_ai', 'inherit', 'custom', 'assist_on_failure', 'assisted'].includes(body.mode)) return err(res, 400, 'invalid_policy', 'Unknown AI mode.', 'The policy was not saved.', 'Choose No AI, the app ladder or a custom ladder.');
+        c.ai_policy = body;
+        c.updated_at = now();
+        emit('case.updated', { case: c }, cid);
+        return send(res, 200, c.ai_policy);
+      }
+    }
+    if (sub === 'ai/activity' && m === 'GET') return send(res, 200, S.activity.get(cid) ?? []);
     if (sub === 'pause' && m === 'POST') {
       setCase(cid, 'paused');
       return send(res, 200, { ok: true });
@@ -766,6 +844,31 @@ async function handle(req, res) {
       if (!c.models.length) c.models = ['demo-model'];
       return send(res, 200, { ...c, probe: { latency_ms: 120 } });
     }
+  }
+  if (p === '/ai/ladder' && m === 'GET') return send(res, 200, currentLadder());
+  if (seg[0] === 'ai' && seg[1] === 'ladder' && seg[2] === 'preset' && m === 'POST') {
+    const ok = ['local_first', 'cloud_first', 'all_local', 'all_cloud', 'no_ai'];
+    if (!ok.includes(body.preset)) return err(res, 400, 'unknown_preset', `Unknown preset ${body.preset}.`, 'No ladder changed.', 'Choose one of the listed presets.');
+    const { out, warnings } = presetPairs(body.preset);
+    if (body.apply) {
+      for (const t of AI_TASK_IDS) S.ladder[t] = { entries: out[t], rationale: `preset:${body.preset}` };
+      S.ladderRev += 1;
+      emit('settings.updated', { ladder: S.ladderRev });
+    }
+    return send(res, 200, { preset: body.preset, applied: !!body.apply, config_revision: S.ladderRev, tasks: Object.fromEntries(AI_TASK_IDS.map((t) => [t, { entries: ladderEntries(out[t]) }])), warnings });
+  }
+  if (seg[0] === 'ai' && seg[1] === 'ladder' && seg[2] && m === 'PUT') {
+    if (!AI_TASK_IDS.includes(seg[2])) return notFound(res, `Task ${seg[2]}`);
+    const entries = Array.isArray(body.entries) ? body.entries.filter((e) => e && e.connection_id && e.model).map((e) => ({ connection_id: e.connection_id, model: e.model })) : [];
+    for (const e of entries) if (!S.connections.has(e.connection_id)) return err(res, 400, 'unknown_connection', `Connection ${e.connection_id} does not exist.`, 'The ladder was not saved.', 'Pick a listed connection.');
+    S.ladder[seg[2]] = { entries, rationale: 'user' };
+    S.ladderRev += 1;
+    return send(res, 200, { config_revision: S.ladderRev, entries: ladderEntries(entries) });
+  }
+  if (p === '/ai/models' && m === 'GET') {
+    const q = (url.searchParams.get('q') ?? '').toLowerCase();
+    const task = url.searchParams.get('task');
+    return send(res, 200, MODELS.filter((x) => (!q || `${x.model} ${S.connections.get(x.connection_id)?.label ?? ''}`.toLowerCase().includes(q)) && (task !== 'visual_review' || x.capabilities?.vision)).map((x) => catalogEntry(x)));
   }
   if (p === '/routes') return send(res, 200, [...S.routes.values()]);
   if (seg[0] === 'routes' && seg[1] && m === 'PUT') {
