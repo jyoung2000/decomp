@@ -17,3 +17,7 @@ target/
 *.log
 /ui/e2e/test-results/
 /ui/playwright-report/
+/controller/build/
+/controller/*.egg-info/
+/build/
+/dist/

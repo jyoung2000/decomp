@@ -62,7 +62,7 @@ export class Api {
       }
     }
     if (!res.ok) {
-      const err = (data && typeof data === 'object' && 'error' in (data as object) ? normalizeErrorBody((data as { error: unknown }).error, res.status) : null) ?? fromDetail(data, res.status, method, path) ?? {
+      const err = (data && typeof data === 'object' && 'error' in (data as object) ? normalizeErrorBody((data as { error: unknown }).error, res.status, `${method} ${path}`) : null) ?? fromDetail(data, res.status, method, path) ?? {
         code: `http_${res.status}`,
         message: `The controller answered ${res.status} ${res.statusText || ''} for ${method} ${path}.`.replace(/\s+/g, ' '),
         next_action: res.status === 401 || res.status === 403 ? 'Restart Rebuild Studio so the controller token is refreshed.' : 'Retry; if it keeps failing, open Advanced → Raw logs.',
@@ -172,10 +172,18 @@ function qs(o: Record<string, string | undefined>): string {
 }
 
 /** The documented error body, tolerating a missing/odd `code` or `message` (e.g. `{"error": "..."}`). */
-function normalizeErrorBody(e: unknown, status: number): ApiErrorBody | null {
+function normalizeErrorBody(e: unknown, status: number, request?: string): ApiErrorBody | null {
   if (typeof e === 'string') return { code: `http_${status}`, message: e };
   if (!e || typeof e !== 'object') return null;
   const o = e as Record<string, unknown>;
+  // the controller maps an unknown id to 404 {"code": "KeyError", "message": "'<id>'"} without affected/next_action
+  if (status === 404 && o.code === 'KeyError')
+    return {
+      code: 'not_found',
+      message: `${typeof o.message === 'string' ? o.message.replace(/^'|'$/g, '') : 'The item'} was not found${request ? ` (${request})` : ''}.`,
+      affected: typeof o.affected === 'string' ? o.affected : 'Only this request; it may have been removed or belong to another data folder.',
+      next_action: typeof o.next_action === 'string' ? o.next_action : 'Refresh the view or go back to the project list.',
+    };
   return {
     code: typeof o.code === 'string' ? o.code : `http_${status}`,
     message: typeof o.message === 'string' && o.message ? o.message : `The controller answered ${status}.`,
@@ -204,7 +212,7 @@ function fromDetail(data: unknown, status: number, method: string, path: string)
       next_action: 'Correct the listed fields and try again.',
     };
   }
-  if (d && typeof d === 'object') return normalizeErrorBody(d, status);
+  if (d && typeof d === 'object') return normalizeErrorBody(d, status, `${method} ${path}`);
   const msg = String(d);
   if (status === 404)
     return {

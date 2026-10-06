@@ -263,17 +263,28 @@ if ($SkipSidecar) {
     Note "skipped (-SkipSidecar); $SidecarPath must already be the real PyInstaller build"
 } else {
     $pyArgs0 = @($py.args)
+    # pip builds non-editable installs inside the source folder (controller\build\lib, *.egg-info), which would dirty a clean
+    # checkout; install the controller's dependencies from a throw-away copy of pyproject.toml + the package instead.
+    $ctlStage = Join-RsPath @($WorkDir, 'controller-src')
+    if ($DryRun) { Write-RsLog "copy controller\pyproject.toml + controller\rebuild_controller (no __pycache__) -> $ctlStage (pip installs from the copy, never in-tree)" 'DRY' }
+    else {
+        if (Test-Path -LiteralPath $ctlStage) { Remove-Item -LiteralPath $ctlStage -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path $ctlStage | Out-Null
+        Copy-Item -LiteralPath (Join-RsPath @($ControllerDir, 'pyproject.toml')) -Destination $ctlStage
+        Copy-Item -LiteralPath (Join-RsPath @($ControllerDir, 'rebuild_controller')) -Destination (Join-RsPath @($ctlStage, 'rebuild_controller')) -Recurse
+        Get-ChildItem -LiteralPath $ctlStage -Recurse -Directory -Filter '__pycache__' | Remove-Item -Recurse -Force
+    }
     # runtime venv: only the controller's dependencies -> its freeze is what ships, and what the SBOM describes.
     Invoke-Native $py.file ($pyArgs0 + @('-m', 'venv', $VenvRuntime))
     Invoke-Native $pyVenvRuntime @('-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', 'pip')
-    Invoke-Native $pyVenvRuntime @('-m', 'pip', 'install', '--disable-pip-version-check', $ControllerDir)
+    Invoke-Native $pyVenvRuntime @('-m', 'pip', 'install', '--disable-pip-version-check', $ctlStage)
     Invoke-Native $pyVenvRuntime @('-m', 'pip', 'uninstall', '-y', 'rebuild-controller')
     if ($DryRun) { Write-RsLog "capture '$pyVenvRuntime -m pip freeze' -> $freezeFile (constraints for the build venv + SBOM input)" 'DRY' }
     else { Save-RsText $freezeFile ((Get-NativeLines $pyVenvRuntime @('-m', 'pip', 'freeze')) -join "`n") }
     # build venv: same resolved versions (constraints) + PyInstaller and the SBOM tools from requirements-build.txt.
     Invoke-Native $py.file ($pyArgs0 + @('-m', 'venv', $VenvBuild))
     Invoke-Native $pyVenvBuild @('-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', 'pip')
-    Invoke-Native $pyVenvBuild @('-m', 'pip', 'install', '--disable-pip-version-check', '-c', $freezeFile, '-r', $ReqBuild, $ControllerDir)
+    Invoke-Native $pyVenvBuild @('-m', 'pip', 'install', '--disable-pip-version-check', '-c', $freezeFile, '-r', $ReqBuild, $ctlStage)
     Invoke-Native $pyVenvBuild @('-m', 'pip', 'uninstall', '-y', 'rebuild-controller')
 
     Invoke-Pyinstaller 'rebuild-controller' (Join-RsPath @($PSScriptRoot, 'sidecar_entry.py')) @('--collect-submodules', 'uvicorn', '--collect-submodules', 'websockets')

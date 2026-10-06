@@ -1,4 +1,5 @@
 """End-to-end rebuild on real fixtures through the durable DAG (no AI). Marked e2e: slow."""
+import os
 import shutil
 from pathlib import Path
 
@@ -29,7 +30,7 @@ def drain(studio, max_rounds=400):
     raise AssertionError("pipeline did not settle")
 
 
-@pytest.mark.skipif(not (FIX / "pecli" / "original" / "pecli.exe").exists() or not shutil.which("wine"), reason="fixture/wine missing")
+@pytest.mark.skipif(not (FIX / "pecli" / "original" / "pecli.exe").exists() or (os.name != "nt" and not shutil.which("wine")), reason="fixture missing or (non-Windows) wine missing")
 def test_pecli_full_pipeline_no_ai_is_honest(studio, tmp_path):
     orig = FIX / "pecli" / "original"
     out = tmp_path / "out"

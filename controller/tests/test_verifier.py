@@ -1,3 +1,5 @@
+import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -56,6 +58,8 @@ SCENARIOS = [
 ]
 
 
+@pytest.mark.skipif(not shutil.which("x86_64-w64-mingw32-gcc") or not shutil.which("gcc") or (os.name != "nt" and not shutil.which("wine")),
+                    reason="needs mingw+gcc and (on non-Windows) wine to run the PE original")
 def test_verifier_accepts_correct_and_rejects_wrong_remake(studio, tmp_path):
     orig = _build(tmp_path, "orig", C_SRC, pe=True)           # original is a PE (run via wine)
     good = _build(tmp_path, "good", C_SRC, pe=False)          # remake as native ELF
@@ -106,6 +110,7 @@ def test_ai_cannot_write_verdicts(studio, tmp_path, src_out):
         studio.verifier.load_baseline(case["case_id"])
 
 
+@pytest.mark.skipif(not shutil.which("gcc"), reason="needs gcc")
 def test_invalidate_marks_stale(studio, tmp_path):
     orig = _build(tmp_path, "orig", C_SRC, pe=False)
     case = _case(studio, tmp_path, orig); cid = case["case_id"]

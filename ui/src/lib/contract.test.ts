@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyEvent, describeEvent, emptyStudio, jobCounts, normalizeProgress, phaseViews } from './derive';
 import type { Plan } from './types';
+import { Api, describeError } from './api';
 
 // Shapes observed from the real controller (rebuild_controller) that differ from docs/API.md.
 describe('controller progress shapes', () => {
@@ -47,5 +48,31 @@ describe('undocumented controller event kinds', () => {
   it('preview.opened / feature.stale have readable descriptions', () => {
     expect(describeEvent(ev('preview.opened', { url: 'http://127.0.0.1:1/index.html' }))).toBe('Preview opened at http://127.0.0.1:1/index.html');
     expect(describeEvent(ev('feature.stale', { count: 2, reason: 'new candidate' }))).toBe('2 feature result(s) marked stale: new candidate');
+  });
+});
+
+describe('controller error bodies', () => {
+  const api = (status: number, body: unknown) =>
+    new Api({ baseUrl: '', token: 't', mock: false, source: 'url' }, (async () => new Response(JSON.stringify(body), { status })) as typeof fetch);
+  it('FastAPI 422 detail list → what/affected/next', async () => {
+    const e = await api(422, { detail: [{ loc: ['body', 'priority'], msg: 'bad pattern', type: 'x' }] }).post('/cases/c/feedback', {}).catch((x) => x);
+    expect(describeError(e)).toMatchObject({ what: 'The controller rejected the request: priority: bad pattern.', next: 'Correct the listed fields and try again.', code: 'validation_error' });
+  });
+  it('404 KeyError → readable not-found', async () => {
+    const e = await api(404, { error: { code: 'KeyError', message: "'nope'", next_action: null } }).get('/cases/nope').catch((x) => x);
+    expect(describeError(e)).toMatchObject({ what: 'nope was not found (GET /cases/nope).', code: 'not_found' });
+    expect(describeError(e).next).toBeTruthy();
+  });
+  it('404 for an unknown route', async () => {
+    const e = await api(404, { detail: 'Not Found' }).get('/capabilities').catch((x) => x);
+    expect(describeError(e).what).toBe('GET /capabilities: Not Found.');
+  });
+  it('preview open answered 200 with opened:false is an error', async () => {
+    const e = await api(200, { opened: false, message: 'preview files missing', next_action: 'rebuild the candidate' }).openPreview('p').catch((x) => x);
+    expect(describeError(e)).toMatchObject({ what: 'preview files missing', next: 'rebuild the candidate', code: 'preview_not_opened' });
+  });
+  it('budgets accepts both {budgets, quotas} and a bare list', async () => {
+    expect(await api(200, { budgets: [{ budget_id: 'b' }], quotas: [] }).budgets()).toEqual([{ budget_id: 'b' }]);
+    expect(await api(200, [{ budget_id: 'c' }]).budgets()).toEqual([{ budget_id: 'c' }]);
   });
 });

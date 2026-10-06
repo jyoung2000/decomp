@@ -1,4 +1,5 @@
 """Runs the verifier against the real fixtures: correct original (self-check) and the deliberately wrong remake."""
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -16,7 +17,7 @@ def studio(settings):
     s.stop()
 
 
-@pytest.mark.skipif(not (FIX / "pecli" / "original" / "pecli.exe").exists() or not shutil.which("wine"), reason="pecli fixture or wine missing")
+@pytest.mark.skipif(not (FIX / "pecli" / "original" / "pecli.exe").exists() or (os.name != "nt" and not shutil.which("wine")) or not shutil.which("cargo"), reason="pecli fixture, cargo or (non-Windows) wine missing")
 def test_pecli_oracle_rejects_wrong_remake_and_accepts_original(studio, tmp_path):
     from rebuild_controller.fixture_oracle import load_baseline_file
     orig = FIX / "pecli" / "original"

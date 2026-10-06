@@ -1,3 +1,0 @@
-[console_scripts]
-rebuild-mcp = rebuild_controller.mcp.server:main
-rebuildctl = rebuild_controller.cli.main:main
