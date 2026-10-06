@@ -174,8 +174,10 @@ def test_output_cap_truncates_and_records(tmp_path):
 @win_only
 def test_active_process_limit_triggers(tmp_path):
     s = _script(tmp_path, "fork.py", "import subprocess, sys\ntry:\n    subprocess.run([sys.executable, '-c', 'pass'])\n    print('SPAWNED')\nexcept OSError as e:\n    print('REFUSED'); sys.exit(9)\n")
-    # venv launcher + interpreter use the whole budget of 2: the next CreateProcess fails with a quota error
-    r = _run(tmp_path, [PY, str(s)], IsolationPolicy(max_processes=2))
+    # The base interpreter (not a venv launcher, which would add a second process) uses the whole budget of 1:
+    # the next CreateProcess fails with a quota error on every host (venv locally, plain python on CI).
+    base = getattr(sys, "_base_executable", None) or PY
+    r = _run(tmp_path, [base, str(s)], IsolationPolicy(max_processes=1))
     assert r.returncode == 9 and b"REFUSED" in r.stdout, (r.stdout, r.stderr)
     assert "active_processes" in r.triggered
 

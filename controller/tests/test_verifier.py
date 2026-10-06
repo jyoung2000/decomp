@@ -20,9 +20,13 @@ int main(int argc, char **argv){
 C_WRONG = C_SRC.replace('"hello world"', '"hello wrold"').replace("return 2;", "return 3;")
 
 
+# gcc on Windows (e.g. the hosted CI runner's mingw) always writes app.exe
+APP = "app.exe" if os.name == "nt" else "app"
+
+
 def _build(tmp: Path, name: str, src: str, *, pe: bool) -> Path:
     s = tmp / f"{name}.c"; s.write_text(src)
-    out = tmp / name / ("app.exe" if pe else "app"); out.parent.mkdir(parents=True, exist_ok=True)
+    out = tmp / name / ("app.exe" if pe else APP); out.parent.mkdir(parents=True, exist_ok=True)
     cc = ["x86_64-w64-mingw32-gcc"] if pe else ["gcc"]
     subprocess.run(cc + ["-O1", "-o", str(out), str(s)], check=True)
     return out.parent
@@ -72,7 +76,7 @@ def test_verifier_accepts_correct_and_rejects_wrong_remake(studio, tmp_path):
     for name, root in (("good", good), ("wrong", wrong)):
         c = studio.candidates.create(cid, target_language="rust", output_type="exe", plan_revision=1, source_dir=root)
         c = studio.candidates.mark_built(c["candidate_id"], root)
-        studio.db.update("candidates", "candidate_id", c["candidate_id"], {"meta": {"launch": {"type": "exe", "path": "app"}}})
+        studio.db.update("candidates", "candidate_id", c["candidate_id"], {"meta": {"launch": {"type": "exe", "path": APP}}})
         rep = studio.verifier.verify_candidate(cid, c["candidate_id"])
         if name == "good":
             assert rep["summary"] == {"scenarios": 3, "passed": 3, "failed": 0, "errors": 0}
@@ -115,10 +119,10 @@ def test_invalidate_marks_stale(studio, tmp_path):
     orig = _build(tmp_path, "orig", C_SRC, pe=False)
     case = _case(studio, tmp_path, orig); cid = case["case_id"]
     studio.ledger.add(cid, "f.hello", feature_id="f.hello")
-    _baseline_from_run(studio, cid, orig, {"type": "exe", "path": "app"}, SCENARIOS[:1], tmp_path / "bw")
+    _baseline_from_run(studio, cid, orig, {"type": "exe", "path": APP}, SCENARIOS[:1], tmp_path / "bw")
     c = studio.candidates.create(cid, target_language="rust", output_type="exe", plan_revision=1, source_dir=orig)
     c = studio.candidates.mark_built(c["candidate_id"], orig)
-    studio.db.update("candidates", "candidate_id", c["candidate_id"], {"meta": {"launch": {"type": "exe", "path": "app"}}})
+    studio.db.update("candidates", "candidate_id", c["candidate_id"], {"meta": {"launch": {"type": "exe", "path": APP}}})
     studio.verifier.verify_candidate(cid, c["candidate_id"])
     assert studio.ledger.get("f.hello")["verify_status"] == "verified"
     assert studio.verifier.invalidate(cid, "original files changed") == 1
