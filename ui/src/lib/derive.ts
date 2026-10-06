@@ -152,7 +152,23 @@ export function phaseLabel(p: string): string {
   }
 }
 
-function applyProgress(cs: CaseState, progress: Plan['progress'] | undefined, eta: Eta | null | undefined, seq: number, at: string, reason?: string): CaseState {
+/**
+ * docs/API.md: progress = {analysis:{done,total}, recovery, implementation, build, verification}.
+ * The controller returns {jobs:{..}, groups:{discovery, recovery, implementation, build, verification}, features:{..}}.
+ * Flatten the second shape into the first (groups.discovery → analysis); other keys are kept.
+ */
+export function normalizeProgress(progress: Plan['progress'] | undefined): Plan['progress'] | undefined {
+  if (!progress || !obj(progress)) return progress;
+  const groups = (progress as Record<string, unknown>).groups;
+  if (!obj(groups)) return progress;
+  const g = groups as Record<string, PhaseProgress>;
+  const flat: Record<string, unknown> = { ...(progress as Record<string, unknown>) };
+  for (const [k, v] of Object.entries(g)) if (obj(v)) flat[k === 'discovery' ? 'analysis' : k] = v;
+  return flat as Plan['progress'];
+}
+
+function applyProgress(cs: CaseState, rawProgress: Plan['progress'] | undefined, eta: Eta | null | undefined, seq: number, at: string, reason?: string): CaseState {
+  const progress = normalizeProgress(rawProgress);
   let next = cs;
   if (progress && obj(progress) && seq >= cs.progressSeq) {
     const notes = cs.progressSeq >= 0 ? scopeChanges(cs.progress, progress, seq, at, reason) : [];
@@ -340,6 +356,12 @@ export function applyEvent(state: StudioState, ev: ControllerEvent): ApplyResult
     s = { ...s, versions: bump(s.versions, 'budgets') };
   } else if (k === 'ai.call') {
     cs = { ...cs, versions: bump(cs.versions, 'aiCalls') };
+  } else if (k === 'verification.completed' || k === 'verification.invalidated') {
+    // not in docs/API.md; emitted by the controller's verifier — verdicts live on candidates, features and previews
+    cs = { ...cs, versions: bump(cs.versions, 'comparisons') };
+    refresh.push({ caseId, key: 'candidates' }, { caseId, key: 'features' }, { caseId, key: 'previews' });
+  } else if (k === 'feature.stale') {
+    refresh.push({ caseId, key: 'features' });
   }
 
   s = { ...s, cases: { ...s.cases, [caseId]: cs } };
@@ -520,7 +542,46 @@ export function describeEvent(ev: ControllerEvent): string {
       return `Evidence invalidated${p.reason ? `: ${String(p.reason)}` : ''}`;
     case 'ai.call':
       return `AI call (${String(p.task ?? '')})`;
+    case 'preview.opened':
+      return `Preview opened${p.url ? ` at ${String(p.url)}` : ''}`;
+    case 'preview.stopped':
+      return 'Preview stopped';
+    case 'verification.completed': {
+      const sm = (p.summary ?? {}) as Record<string, unknown>;
+      return typeof sm.scenarios === 'number' ? `Verification finished: ${String(sm.passed ?? 0)} passed, ${String(sm.failed ?? 0)} failed, ${String(sm.errors ?? 0)} errors of ${sm.scenarios} scenarios` : 'Verification finished';
+    }
+    case 'verification.invalidated':
+      return `Verification invalidated${p.reason ? `: ${String(p.reason)}` : ''}`;
+    case 'feature.stale':
+      return `${String(p.count ?? '')} feature result(s) marked stale${p.reason ? `: ${String(p.reason)}` : ''}`.trim();
     default:
       return ev.kind;
   }
+}
+
+/**
+ * Raw job counts in the documented form {done, total, unit}. The controller reports free-form measured fields instead,
+ * e.g. {scenarios_done, scenarios_total}, {functions_decompiled, functions_total}, {files_scanned, modules}. Pairs a
+ * `<unit>_total` with `<unit>_done` (or the only other `<unit>_*` count); otherwise the first count has no denominator.
+ * Never invents a total.
+ */
+export function jobCounts(p: Record<string, unknown> | null | undefined): { done: number | null; total: number | null; unit?: string; current?: string } {
+  if (!p || typeof p !== 'object') return { done: null, total: null };
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const current = typeof p.current === 'string' ? p.current : typeof p.module === 'string' ? p.module : typeof p.target === 'string' ? p.target : undefined;
+  if (num(p.done) != null) return { done: num(p.done), total: num(p.total), unit: typeof p.unit === 'string' ? p.unit : undefined, current };
+  const keys = Object.keys(p).filter((k) => num(p[k]) != null);
+  for (const k of keys) {
+    const m = k.match(/^(.+)_total$/);
+    if (!m) continue;
+    const unit = m[1];
+    const doneKey = keys.find((x) => x === `${unit}_done`) ?? keys.filter((x) => x !== k && x.startsWith(`${unit}_`) && !/error|failed/.test(x))[0];
+    if (doneKey) return { done: num(p[doneKey]), total: num(p[k]), unit: unit.replace(/_/g, ' '), current };
+  }
+  const first = keys.find((k) => !/_total$/.test(k));
+  if (first) {
+    const unit = first.replace(/_(scanned|done|processed|count)$/, '').replace(/_/g, ' ');
+    return { done: num(p[first]), total: null, unit, current };
+  }
+  return { done: null, total: null, current };
 }

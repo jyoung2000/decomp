@@ -68,15 +68,30 @@ export type OutputType = 'exe' | 'installer' | 'portable' | 'web' | 'pwa';
 export type AiMode = 'no_ai' | 'assist_on_failure' | 'assisted';
 
 export interface LaunchScenario {
-  name: string;
+  /** controller key (required by the real controller's capture/feature stages) */
+  id?: string;
+  title?: string;
+  name?: string;
   args?: string[];
   stdin?: string;
+  /** cli scenarios as the controller runs them */
+  steps?: { args: string[]; stdin?: string }[];
+  /** web scenarios: browser actions for the capture harness */
+  actions?: unknown[];
+  feature_id?: string;
 }
+
+export type LaunchKind = 'cli' | 'web';
 
 export interface LaunchProfile {
   execute_original: boolean;
+  /** documented in docs/API.md */
   command?: string[];
   scenarios?: LaunchScenario[];
+  /** used by the real controller: how the original runs ("cli" default, or "web") */
+  kind?: LaunchKind;
+  /** used by the real controller: cli → {type:"command", command:[..]}; web → {root, entry} */
+  launch?: { type?: string; command?: string[]; root?: string; entry?: string };
 }
 
 export interface CaseCounts {
@@ -286,6 +301,8 @@ export interface FeedbackHistoryEntry {
   status?: string;
   note?: string;
   actor?: string;
+  /** real controller name for the actor */
+  by?: string;
 }
 
 export interface Feedback {

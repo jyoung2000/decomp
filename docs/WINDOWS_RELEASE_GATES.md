@@ -1,0 +1,436 @@
+# Windows release gates
+
+Everything in this file can only be **certified on a real Windows machine**. The Linux build host that produced this repository
+has no Windows session, so none of these gates has been run (DR-9 in `docs/DECISIONS.md`: Wine/Linux runs are labelled
+non-certifying and are never recorded here as a pass). `.github/workflows/windows.yml` executes the automatable parts on a hosted
+runner and uploads evidence, but a hosted runner is not a clean, interactive, human-observed machine: **CI green is not a gate pass**.
+
+Status of every gate below at the time of writing: **NOT RUN**.
+
+## How to run a gate and record it
+
+1. Use a Windows 10 22H2 or Windows 11 x64 machine with an interactive, logged-on desktop. Gates marked *clean machine* need a VM
+   snapshot with no developer tools (see W13).
+2. Build or download the artifacts under test and note their identity: `dist\BUILD-INFO.json` and `dist\SHA256SUMS.txt` (Build script),
+   or the CI artifact names `rebuild-studio-windows-UNSIGNED-*`. Every gate result must name the build (installer sha256).
+3. Create an evidence folder per run: `evidence\windows\<yyyyMMdd>-<hostname>\` (the `evidence\` folder is for local records; do not commit user data).
+   Save the exact command output with `Start-Transcript -Path evidence\windows\<run>\W<n>.txt` before each gate, and keep screenshots as PNG.
+4. Record `PASS` / `FAIL` / `WAIVED (reason, owner)` per gate in `CHECKPOINT.md` with: gate id, date, machine (`winver`, `(Get-CimInstance Win32_OperatingSystem).Caption`,
+   build number), build sha256, evidence path. A gate with any unmet pass criterion is `FAIL`; do not edit criteria to fit the result.
+5. All commands are PowerShell; `<repo>` is the checkout root, `<inst>` the install folder, `<data>` = `%LOCALAPPDATA%\RebuildStudio`.
+
+Shorthand used below:
+
+```powershell
+$Repo = (Get-Location).Path                                   # repo root
+$Inst = "$env:LOCALAPPDATA\Programs\RebuildStudio"            # script install; NSIS install is recorded in W2
+$Data = "$env:LOCALAPPDATA\RebuildStudio"
+$Ev   = "$Repo\evidence\windows\$(Get-Date -Format yyyyMMdd)-$env:COMPUTERNAME"; New-Item -ItemType Directory -Force $Ev | Out-Null
+```
+
+## Gate summary
+
+| Gate | What only Windows can prove | Automated partial evidence (never a pass) |
+|------|-----------------------------|-------------------------------------------|
+| W1 | Clean-checkout build produces working unsigned artifacts | `windows.yml` build step |
+| W2 | NSIS installer and scripted install launch the app | `windows.yml` install/doctor/launch steps |
+| W3 | Dependency pins are complete and `Setup-Dependencies.ps1` works end to end | `Test-SetupDependencies.ps1` (offline) |
+| W4 | Sidecar starts from the installed app and writes `controller.json` | `Test-AppLaunch.ps1` in CI (advisory) |
+| W5 | WebView2 strategy: present, absent, offline, tampered | `Doctor` webview2 check |
+| W6 | Credential Manager and DPAPI put/get | `cargo test` + `tests/test_secrets.py` in CI |
+| W7 | Native PE capture of `fixtures/pecli` on real Windows | none (the Linux oracle is Wine) |
+| W8 | Native folder picker | none |
+| W9 | UI at 1024x700 / 1920x1080 / 2560x1440 x 100/150/200 % DPI | Playwright screenshots at 1920x1080 on Linux only |
+| W10 | Cancel kills the process tree (`taskkill /T`) | `test_cancel_tree.py`, `windows_stop_kills_the_whole_tree` in CI |
+| W11 | Hermes gates G1-G9 | recorded-protocol unit tests |
+| W12 | Uninstall preserves projects and credentials | CI uninstall step (marker file) |
+| W13 | Clean-machine test list (PLAN.md M15) | none |
+| W14 | Paths: spaces, non-ASCII, long paths, UNC, OneDrive; Session 0 / locked desktop | `Doctor` longpaths/session0 checks |
+| W15 | One-file sidecar vs Defender / cold start vs the 90 s startup timeout | `Build` sidecar smoke |
+| W16 | Client packages (Claude Code / Codex / Gemini / Hermes) install on Windows | `test_install_clients.py` on Linux |
+| W17 | Code signing and SmartScreen (release owner) | none; CI artifacts are explicitly unsigned |
+| W18 | SBOM and notices review | SBOM files from the build |
+| W19 | Upgrade in place, downgrade, rollback | none |
+| W20 | Packaged-app limits: browser comparison channel, preview launch on Windows | none |
+
+---
+
+## W1 Clean-checkout build
+
+*Proves:* `Build-RebuildStudio.ps1` works from a fresh clone on Windows with only the documented prerequisites (docs/PACKAGING.md).
+
+```powershell
+git clone <repo-url> C:\src\rebuild-studio; cd C:\src\rebuild-studio; git status --porcelain   # must print nothing
+.\scripts\windows\Build-RebuildStudio.ps1 -DryRun                                              # review the plan
+.\scripts\windows\Build-RebuildStudio.ps1 *>&1 | Tee-Object $Ev\W1-build.txt
+Get-Content dist\BUILD-INFO.json; Get-Content dist\SHA256SUMS.txt
+Get-ChildItem dist, dist\sbom
+```
+
+*Evidence:* `W1-build.txt`; `dist\BUILD-INFO.json` (`signed: false`, `git_dirty: false`, tool versions); `dist\SHA256SUMS.txt`;
+`dist\RebuildStudio-<ver>-x64-setup-UNSIGNED.exe`; `dist\RebuildStudio-<ver>-win-x64-portable-UNSIGNED.zip`; `dist\sbom\{ui.cdx.json, rebuild-studio.cdx.json, controller.cdx.json, python-licenses.json, python-freeze.txt}`; `dist\NOTICES.md`; log line `sidecar smoke ok`.
+
+*Pass:* exit code 0; both artifacts exist and carry `-UNSIGNED`; `rebuild-controller-x86_64-pc-windows-msvc.exe` in `desktop\src-tauri\binaries` is > 1 MB (not the dev stub); the sidecar smoke step printed `sidecar smoke ok`; every SBOM file is non-empty valid JSON (`Get-ChildItem dist\sbom\*.json | % { Get-Content $_ -Raw | ConvertFrom-Json | Out-Null }`);
+the build left the working tree clean except ignored folders (`git status --porcelain` empty). Second run with `-Clean` gives the same artifact names.
+
+## W2 Installer launch
+
+*Proves:* the NSIS installer installs per user without elevation and the app starts; the scripted installer does the same from the portable zip.
+
+```powershell
+# A. NSIS installer (as a NON-admin user)
+Get-ChildItem dist\RebuildStudio-*-x64-setup-UNSIGNED.exe | % { Get-FileHash $_.FullName -Algorithm SHA256 }   # compare with SHA256SUMS.txt
+Start-Process (Get-ChildItem dist\RebuildStudio-*-setup-UNSIGNED.exe).FullName -Wait                               # click through; note any SmartScreen / UAC prompt
+Get-ChildItem "$env:LOCALAPPDATA\Rebuild Studio" -Recurse -File | Select-Object FullName, Length                   # record the real install dir
+Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall | Get-ItemProperty | ? DisplayName -like 'Rebuild*' | fl DisplayName, DisplayVersion, InstallLocation, UninstallString
+Start-Process "$env:LOCALAPPDATA\Rebuild Studio\rebuild-studio.exe"
+.\scripts\windows\Doctor-RebuildStudio.ps1 -InstallDir "$env:LOCALAPPDATA\Rebuild Studio" -FailOn warn *>&1 | Tee-Object $Ev\W2-doctor-nsis.txt
+# B. scripted install from the portable zip (second machine state or after uninstalling A)
+.\scripts\windows\Install-RebuildStudio.ps1 -Source (Get-ChildItem dist\*portable-UNSIGNED.zip).FullName -DryRun
+.\scripts\windows\Install-RebuildStudio.ps1 -Source (Get-ChildItem dist\*portable-UNSIGNED.zip).FullName *>&1 | Tee-Object $Ev\W2-install-script.txt
+.\scripts\windows\tests\Test-AppLaunch.ps1 -InstallDir $Inst -RequireWindow -EvidenceFile $Ev\W2-app-launch.json
+```
+
+*Evidence:* screenshots of the installer pages and of the first-run main window; `W2-doctor-nsis.txt`; `W2-install-script.txt`; `W2-app-launch.json`; the registry/Apps entry text.
+
+*Pass:* installs with no UAC prompt as a standard user; the main window shows the Rebuild Studio UI (not an error page) within 90 s of the first launch; `Doctor` has no `FAIL` (WARN for missing analysis tools is acceptable here and is covered by W3);
+`Install-RebuildStudio.ps1` prints a verified package and finishes with exit 0; the Start-menu shortcut and the Apps & Features entry work; `Test-AppLaunch.ps1` exits 0.
+
+## W3 Dependency pins and `Setup-Dependencies.ps1`
+
+*Proves:* `docs/dependency-lock.json` is complete (no null hash), downloads verify, atomic activation and rollback work on NTFS, and the tools run.
+
+```powershell
+.\scripts\windows\Setup-Dependencies.ps1 -ComputeHash dotnet-runtime        # cross-check against https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json, then paste into docs/dependency-lock.json
+git diff docs\dependency-lock.json                                          # the only change: sha256 / size_bytes / entry_sha256 / hash_provenance for dotnet-runtime
+.\scripts\windows\Setup-Dependencies.ps1 -DryRun -IncludeOptional
+.\scripts\windows\Setup-Dependencies.ps1 -IncludeOptional *>&1 | Tee-Object $Ev\W3-setup.txt
+.\scripts\windows\Doctor-RebuildStudio.ps1 -Smoke -FailOn warn -OutFile $Ev\W3-doctor.json
+.\scripts\windows\Setup-Dependencies.ps1 -Tool rizin -Force; (Get-Content "$Data\tools\.state\rizin.json" -Raw | ConvertFrom-Json).version
+.\scripts\windows\Setup-Dependencies.ps1 -Rollback -Tool rizin; (Get-Content "$Data\tools\.state\rizin.json" -Raw | ConvertFrom-Json).version
+& "$env:LOCALAPPDATA\RebuildStudio\tools\rizin\bin\rizin.exe" -v ; & "$env:LOCALAPPDATA\RebuildStudio\tools\gdre\gdre_tools.exe" --version
+& "$env:LOCALAPPDATA\RebuildStudio\tools\dotnet\dotnet.exe" --list-runtimes
+rebuildctl doctor --smoke --json *>&1 | Tee-Object $Ev\W3-rebuildctl-doctor.json
+```
+
+*Evidence:* `W3-setup.txt`, `W3-doctor.json`, `W3-rebuildctl-doctor.json`, the committed lock diff, `%LOCALAPPDATA%\RebuildStudio\tools\.state\*.json`.
+
+*Pass:* no tool in the lock has `sha256: null`; every selected tool downloads, verifies and activates; `Doctor -Smoke` reports `ok` for `tool-rizin`, `tool-gdre`, `tool-ilspycmd`, `tool-node`, `dotnet`; `rebuildctl doctor --smoke` shows rizin/ilspy/gdre/node as `usable` or `verified` (not `missing`);
+the rollback restores the previous version (state file `version` changes back); tampering with one byte of an installed entry binary makes `Doctor` report `fail ... sha256 mismatch`; a modified hash in a copy of the lock makes `Setup-Dependencies.ps1` exit 1 and install nothing.
+
+## W4 Sidecar start and `controller.json`
+
+*Proves:* the installed shell starts the packaged controller, which writes `<data>\controller.json`; the UI is given the token; the token is enforced.
+
+```powershell
+Remove-Item "$Data\controller.json" -ErrorAction SilentlyContinue
+$t0 = Get-Date; Start-Process "$Inst\rebuild-studio.exe"
+while (-not (Test-Path "$Data\controller.json")) { Start-Sleep -Milliseconds 250 }; "controller.json after $(((Get-Date)-$t0).TotalSeconds) s"
+$c = Get-Content "$Data\controller.json" -Raw | ConvertFrom-Json; $c | Select-Object port, pid, started_at     # token intentionally not printed
+Invoke-RestMethod "http://127.0.0.1:$($c.port)/health" -Headers @{ Authorization = "Bearer $($c.token)" } | ConvertTo-Json
+try { Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$($c.port)/health" } catch { $_.Exception.Response.StatusCode }     # 401 or 403
+Get-Process -Id $c.pid | Select-Object Id, Path
+Get-NetTCPConnection -OwningProcess $c.pid -State Listen | Select-Object LocalAddress, LocalPort                 # 127.0.0.1 only
+Get-Content "$Data\logs\controller.log" -Tail 20
+.\scripts\windows\tests\Test-AppLaunch.ps1 -InstallDir $Inst -RequireWindow -EvidenceFile $Ev\W4-app-launch.json
+```
+
+*Evidence:* the transcript, `W4-app-launch.json`, `controller.log` tail, a screenshot of the UI header showing a live (non-stale) state.
+
+*Pass:* `controller.json` appears within the 90 s default startup timeout on the first run **and** on a warm second run (record both times; first-run time feeds W15); `/health` returns `ok: true` with the token and a refusal without it;
+the controller process path is `<inst>\rebuild-controller.exe`; it listens on 127.0.0.1 only (no `0.0.0.0` / `::`); closing the window ends the controller (no `rebuild-controller.exe` left: `Get-Process rebuild-controller` is empty after 10 s); `Test-AppLaunch.ps1` exits 0 including `sidecar_dies_with_shell`.
+
+## W5 WebView2 strategy (Evergreen runtime, never bundled)
+
+*Proves:* the app runs against the machine's Evergreen WebView2; when it is absent the documented bootstrapper path installs it; failures are explicit.
+
+```powershell
+# Registry probe used by Doctor and Install-RebuildStudio.ps1 (docs/dependency-lock.json system_prerequisites)
+foreach ($k in 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}','HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}','HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}') { "$k : $((Get-ItemProperty $k -ErrorAction SilentlyContinue).pv)" }
+# Case A: runtime present
+.\scripts\windows\Doctor-RebuildStudio.ps1 -SkipChecks tool-rizin,tool-gdre,tool-ilspycmd,tool-node,dotnet -FailOn none | Select-String webview2
+# Case B: runtime absent (clean VM image without WebView2, or uninstall it first), online
+.\scripts\windows\Install-RebuildStudio.ps1 -Source <portable.zip> -DryRun | Select-String WebView2        # states the decision and the URL
+.\scripts\windows\Install-RebuildStudio.ps1 -Source <portable.zip> *>&1 | Tee-Object $Ev\W5-bootstrapper.txt
+Get-AuthenticodeSignature "$env:TEMP\rs-wv2-*\MicrosoftEdgeWebview2Setup.exe" | fl Status, SignerCertificate   # if the temp copy still exists
+# Case C: NSIS installer on a machine without the runtime (downloadBootstrapper, silent)
+Start-Process (Get-ChildItem dist\*setup-UNSIGNED.exe).FullName -Wait
+# Case D: offline
+#   disable the network adapter, run the NSIS installer and Install-RebuildStudio.ps1 on a machine without the runtime; capture the messages
+.\scripts\windows\Install-RebuildStudio.ps1 -Source <portable.zip> -WebView2Installer C:\media\MicrosoftEdgeWebview2Setup.exe    # pre-downloaded copy
+# Case E: tampered bootstrapper must be refused
+Copy-Item C:\Windows\System32\notepad.exe $env:TEMP\fake-wv2.exe; .\scripts\windows\Install-RebuildStudio.ps1 -Source <portable.zip> -WebView2Installer $env:TEMP\fake-wv2.exe; $LASTEXITCODE
+```
+
+*Evidence:* registry output; `W5-bootstrapper.txt`; signature output (`Status: Valid`, subject contains `Microsoft Corporation`); screenshots of the NSIS installer's WebView2 step; the offline-failure messages (text and screenshot).
+
+*Pass:* (A) Doctor `webview2 ok` with a version >= `minimum_version` in the lock (110.0.0.0); (B) the bootstrapper is downloaded from `https://go.microsoft.com/fwlink/p/?LinkId=2124703`, its Authenticode signature is `Valid` for `Microsoft Corporation`, the runtime appears in the registry, and the app starts;
+(C) the NSIS installer completes and the app starts; (D) offline gives a clear, actionable failure (not a hang or an empty window) and the pre-downloaded installer path works; (E) exit code 3 and the log says the bootstrapper was refused; the fake file is never executed.
+Nothing in the installer or portable zip contains the WebView2 runtime (`Get-ChildItem $Inst -Recurse -Filter *webview2*` finds no runtime files; zip size is within 5 % of the Build output).
+
+## W6 Credential Manager and DPAPI put/get
+
+*Proves:* the shell's `credential_set/get/delete` use the real Windows Credential Manager and the controller's `SecretStore` encrypts with DPAPI.
+
+```powershell
+Set-Location desktop\src-tauri
+cargo test --locked windows_credential_manager_roundtrip -- --nocapture *>&1 | Tee-Object $Ev\W6-cargo-test.txt
+Set-Location ..\..
+cmdkey /list | Select-String 'RebuildStudio'                     # before and after the test: no leftover rs-test.* entries
+python -m pytest controller\tests\test_secrets.py -v -p no:cacheprovider *>&1 | Tee-Object $Ev\W6-dpapi-pytest.txt
+# end-to-end through the app: add a provider key in Connections (dummy value such as sk-test-AAAAAAAAAAAAAAAAAAAA), then
+Get-ChildItem "$Data\secrets" -Recurse
+Select-String -Path "$Data\secrets\*" -Pattern 'sk-test-AAAA' -ErrorAction SilentlyContinue        # must find nothing (DPAPI-protected blob)
+python -c "import os, json; from rebuild_controller.providers import secrets as S; print(json.dumps(S.SecretStore(os.environ['LOCALAPPDATA'] + r'\RebuildStudio').describe(), indent=1))"
+# a different Windows user must not be able to decrypt the stored value:
+#   as an administrator copy "$Data\secrets\secrets.json" to C:\Temp\other\secrets\secrets.json, then as a second local user run
+python -c "from rebuild_controller.providers import secrets as S; s=S.SecretStore(r'C:\Temp\other'); print([s.get(r) for r in s.refs()])"
+```
+
+*Evidence:* `W6-cargo-test.txt` (test `windows_credential_manager_roundtrip ... ok`), `W6-dpapi-pytest.txt` (all `test_secrets.py` tests pass; `test_default_backend_selection_matches_os` asserts `dpapi` on `nt`), `describe()` output, the `<data>\secrets` listing, the other-user result.
+
+*Pass:* the Rust round trip passes with the `windows-credential-manager` backend and no `<data>\credentials` file fallback in the Rust round trip; all of `test_secrets.py` passes with the `dpapi` backend (`os_backed: true`, no `NOT OS-backed` warning); the key typed in the UI never appears in plain text under `<data>`;
+the other user cannot decrypt the copied file (error or `None`, never the key); `GET /connections` and the logs never contain the key (`Select-String -Path "$Data\logs\*" -Pattern 'sk-test-AAAA'` finds nothing).
+
+## W7 Native PE capture of `fixtures/pecli` on real Windows
+
+*Proves:* the original `pecli.exe` run natively behaves as the Wine-recorded oracle says (or the differences are understood and recorded), and the verifier still rejects the deliberately wrong remake. The Linux oracle (`fixtures/pecli/expected/scenarios.json`) came from **Wine and is non-certifying**.
+
+```powershell
+python fixtures\tools\scenario_runner.py check --fixture fixtures/pecli --launcher fixtures/pecli/original/pecli.exe *>&1 | Tee-Object $Ev\W7-oracle-check.txt
+#   NOTE: forward slashes in --launcher (the runner shell-splits it; backslashes would be eaten)
+cargo build --release --manifest-path fixtures\pecli\wrong_remake\Cargo.toml
+python fixtures\tools\scenario_runner.py check --fixture fixtures/pecli --launcher fixtures/pecli/wrong_remake/target/release/pecli.exe *>&1 | Tee-Object $Ev\W7-wrong-remake.txt
+rebuildctl rebuild --source fixtures\pecli\original --output $env:TEMP\rs-pecli-out --execute-original --wait --timeout 1800 --json *>&1 | Tee-Object $Ev\W7-rebuildctl.json
+Get-ChildItem $env:TEMP\rs-pecli-out -Recurse -Filter *.json | Select-Object -First 20 FullName
+Select-String -Path fixtures\pecli\features.json -Pattern 'windows_native_exec' -Context 0,6
+```
+
+*Evidence:* `W7-oracle-check.txt` (8 scenarios, per-scenario PASS/FAIL with diffs), `W7-wrong-remake.txt`, `W7-rebuildctl.json` plus the evidence rows written under the output folder (runner label must be `native`, not `wine ...`), and a note of the console code page (`chcp`) and shell used (cmd vs PowerShell) because `pecli.windows_native_exec` has no frozen expected values.
+
+*Pass:* the original passes all 8 scenarios natively; any diff is analysed and recorded (CRLF handling through PowerShell redirection, console code page, Windows path forms) and the oracle or comparator is fixed through the owning milestone, never by editing the expected file to match; the wrong remake **fails** (CRC final XOR, exit codes 1 vs 3 / 2, usage text);
+`rebuildctl rebuild --execute-original` captures the original with runner label `native` and the feature `pecli.windows_native_exec` is recorded from the native run.
+Note: `controller/tests/test_e2e_pipeline.py::test_pecli_full_pipeline_no_ai_is_honest` and `test_fixture_oracle.py` are skipped when `wine` is missing, so they do not run on Windows; this gate replaces them until their skip conditions are made OS-aware.
+
+## W8 Folder picker
+
+*Proves:* the native folder dialog (Tauri `pick_folder` command) works, is parent-modal, cancellable, and returns usable Windows paths.
+
+Steps (interactive, UI): New project -> source folder **Browse**, then output folder **Browse**; repeat for each target below. After each pick, create the project and read it back:
+
+```powershell
+rebuildctl status <case_id> --json | Tee-Object -Append $Ev\W8-cases.json        # source_root / output_root exactly as picked
+```
+
+Targets: `C:\Test Folder With Spaces`; `C:\Test\Ünïcödé 日本語`; a path > 260 characters (with LongPathsEnabled=1 and with it off: record behaviour); a mapped drive `Z:\`; a UNC path `\\localhost\c$\temp`; a OneDrive-redirected Desktop/Documents folder; a removable drive; an empty folder created from inside the dialog ("Make New Folder").
+Also: press **Cancel** (UI must not change the field); press **Esc**; open the dialog twice quickly; open it with the main window minimised/behind another window; move the dialog to a second monitor if available.
+
+*Evidence:* one screenshot per target (dialog and the resulting field), `W8-cases.json`, `controller.log` excerpt for each create.
+
+*Pass:* the dialog is modal to the app window and in front; Cancel/Esc leave the previous value untouched with no error toast; the returned path has no `\\?\` prefix (UNC kept as `\\server\share`) and round-trips byte-for-byte into `source_root`/`output_root`; non-ASCII and space paths work through analysis start (job created, no `path_escape` false positive);
+a path the controller refuses (junction escape, over-long without long-path support) produces the documented error with `next_action`, not a crash.
+
+## W9 UI at 1024x700 / 1920x1080 / 2560x1440 at 100 / 150 / 200 % DPI
+
+*Proves:* the WebView2 UI is readable and usable across the declared window sizes and display scales (window minimum is 1024x700 logical, `tauri.conf.json`). Sizes are **logical client pixels**; at 150 %/200 % a 2560x1440 logical window needs a monitor of 3840x2160 / 5120x2880 physical pixels, so on smaller monitors those cells are recorded as `fits: false` and need a bigger display or are waived with the reason.
+
+For each display scale (Settings > System > Display > Scale, no sign-out needed) run the helper once per view (Overview, Plan, Preview & Test, Comparisons, Connections, Settings; add Feedback and Knowledge when time allows):
+
+```powershell
+# start the app, open the view, then:
+.\scripts\windows\tests\Capture-UiMatrix.ps1 -OutDir $Ev\W9 -Label overview
+# change the view and repeat with -Label plan / preview / comparisons / connections / settings
+# change the display scale (100 -> 150 -> 200 %), repeat all of the above
+Get-Content $Ev\W9\matrix.json | ConvertFrom-Json | Format-Table label, scale_percent, requested_logical, actual_client_logical, fits, clamped, file
+```
+
+Matrix (9 cells; each needs the 6 view captures):
+
+| Logical size | 100 % | 150 % | 200 % |
+|--------------|-------|-------|-------|
+| 1024x700 (minimum) | W9.1 | W9.2 | W9.3 |
+| 1920x1080 | W9.4 | W9.5 | W9.6 |
+| 2560x1440 | W9.7 | W9.8 | W9.9 |
+
+*Evidence:* the PNGs and `matrix.json` from the helper; a written checklist result per cell.
+
+*Pass (per cell, by human review of the PNGs):* no clipped or overlapping text or controls; no page-level horizontal scrollbar (inner tables/log panes may scroll); focus ring visible on the first interactive control; status chips and progress numbers readable (>= 4.5:1 contrast spot-check on 3 chips);
+at 1024x700 the main navigation and the primary action of the view are reachable without scrolling the page; at 2560x1440 content does not stretch into unreadable line lengths; text is crisp (not bitmap-scaled/blurry: the window is per-monitor DPI aware); moving the window between monitors of different scale re-lays out correctly.
+`clamped: true` is expected only for requests below 1024x700.
+
+## W10 Cancel kills the process tree
+
+*Proves:* cancelling a job, stopping a preview, and quitting/killing the shell leave **no orphan processes** on Windows (`taskkill /T /F` and the kill-on-close job object).
+
+```powershell
+python -m pytest scripts\windows\tests\test_cancel_tree.py -v -s -p no:cacheprovider *>&1 | Tee-Object $Ev\W10-cancel-tree.txt        # powershell -> ping.exe grandchild, cancelled through the real job runner
+Set-Location desktop\src-tauri
+cargo test --locked windows_stop_kills_the_whole_tree -- --nocapture *>&1 | Tee-Object $Ev\W10-preview-stop.txt                   # shell's preview registry: stop kills the tree
+Set-Location ..\..
+.\scripts\windows\tests\Test-AppLaunch.ps1 -InstallDir $Inst -EvidenceFile $Ev\W10-shell-kill.json                                 # Stop-Process on the shell only; sidecar must die (job object)
+# manual, in the app: start a case on a real input, cancel it in the UI while a stage is running
+Get-CimInstance Win32_Process | ? { $_.ParentProcessId -eq (Get-Process rebuild-controller).Id } | Select-Object ProcessId, Name, CommandLine     # children of the controller while running
+# press Cancel, then:
+Start-Sleep 10; Get-Process rizin, ilspycmd, dotnet, gdre_tools, node, ping -ErrorAction SilentlyContinue                              # must be empty (or only unrelated pre-existing processes)
+taskkill /F /IM rebuild-studio.exe; Start-Sleep 10; Get-Process rebuild-controller -ErrorAction SilentlyContinue                    # crash of the shell: sidecar must still end
+```
+
+*Evidence:* the three test transcripts, `W10-shell-kill.json` (`sidecar_died_after_shell_kill: true`), before/after process listings for the manual cancel, UI screenshot showing the job as `cancelled`.
+
+*Pass:* all three automated tests pass; after a UI cancel the job state is `cancelled` within 15 s and every descendant of the controller that the job started is gone within 10 s (no `rizin.exe`, `dotnet.exe`, `ilspycmd`, `node.exe`, preview app left); force-killing the shell ends `rebuild-controller.exe` within 15 s;
+a cancelled job can be resumed (`POST /jobs/{id}/resume`) and reaches `completed` without duplicate evidence.
+
+## W11 Hermes gates G1-G9 (`docs/HERMES.md`, section 7)
+
+*Proves:* the Hermes bridge matches real Hermes and cua-driver on Windows. Preconditions (from HERMES.md): Windows 10/11 with an interactive logged-in desktop, repo checked out, `pip install -e controller` done. Run each gate in a transcript (`Start-Transcript $Ev\W11-G<n>.txt`).
+The command and expected result below are copied from HERMES.md section 7 and must stay identical to it; if you change one, change both. Record G-specific findings (e.g. real `list_windows` JSON differing from `test_hermes.transcript()`) as defects against `controller/rebuild_controller/hermes/protocol.py`.
+
+| Gate | What it proves | Command (PowerShell) | Expected evidence |
+|---|---|---|---|
+| W11-G1 Install + contract | Hermes and the pinned driver install natively and meet the contract | `iex (irm https://hermes-agent.nousresearch.com/install.ps1)`; `hermes --version`; `hermes setup`; `hermes computer-use install`; `hermes computer-use status`; `hermes computer-use doctor --json`; `& (Get-Command cua-driver).Source manifest` | version line `Hermes Agent v... (...)`; driver `>= 0.20.0`; manifest has `mcp_invocation` and the `mcp/serve/stop` args; doctor `overall: ok` |
+| W11-G2 Detect + pair + register | profile discovery on `%LOCALAPPDATA%\hermes`, config merge on a real (possibly BOM/CRLF) config | `python -c "import json; from rebuild_controller.hermes import HermesBridge as B; b=B(); print(json.dumps(b.detect_installation(),indent=1)); print(b.pair()); r=b.register_mcp(True); print(r['diff'])"`; then `b.register_mcp(False)`; `hermes mcp list`; `hermes mcp test rebuild_studio` | install detected with path/version/profile; pairing written; diff is additions only; backup file exists; second `register_mcp(False)` reports `changed: false`; `hermes mcp test` connects |
+| W11-G3 Session probes | `ProcessIdToSessionId`, window station, `OpenInputDesktop`, elevation probe via ctypes | Normal desktop: `python -c "import json;from rebuild_controller.hermes import HermesBridge as B;print(json.dumps(B().status()['session'],indent=1))"`. Session 0: run the same over `ssh` into the box. Locked: press Win+L, run via a scheduled task or `psexec -i`. UIPI: `$p=Start-Process notepad -Verb RunAs -PassThru`, then `B().status(target_pid=$p.Id)` from a non-elevated shell | `interactive: true, session_id>0`; over SSH `session_0`; locked `desktop_locked`; elevated notepad `uipi_elevated_target`; none of the three on the clean desktop |
+| W11-G4 Direct driver | typed MCP calls work against the real cua-driver; protocol shapes match the recorded ones | `python -c "from rebuild_controller.hermes import *; b=HermesBridge(); import json; print(json.dumps(b.status(probe_tools=True)['capabilities'],indent=1))"`; start Notepad; replay a recipe: `python -c "import json;from rebuild_controller.hermes import *;print(json.dumps(HermesBridge().replay(Recipe.from_dict(json.load(open('notepad.json')))).to_dict(),indent=1))"` (author `notepad.json` per 4.5; Notepad's UIA role/label names vary by Windows build) | `live_tools` includes `get_window_state click type_text list_windows`; replay `completed`, `postcondition_ok: true`, `model_calls: 0`; diff the real `list_windows`/`get_window_state` JSON against `test_hermes.transcript()` and fix `protocol.py` if shapes differ |
+| W11-G5 Agent session | a model-driven session records actions and evidence against a real profile | In the profile set `approvals.single_query_mode: approve` (or bounded + manifest). `python -c "from rebuild_controller.hermes import *;r=HermesBridge().run_task(HermesTask(goal='Capture the Notepad window and tell me its title',target_window_title='Notepad',allowed_actions=('capture',),max_steps=5));print(r.status,r.records,r.diagnostics)"` | `completed`; records labelled `hermes_agent_session`; PNGs under `%LOCALAPPDATA%\hermes\cache\images\`; screenshot shas resolved (or flagged `cache_scan_ordered`) |
+| W11-G6 Stream shape | real `--format stream-json` output matches `StreamParser` | `hermes -p default chat -Q --format stream-json --query-file p.md --source tool -t computer_use --max-turns 3 > stream.jsonl` with a prompt asking for a capture; inspect `stream.jsonl` | `system/init`, `tool_use`/`tool_result` with `name: computer_use`, one `result`; check what a capture's `output` looks like (truncated repr vs JSON) and whether `tool_call_id` is present |
+| W11-G7 Process tree on Windows | cancel / disconnect kills Hermes **and** cua-driver, no orphans | start a long task, cancel it via job cancel and via `HermesBridge.cancel(task_id)`; `Get-Process hermes,python,cua-driver*` before/after | all gone within ~10 s (`taskkill /F /T`, `CREATE_NEW_PROCESS_GROUP`); also confirm a `hermes.cmd`/`.exe` shim launches under `Popen` without a shell |
+| W11-G8 Scope enforcement | violation kill and direct-mode pre-send rejection against real windows | agent task with `allowed_actions=('capture',)` on a prompt that asks for a click; direct session with `Scope(process_names=('notepad.exe',))` while Calculator is frontmost | agent: `scope_violation`, process gone; direct: `ScopeViolation`, driver log shows no input call |
+| W11-G9 No egress | direct mode is silent on the network | run G4 with `CUA_DRIVER_RS_TELEMETRY_ENABLED` unset in the parent; watch `Get-NetTCPConnection -OwningProcess (Get-Process cua-driver).Id` and Resource Monitor during the run | no connections from cua-driver or python; driver env dump shows `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` |
+
+*Pass:* every G-row meets its Expected column. G5/G6 need a configured model profile (API key or subscription); if none is available the gate is `WAIVED (no credentials)` and W11 is not complete. G3 needs a second, elevated Notepad and (for the locked case) a scheduled task or `psexec -i`.
+
+## W12 Uninstall preserves data
+
+*Proves:* uninstall removes the program but keeps projects, evidence, settings and credentials unless `-RemoveUserData` is given.
+
+```powershell
+# create user data first: a project via the UI or  rebuildctl rebuild --source <folder> --output $env:TEMP\rs-out-keep ; add a provider key in Connections
+Get-ChildItem $Data -Recurse -File | Measure-Object | Select-Object Count; cmdkey /list | Select-String RebuildStudio; Get-FileHash "$Data\studio.sqlite3" -ErrorAction SilentlyContinue
+# A. script uninstall
+.\scripts\windows\Uninstall-RebuildStudio.ps1 -InstallDir $Inst -DryRun
+.\scripts\windows\Uninstall-RebuildStudio.ps1 -InstallDir $Inst *>&1 | Tee-Object $Ev\W12-uninstall.txt
+Test-Path $Inst, "$Data", "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Rebuild Studio.lnk"
+Get-ChildItem $Data -Recurse -File | Measure-Object | Select-Object Count; cmdkey /list | Select-String RebuildStudio       # unchanged
+# B. NSIS uninstall (Apps & Features -> Rebuild Studio -> Uninstall; try with and without the "delete application data" checkbox)
+# C. reinstall and confirm the project and the connection are still there
+.\scripts\windows\Install-RebuildStudio.ps1 -Source <portable.zip>; Start-Process "$Inst\rebuild-studio.exe"
+# D. explicit removal
+.\scripts\windows\Uninstall-RebuildStudio.ps1 -InstallDir $Inst -RemoveUserData      # type DELETE
+Test-Path $Data; cmdkey /list | Select-String RebuildStudio                           # both gone; the case OUTPUT folder you picked is untouched
+```
+
+*Evidence:* `W12-uninstall.txt` (PRESERVED section), before/after file counts and hashes, `cmdkey` before/after, screenshots of the NSIS uninstaller and of the reinstalled app showing the old project.
+
+*Pass:* after A and B the install folder, shortcut and Apps entry are gone and `<data>` (`studio.sqlite3`, evidence, `secrets`, settings) plus all `RebuildStudio:*` credentials are byte-identical to before; after C the old project and connection are visible; after D (and only D) `<data>` and the credentials are gone while case output folders chosen by the user remain; no `rebuild-*.exe` process survives any step.
+Record what the NSIS uninstaller's data checkbox deletes (it targets `%APPDATA%`/`%LOCALAPPDATA%\io.rebuildstudio.desktop`, window state and WebView2 profile) and confirm it never touches `%LOCALAPPDATA%\RebuildStudio`.
+
+## W13 Clean-machine test list (PLAN.md M15)
+
+PLAN.md M15 states the outcome ("Windows packaging + CI handoff: Tauri bundle (NSIS), PowerShell scripts, SBOM/notices, Windows CI workflow, release gates list") but contains **no enumerated clean-machine checklist**, so this list is derived from M15's scope and the host constraints recorded in PLAN.md. A clean machine is a fresh VM snapshot of Windows 10 22H2 x64 and of Windows 11 (current), standard (non-admin) user, Windows Defender on, no Node/Python/Rust/.NET/Git/Visual Studio, no WebView2 on one of them if the image allows, network available (and unplugged for C11).
+
+- **C1 Snapshot is clean.** Command / action: `Get-Command node, python, cargo, dotnet, git -ErrorAction SilentlyContinue`; `reg query HKLM\SOFTWARE\Microsoft\EdgeUpdate\Clients`; `whoami /groups` (no enabled `S-1-5-32-544` Administrators group). Evidence: command output. Pass: no developer tools present; the user is a standard user.
+- **C2 Baseline for the residue diff.** Command / action: `Get-ChildItem Env: > $Ev\env-before.txt`; `reg export HKCU $Ev\hkcu-before.reg /y`; `Get-ScheduledTask > $Ev\tasks-before.txt`; `Get-Service > $Ev\services-before.txt`; `Get-NetFirewallRule > $Ev\fw-before.txt`; `Get-ChildItem $env:LOCALAPPDATA, $env:APPDATA -Directory > $Ev\dirs-before.txt`. Evidence: the saved files. Pass: saved before anything is installed.
+- **C3 Install from the unsigned NSIS installer.** Command / action: W2 part A. Evidence: screenshots including any SmartScreen text. Pass: installs per user with no UAC; the app starts.
+- **C4 Doctor from the installed folder.** Command / action: `Doctor-RebuildStudio.ps1 -InstallDir <install>`. Evidence: text. Pass: no FAIL other than missing analysis tools.
+- **C5 No firewall prompt.** Command / action: start the app and watch for a Windows Defender Firewall dialog. Evidence: screenshot, or a note that none appeared. Pass: no prompt (the controller listens on loopback only, W4).
+- **C6 Fetch tools.** Command / action: `Setup-Dependencies.ps1 -IncludeOptional`, then `Doctor-RebuildStudio.ps1 -Smoke -FailOn warn`. Evidence: transcripts. Pass: all tool checks `ok`.
+- **C7 First project without AI.** Command / action: copy `fixtures\pecli\original` to the machine, create a project in the UI with `no_ai`, run it to completion, export the plan. Evidence: screenshots, `project-plan.json/html`. Pass: honest status; native capture as in W7.
+- **C8 Restart persistence.** Command / action: reboot; start the app. Evidence: screenshot. Pass: project, plan and feedback are still present; the controller restarts with a fresh `controller.json`.
+- **C9 Second user profile.** Command / action: create a second standard user, install per user, run. Evidence: listing of both data dirs. Pass: independent data dirs and credentials; no cross-user access.
+- **C10 Offline use.** Command / action: disconnect the network, restart the app, open the existing project. Evidence: screenshot. Pass: the UI works; AI features say they are offline; nothing hangs.
+- **C11 Offline first install.** Command / action: on a fresh snapshot with the network off, run the NSIS installer. Evidence: messages. Pass: the W5 case D behaviour.
+- **C12 Defender.** Command / action: `Get-MpThreatDetection`; `Start-MpScan -ScanType CustomScan -ScanPath <install>`. Evidence: output. Pass: no detections and no quarantined files (also W15).
+- **C13 Uninstall.** Command / action: W12. Evidence: transcripts. Pass: as W12.
+- **C14 No residue.** Command / action: repeat the C2 captures as `*-after` and compare (`fc.exe` / `Compare-Object`); list new folders, firewall rules, tasks and services. Evidence: diff files. Pass: only `<data>` remains (kept by design); no HKLM change, service, scheduled task or firewall rule was added.
+- **C15 Reinstall after uninstall.** Command / action: W2 part A again. Evidence: screenshot. Pass: works and reuses the kept data.
+
+## W14 Paths, Session 0 and locked desktop
+
+```powershell
+.\scripts\windows\Doctor-RebuildStudio.ps1 -OutFile $Ev\W14-doctor.json -FailOn none | Select-String longpaths, session0
+# long path: with and without LongPathsEnabled; project source tree with a 300-character path, a folder named with trailing space/dot, reserved names (CON, NUL), a junction pointing outside the project
+New-Item -ItemType Junction -Path C:\work\proj\escape -Target C:\Windows\System32
+New-Item -ItemType SymbolicLink -Path C:\work\proj\link.txt -Target C:\Windows\win.ini      # needs Developer Mode or an elevated shell
+python -m pytest controller\tests\test_paths.py -v -p no:cacheprovider *>&1 | Tee-Object $Ev\W14-paths.txt
+# Session 0: run the Doctor as a service/scheduled task "run whether user is logged on or not"
+schtasks /create /tn rs-doctor /sc once /st 23:59 /ru SYSTEM /tr "powershell -File $Repo\scripts\windows\Doctor-RebuildStudio.ps1 -OutFile C:\Temp\doctor-s0.json -FailOn none" ; schtasks /run /tn rs-doctor ; Get-Content C:\Temp\doctor-s0.json | ConvertFrom-Json | % checks | ? id -eq session0
+# locked desktop: Win+L while a case runs, unlock after two minutes
+```
+
+*Evidence:* the Doctor reports, the pytest transcript, screenshots of error messages for refused paths, the Session 0 JSON. *Pass:* Windows-specific path regressions in `test_paths.py` pass (junction/reparse escape refused, reserved names, long paths either work with LongPathsEnabled=1 or fail with a message that tells the user to enable it); `session0` is `fail` with the documented remedy when run as SYSTEM and `ok` interactively;
+a case continues across lock/unlock with no lost events and no stale-state flag once the user is back (heartbeat resumes).
+
+## W15 One-file sidecar vs Defender, SmartScreen and the startup timeout
+
+*Proves:* the PyInstaller one-file `rebuild-controller.exe` (which unpacks to `%TEMP%\_MEI*` on every start) is not quarantined and starts inside the shell's startup timeout (default 90 s, `REBUILD_STUDIO_STARTUP_TIMEOUT_SECS`).
+
+```powershell
+1..5 | % { $t0 = Get-Date; Remove-Item "$Data\controller.json" -ErrorAction SilentlyContinue; $p = Start-Process "$Inst\rebuild-studio.exe" -PassThru; while (-not (Test-Path "$Data\controller.json")) { Start-Sleep -Milliseconds 200 }; "{0:N1}s" -f ((Get-Date)-$t0).TotalSeconds; Stop-Process $p -Force; Start-Sleep 3 } | Tee-Object $Ev\W15-start-times.txt
+Get-MpThreatDetection | Select-Object -First 5; Get-ChildItem $env:TEMP -Filter _MEI* -Directory | Measure-Object | Select-Object Count      # leftover unpack dirs after kills
+# first start right after a fresh install on a machine with real-time protection on (cold Defender scan): record the time
+```
+
+*Evidence:* the five start times (first one cold), Defender detections list (empty), count of leftover `_MEI*` directories, screenshot of any SmartScreen/Defender message. *Pass:* no detection or quarantine; cold first start < 90 s and warm starts < 20 s (record the real numbers; if cold start exceeds the timeout the gate fails and `STARTUP_TIMEOUT` or the sidecar packaging (one-dir) must change); leftover `_MEI*` folders do not accumulate across the five force-kills beyond the number of kills.
+
+## W16 Client packages on Windows
+
+```powershell
+.\scripts\windows\Install-Clients.ps1 -Client all -DryRun *>&1 | Tee-Object $Ev\W16-dryrun.txt          # inside the installed package: uses runtime\Scripts\rebuild-mcp.exe
+.\scripts\windows\Install-Clients.ps1 -Client claude-code
+.\scripts\windows\Install-Clients.ps1 -Client claude-code        # second run must change nothing
+& "$Inst\runtime\Scripts\rebuild-mcp.exe" --list-tools
+claude mcp list ; codex mcp list ; gemini mcp list ; hermes mcp list         # for each installed client
+.\scripts\windows\Remove-Clients.ps1 -Client all -DryRun ; .\scripts\windows\Remove-Clients.ps1 -Client all
+```
+
+*Evidence:* dry-run diffs, the real client listing showing the `rebuild-studio` server connected, a tool call from the client. *Pass:* idempotent; existing client config (BOM/CRLF) preserved; `rebuild-mcp.exe --list-tools` works from the packaged runtime (PyInstaller build, no system Python needed for the server; `Install-Clients.ps1` itself needs a Python on PATH or a bundled one and warns when it falls back); remove restores the original files.
+
+## W17 Code signing and SmartScreen (release owner)
+
+CI and `Build-RebuildStudio.ps1` without `-SignCert` produce **unsigned** artifacts, named `-UNSIGNED`. Signing is a release-owner decision (certificate type: OV/EV, Azure Trusted Signing, HSM) and no certificate exists in this repository.
+
+```powershell
+$env:RS_SIGN_PASSWORD = '...'   # or -SignPassword (Read-Host -AsSecureString)
+.\scripts\windows\Build-RebuildStudio.ps1 -SignCert C:\keys\release.pfx -TimestampUrl http://timestamp.digicert.com *>&1 | Tee-Object $Ev\W17-signed-build.txt
+Get-ChildItem dist\*.exe, desktop\src-tauri\binaries\*.exe | % { Get-AuthenticodeSignature $_.FullName | Select-Object Path, Status, @{n='Subject';e={$_.SignerCertificate.Subject}}, @{n='Timestamp';e={$_.TimeStamperCertificate.Subject}} }
+# on a clean machine that downloaded the installer through a browser (Mark of the Web): record SmartScreen behaviour
+Get-Content dist\BUILD-INFO.json | ConvertFrom-Json | Select-Object signed, signatures
+```
+
+*Evidence:* signature table (every exe `Valid`, timestamped), SmartScreen screenshots (reputation warning or none), `BUILD-INFO.json` `signed: true`. *Pass:* installer, `rebuild-studio.exe`, `rebuild-controller.exe` and `rebuild-mcp.exe` are `Valid` with a timestamp; the artifacts lose the `-UNSIGNED` suffix only when every signature verified; the Doctor `signature` check reports `ok`. Until this gate passes, no artifact may be described as a release.
+
+## W18 SBOM and notices review
+
+```powershell
+Get-ChildItem dist\sbom; (Get-Content dist\sbom\ui.cdx.json -Raw | ConvertFrom-Json).components.Count; (Get-Content dist\sbom\rebuild-studio.cdx.json -Raw | ConvertFrom-Json).components.Count
+Get-Content dist\sbom\python-licenses.json -Raw | ConvertFrom-Json | Group-Object License | Sort-Object Count -Descending | Select-Object Count, Name
+Get-Content dist\sbom\python-freeze.txt | Select-Object -First 40
+```
+
+*Evidence:* component counts, license group listing, the reviewed list of non-permissive licenses. *Pass:* every license in the Rust/npm/Python SBOMs is either on the allow-list approved by the release owner or has a recorded decision; `docs/NOTICES.md` lists every shipped component class and names Rizin/GDRE/ILSpy/.NET/Node as downloaded, not bundled; the LGPL (Rizin) statement matches what Setup-Dependencies actually does (separate process, user-replaceable); license texts for Rust and npm packages are bundled (add a `cargo about`-style step) before public distribution.
+
+## W19 Upgrade in place, downgrade and rollback
+
+```powershell
+.\scripts\windows\Install-RebuildStudio.ps1 -Source <old.zip>; .\scripts\windows\Install-RebuildStudio.ps1 -Source <new.zip> -StopRunning
+Test-Path "$Inst.previous"; Get-Content "$Data\install.json"
+.\scripts\windows\Install-RebuildStudio.ps1 -Source <old.zip> -StopRunning        # downgrade (allowDowngrades is true for NSIS)
+# NSIS: install the old setup, then the new setup over it, with the app running (installer must close it or ask)
+```
+
+*Pass:* the data dir and projects survive both directions; `.previous` holds the prior version; running processes are stopped only with `-StopRunning`; a corrupted zip (flip one byte) is refused before anything changes (exit 3, install untouched).
+
+## W20 Packaged-app limits
+
+Two known differences between the Linux-tested controller and the frozen Windows controller:
+
+1. The browser comparison channel (`controller/harness`, Node + Playwright + Chromium) is not inside the PyInstaller bundle; `harness_dir()` resolves inside the frozen app, where `node_modules` does not exist, so `web_available()` reports unavailable.
+2. `controller/pyproject.toml` declares no package data, so `store/schema.sql` and `comparators/web_harness.mjs` are added to the PyInstaller bundle by the Build script rather than by the wheel.
+
+```powershell
+rebuildctl doctor --json | ConvertFrom-Json | % backends | ? { $_.backend_id -match 'web|js' }      # web channel status in the packaged controller
+& "$Inst\rebuild-controller.exe" --version; & "$Inst\rebuild-controller.exe" doctor --json | Out-Null
+# preview launch/stop of a built Windows candidate from the UI (Preview & Test -> Open), then Stop; confirm the app window closes and no process is left (see W10)
+```
+
+*Pass:* the web channel is reported as unavailable with an actionable message (not a crash, not a silent pass), or a provisioned harness location is documented and works; `schema.sql` is present (controller starts, W4); preview of a native candidate opens a window, `stop_preview` closes it and its children; `open_path`/`open_url` refuse executables (`commands.rs` deny list) with a visible message.

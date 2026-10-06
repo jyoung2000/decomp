@@ -61,6 +61,7 @@ export class EventClient {
   private gapTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<(ev: ControllerEvent) => void>();
+  private heartbeatListeners = new Set<(ev: ControllerEvent) => void>();
   private statusListeners = new Set<(s: ClientSnapshot) => void>();
   private snap: ClientSnapshot;
   private floorSeq: number;
@@ -95,6 +96,16 @@ export class EventClient {
   onEvent(fn: (ev: ControllerEvent) => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  /**
+   * Liveness-only heartbeats: the controller's idle WS keep-alive re-uses the last delivered seq
+   * (`{"seq": last, "kind": "controller.heartbeat", "payload": {"idle": true}}`). It is not a new event, so it is not
+   * delivered to reducers or counted as a duplicate, but it proves the controller is alive.
+   */
+  onHeartbeat(fn: (ev: ControllerEvent) => void): () => void {
+    this.heartbeatListeners.add(fn);
+    return () => this.heartbeatListeners.delete(fn);
   }
 
   onStatus(fn: (s: ClientSnapshot) => void): () => void {
@@ -150,6 +161,10 @@ export class EventClient {
     this.update({ lastEventAt: this.opts.now() });
     const seq = ev.seq;
     if (this.delivered.has(seq) || this.buffer.has(seq) || seq <= this.floor) {
+      if (ev.kind === 'controller.heartbeat' && !this.buffer.has(seq)) {
+        for (const fn of this.heartbeatListeners) fn(ev);
+        return false;
+      }
       this.update({ duplicatesDropped: this.snap.duplicatesDropped + 1 });
       return false;
     }

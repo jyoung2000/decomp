@@ -70,3 +70,24 @@ test('dialogs open from the keyboard, trap focus and close with Esc', async ({ p
   await expect(dialog).toBeHidden();
   expect((await focusedInfo(page))?.testid).toBe('btn-stop');
 });
+
+test('every keyboard stop shows the same visible focus ring', async ({ page }) => {
+  await openApp(page, '#/projects/case_demo/overview');
+  await expect(page.getByTestId('phase-progress')).toBeVisible();
+  const seen: string[] = [];
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press('Tab');
+    const f = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || el === document.body) return null;
+      const cs = getComputedStyle(el);
+      return { id: `${el.tagName.toLowerCase()}:${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30)}`, style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), color: cs.outlineColor };
+    });
+    if (!f) continue;
+    seen.push(f.id);
+    expect(f.style, `${f.id} has no focus outline`).not.toBe('none');
+    expect(f.width, `${f.id} focus outline width`).toBeGreaterThanOrEqual(2);
+    expect(f.color, `${f.id} focus color`).toBe('rgb(0, 113, 227)');
+  }
+  expect(seen.length).toBeGreaterThan(20);
+});

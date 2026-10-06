@@ -122,7 +122,12 @@ function DoctorRow({ b, t }: { b: BackendEntry; t: ToolProbe | null }) {
 
 type Settings = Record<string, unknown>;
 const SECTION_ORDER = ['storage', 'concurrency', 'limits', 'capture', 'network', 'output'];
+/** Reported by the controller at runtime; PUT /settings does not change them. */
+const READ_ONLY = new Set(['data_dir', 'tools_dir', 'previews_running', 'version', 'pid']);
 const SECTION_HELP: Record<string, string> = {
+  data_dir: 'Where this controller keeps projects, evidence and its database. Set when the controller starts.',
+  tools_dir: 'Where pinned rebuild tools are installed.',
+  previews_running: 'Preview instances currently running.',
   storage: 'Where projects, evidence blobs and caches are kept.',
   concurrency: 'How many jobs and workers may run at once.',
   limits: 'Hard bounds for each stage and subprocess.',
@@ -172,7 +177,9 @@ function SettingsEditor() {
             <fieldset key={s} data-testid={`settings-${s}`}>
               <legend>{humanize(s)}</legend>
               {SECTION_HELP[s] && <p className="small muted" style={{ marginBottom: 8 }}>{SECTION_HELP[s]}</p>}
-              {val && typeof val === 'object' && !Array.isArray(val) ? (
+              {READ_ONLY.has(s) ? (
+                <ReadOnlyValue id={`set-${s}`} value={val} />
+              ) : val && typeof val === 'object' && !Array.isArray(val) ? (
                 <div className="stack">
                   {Object.entries(val as Settings).map(([k, v]) => (
                     <SettingField key={k} id={`set-${s}-${k}`} label={humanize(k)} value={v} onChange={(nv) => update([s, k], nv)} />
@@ -236,5 +243,14 @@ function SettingField({ id, label, value, onChange }: { id: string; label: strin
       <label htmlFor={id}>{label}</label>
       <input id={id} type="text" value={value == null ? '' : String(value)} onChange={(e) => onChange(e.target.value)} spellCheck={false} />
     </div>
+  );
+}
+
+function ReadOnlyValue({ id, value }: { id: string; value: unknown }) {
+  const text = Array.isArray(value) ? (value.length ? value.map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v))).join(', ') : 'None') : value == null || value === '' ? 'Not reported' : typeof value === 'object' ? JSON.stringify(value) : String(value);
+  return (
+    <p className="mono small wrap-any" id={id} data-readonly="true" title="Reported by the controller; not editable here">
+      {text}
+    </p>
   );
 }

@@ -1,0 +1,193 @@
+# Linux validation: everything that can pass on a plain ubuntu runner.
+# Windows-only certification (installer, WebView2, UI at DPI, Hermes G1-G9, ...) lives in windows.yml and
+# docs/WINDOWS_RELEASE_GATES.md; nothing here certifies a Windows release.
+name: linux
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  controller:
+    name: controller pytest (py${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: controller/pyproject.toml
+      - name: Install controller (+dev extras)
+        run: python -m pip install -e "controller[dev]"
+      # Excluded: e2e (slow, needs the fixture toolchains) and live (needs provider keys).
+      # Deselected: the two tests that compile a PE with mingw and run it under wine; they need a wine prefix
+      # (see the advisory wine-oracle job). Tests that need rizin / asar / dotnet / Godot skip themselves when the
+      # tool is absent; those paths are certified on the dev host and in docs/WINDOWS_RELEASE_GATES.md.
+      - name: pytest (not e2e, not live)
+        working-directory: controller
+        run: >
+          python -m pytest -m "not e2e and not live" -q -p no:cacheprovider
+          --deselect tests/test_fixture_oracle.py::test_pecli_oracle_rejects_wrong_remake_and_accepts_original
+          --deselect tests/test_verifier.py::test_verifier_accepts_correct_and_rejects_wrong_remake
+      - name: Cancel kills the process tree (POSIX self-check of the Windows gate W10 test)
+        run: python -m pytest scripts/windows/tests/test_cancel_tree.py -v -p no:cacheprovider
+
+  ui:
+    name: ui test + build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: npm ci
+        working-directory: ui
+        run: npm ci
+      - name: npm test
+        working-directory: ui
+        run: npm test
+      - name: npm run build (tsc --noEmit + vite build)
+        working-directory: ui
+        run: npm run build
+      - name: Keep ui/dist for the desktop job
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist
+          path: ui/dist
+          retention-days: 3
+
+  desktop:
+    name: desktop shell cargo check + test (Linux, stub sidecar)
+    runs-on: ubuntu-24.04
+    needs: ui
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - uses: actions/download-artifact@v4
+        with:
+          name: ui-dist
+          path: ui/dist
+      # desktop/scripts/check.sh creates the dev stub sidecar (tauri-build refuses a missing externalBin) and falls back to
+      # desktop/placeholder-dist when ui/dist is absent. The stub is never shipped; see docs/PACKAGING.md.
+      - name: cargo check --locked
+        run: sh desktop/scripts/check.sh
+      - name: cargo test --locked
+        run: sh desktop/scripts/check.sh test
+
+  windows-scripts:
+    name: PowerShell scripts (parse, offline tests, dry runs) on Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      REBUILD_STUDIO_DATA: ${{ github.workspace }}/.ci-data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Workflow YAML syntax
+        run: |
+          python -m pip install pyyaml
+          python -c "import sys, yaml, glob; [yaml.safe_load(open(f)) for f in sorted(glob.glob('.github/workflows/*.yml'))]; print('workflows parse')"
+      - name: Parse every .ps1 (structural check + pwsh AST; pwsh is preinstalled on ubuntu runners)
+        run: python scripts/windows/tests/parse_check.py
+      - name: Setup-Dependencies offline unit checks
+        shell: pwsh
+        run: ./scripts/windows/tests/Test-SetupDependencies.ps1
+      - name: Build-RebuildStudio.ps1 -DryRun
+        shell: pwsh
+        run: ./scripts/windows/Build-RebuildStudio.ps1 -DryRun
+      - name: Setup-Dependencies.ps1 -DryRun
+        shell: pwsh
+        # Exit 3 = "refused": docs/dependency-lock.json still pins no sha256 for dotnet-runtime (gate W3). Anything else non-zero is a failure.
+        run: |
+          ./scripts/windows/Setup-Dependencies.ps1 -DryRun -IncludeOptional
+          if ($LASTEXITCODE -notin 0, 3) { throw "Setup-Dependencies.ps1 -DryRun exited $LASTEXITCODE" }
+          if ($LASTEXITCODE -eq 3) { Write-Host '::warning::dependency lock has an unpinned artifact (expected until gate W3 is done)' }
+          $global:LASTEXITCODE = 0
+      - name: Install/Uninstall -DryRun with a synthetic package
+        shell: pwsh
+        run: |
+          $pkg = Join-Path $env:RUNNER_TEMP 'pkg'
+          New-Item -ItemType Directory -Force "$pkg/scripts/windows", "$pkg/docs" | Out-Null
+          Set-Content "$pkg/rebuild-studio.exe" 'MZ'
+          $f = [System.IO.File]::Create("$pkg/rebuild-controller.exe"); $f.SetLength(2MB); $f.Dispose()
+          Copy-Item scripts/windows/Doctor-RebuildStudio.ps1, scripts/windows/_common.ps1, scripts/windows/Uninstall-RebuildStudio.ps1 "$pkg/scripts/windows"
+          Copy-Item docs/dependency-lock.json, docs/NOTICES.md "$pkg/docs"
+          $root = (Resolve-Path $pkg).Path
+          $lines = Get-ChildItem $pkg -Recurse -File | ForEach-Object {
+            '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), ($_.FullName.Substring($root.Length + 1) -replace '\\', '/') }
+          Set-Content "$pkg/SHA256SUMS.txt" $lines
+          $inst = Join-Path $env:RUNNER_TEMP 'inst'
+          New-Item -ItemType Directory -Force $inst | Out-Null
+          Set-Content "$inst/rebuild-studio.exe" 'MZ'
+          ./scripts/windows/Install-RebuildStudio.ps1 -DryRun -Source $pkg -InstallDir "$inst-new" -SkipWebView2
+          ./scripts/windows/Uninstall-RebuildStudio.ps1 -DryRun -InstallDir $inst
+          Add-Content "$pkg/extra.txt" 'tamper'
+          ./scripts/windows/Install-RebuildStudio.ps1 -DryRun -Source $pkg -InstallDir "$inst-new" -SkipWebView2 *>&1 | Tee-Object -Variable out | Out-Host
+          if (($out | Out-String) -notmatch 'not covered by SHA256SUMS') { throw 'tampered package was not flagged' }
+
+  wine-oracle:
+    name: wine oracle tests (advisory, non-certifying)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Compiles PE fixtures with mingw and runs them under wine. Wine is NOT Windows (DR-9): a pass here proves the comparator
+    # plumbing only. Advisory because wine prefix creation on a fresh runner has not been verified.
+    continue-on-error: true
+    env:
+      WINEDEBUG: "-all"
+      REBUILD_WINEPREFIX: ${{ github.workspace }}/.wineprefix
+      WINEPREFIX: ${{ github.workspace }}/.wineprefix
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: controller/pyproject.toml
+      - name: Install mingw + wine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mingw-w64 wine64
+      - name: Initialise the wine prefix
+        run: WINEDLLOVERRIDES="mscoree,mshtml=" wineboot --init || true
+      - run: python -m pip install -e "controller[dev]"
+      - name: pytest (wine tests only)
+        working-directory: controller
+        run: >
+          python -m pytest -q -p no:cacheprovider
+          tests/test_fixture_oracle.py::test_pecli_oracle_rejects_wrong_remake_and_accepts_original
+          tests/test_verifier.py::test_verifier_accepts_correct_and_rejects_wrong_remake

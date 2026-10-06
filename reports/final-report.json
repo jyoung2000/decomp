@@ -1,0 +1,1070 @@
+{
+ "generated_at": "2026-10-06T12:20:17.639663+00:00",
+ "host": {
+  "os": "Linux 6.18.44-fc-v70",
+  "certifies_windows": false
+ },
+ "commits": [
+  "53cb214 dotnetapp managed-path demo (Rust from ILSpy evidence via MCP, verified 9/9); report wording: runners used, candidate author",
+  "78d26a1 Scaffold candidates carry recovered original-language material and decompiled C as intermediate evidence",
+  "1422b3b API doc: deliver, review, subscriptions, doctor states, error mapping",
+  "68622dd Doctor: usable via smoke, verified via recorded fixture regression bound to tool versions",
+  "5b7dab4 Record e2e run",
+  "d13cc41 Checkpoint; cap evidence body reads",
+  "6751289 Record test runs; plan statuses",
+  "3eb3e01 Support matrix update; plan/preview/feedback cycle test",
+  "1751a8e Final report generator and test-run recorder",
+  "5165c3f Usage docs and README",
+  "70b7551 pecli native demo: Rust candidate proposed through MCP from rz-ghidra evidence, verified 8/8; deliver operation",
+  "46db2fc Web pipeline: single root recovery job, harness module resolution",
+  "11c99fd Knowledge: signature/rewrite application and no-AI reuse demonstration",
+  "e9d7a7d Update plan and checkpoint",
+  "e825044 Pipeline: oracle features in ledger, manifest covers plan exports, untested verdict for empty baselines, goto templating",
+  "d2fefc0 Jobs: dynamic dependencies for recovery fan-in; blocked cascade",
+  "5dcfe1c Providers/budgets/JeV, MCP server, CLI, client packages, Hermes bridge, managed backends, UI and Tauri shell (worker output, integration in progress)",
+  "5d8e6c1 Rizin native backend with rz-ghidra decompilation, loopback API server, fixture oracle adapter",
+  "778c932 Fixtures (pecli, dotnetapp, godotgame, webapp) with frozen oracles; verifier, comparators, plan/feedback/preview stores, pipeline stages, builders, delivery and reports",
+  "3f13319 Controller core: durable store, event log, job DAG/runner, path policy, case and evidence stores, adapter contract",
+  "b5fc38b Bootstrap Rebuild Studio plan and checkpoint"
+ ],
+ "branch": "ccr-4dbe9b92-nyzsa8",
+ "pins": {
+  "controller_python_deps": [
+   "pydantic>=2.13,<3",
+   "fastapi>=0.142,<1",
+   "uvicorn[standard]>=0.54,<1",
+   "websockets>=15",
+   "httpx>=0.28,<1",
+   "rzpipe==0.6.2",
+   "lief>=1.0,<2",
+   "pefile>=2024.8",
+   "mcp>=2.3,<3",
+   "pillow>=12",
+   "pyyaml>=6"
+  ],
+  "ui_deps": {
+   "@tauri-apps/api": "2.12.1",
+   "react": "18.3.1",
+   "react-dom": "18.3.1",
+   "react-router-dom": "6.30.6",
+   "@playwright/test": "1.56.1",
+   "typescript": "5.9.3",
+   "vite": "5.4.21",
+   "vitest": "2.1.9"
+  },
+  "tauri_crates": {
+   "tauri-build": "=2.7.1",
+   "tauri": "=2.12.1"
+  },
+  "dependency_lock": {
+   "$comment": "Pinned external dependencies for Rebuild Studio on Windows. Consumed by scripts/windows/Setup-Dependencies.ps1 and Doctor-RebuildStudio.ps1. An artifact with sha256 == null is NEVER installed (verify_required). Compute with: Setup-Dependencies.ps1 -ComputeHash <tool>, review the source, then paste the value here.",
+   "schema_version": 1,
+   "generated_utc": "2026-10-06",
+   "hash_algorithm": "sha256",
+   "tools": {
+    "rizin": {
+     "version": "0.9.1",
+     "role": "Native analysis engine (subprocess via rzpipe; LGPL-3.0, never linked)",
+     "license": "LGPL-3.0-only",
+     "source": {
+      "repo": "https://github.com/rizinorg/rizin",
+      "tag": "v0.9.1",
+      "commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7"
+     },
+     "artifact": {
+      "name": "rizin-windows-static-v0.9.1.zip",
+      "url": "https://github.com/rizinorg/rizin/releases/download/v0.9.1/rizin-windows-static-v0.9.1.zip",
+      "size_bytes": 115391593,
+      "sha256": "2d14e0a6ecba1196dcd742d63de83bbaffed2a7a78ef5a0a9b4e92a0f73d1d28",
+      "verify_required": false,
+      "hash_provenance": "computed by downloading the release asset on 2026-10-06 (Linux build host)"
+     },
+     "layout": {
+      "archive_root": "rizin-win-installer-vs2019_static-64",
+      "entry": "bin/rizin.exe",
+      "entry_sha256": "986c06775f08d7645502f49f630db3f2f443a554f82fa304661fda0b2b00ee79",
+      "version_args": [
+       "-v"
+      ]
+     },
+     "install_dir": "rizin"
+    },
+    "gdre": {
+     "version": "2.7.0",
+     "role": "Godot PCK recovery (gdsdecomp / GDRE tools, MIT)",
+     "license": "MIT",
+     "source": {
+      "repo": "https://github.com/GDRETools/gdsdecomp",
+      "tag": "v2.7.0",
+      "commit": "4c8c8807ae509f4db7e3c12a5adfb6e334fca3ec"
+     },
+     "artifact": {
+      "name": "GDRE_tools-v2.7.0-windows.zip",
+      "url": "https://github.com/GDRETools/gdsdecomp/releases/download/v2.7.0/GDRE_tools-v2.7.0-windows.zip",
+      "size_bytes": 42619156,
+      "sha256": "92a8d5d3d5c0cca159fc6cc34ebdda2cf7e1b448035cdabe1a67f0981cbd0a2c",
+      "verify_required": false,
+      "hash_provenance": "computed by downloading the release asset on 2026-10-06 (Linux build host)"
+     },
+     "layout": {
+      "archive_root": "",
+      "entry": "gdre_tools.exe",
+      "entry_sha256": "d906ff73cc8e8b0e96e1f89f1690ac39ae187c0e7876bce9ded4d89cdb41fe35",
+      "version_args": [
+       "--version"
+      ],
+      "extra_files": {
+       "gdre_tools.pck": "d445fc7c8e81da30d9de2369b90cb9c4ff1576a046679c53ffcec79787063124"
+      }
+     },
+     "install_dir": "gdre"
+    },
+    "ilspycmd": {
+     "version": "9.1.0.7988",
+     "role": ".NET decompiler CLI (ILSpy, MIT). Framework-dependent; needs the .NET 8 runtime below.",
+     "license": "MIT",
+     "source": {
+      "repo": "https://github.com/icsharpcode/ILSpy",
+      "nuget": "https://www.nuget.org/packages/ilspycmd/9.1.0.7988"
+     },
+     "artifact": {
+      "name": "ilspycmd.9.1.0.7988.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/ilspycmd/9.1.0.7988/ilspycmd.9.1.0.7988.nupkg",
+      "size_bytes": 4183395,
+      "sha256": "2b5058f5ccc164c33b7aabf1a5eb0cf3d3a6af6c145aaf58efd3ed891443af7c",
+      "verify_required": false,
+      "hash_provenance": "computed by downloading the nupkg on 2026-10-06 (Linux build host)",
+      "format": "zip"
+     },
+     "layout": {
+      "archive_root": "tools/net8.0/any",
+      "entry": "ilspycmd.dll",
+      "entry_sha256": "58ef1a86bea09f2e5a114720b607dd0bdaaf91cfe498c6b7a3412bd960d0f57d",
+      "launch": "dotnet ilspycmd.dll",
+      "requires": [
+       "dotnet-runtime"
+      ]
+     },
+     "install_dir": "ilspycmd"
+    },
+    "dotnet-runtime": {
+     "version": "8.0.31",
+     "role": ".NET 8 shared runtime (Microsoft.NETCore.App) for ilspycmd. Installed side by side under tools\\dotnet; no machine-wide install.",
+     "license": "MIT",
+     "source": {
+      "docs": "https://dotnet.microsoft.com/download/dotnet/8.0"
+     },
+     "artifact": {
+      "name": "dotnet-runtime-8.0.31-win-x64.zip",
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Runtime/8.0.31/dotnet-runtime-8.0.31-win-x64.zip",
+      "size_bytes": null,
+      "sha256": null,
+      "verify_required": true,
+      "hash_provenance": "NOT VERIFIED: builds.dotnet.microsoft.com is unreachable from the Linux build host. Run Setup-Dependencies.ps1 -ComputeHash dotnet-runtime on Windows, cross-check against https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json, then record the value."
+     },
+     "layout": {
+      "archive_root": "",
+      "entry": "dotnet.exe",
+      "entry_sha256": null,
+      "version_args": [
+       "--list-runtimes"
+      ]
+     },
+     "install_dir": "dotnet"
+    },
+    "node": {
+     "version": "22.22.0",
+     "role": "Optional: JS/Electron extraction (@electron/asar) at runtime. Not required for native/.NET/Godot paths.",
+     "license": "MIT",
+     "optional": true,
+     "source": {
+      "docs": "https://nodejs.org/dist/v22.22.0/SHASUMS256.txt"
+     },
+     "artifact": {
+      "name": "node-v22.22.0-win-x64.zip",
+      "url": "https://nodejs.org/dist/v22.22.0/node-v22.22.0-win-x64.zip",
+      "size_bytes": 35556852,
+      "sha256": "c97fa376d2becdc8863fcd3ca2dd9a83a9f3468ee7ccf7a6d076ec66a645c77a",
+      "verify_required": false,
+      "hash_provenance": "computed by downloading the zip on 2026-10-06 and matched against nodejs.org SHASUMS256.txt"
+     },
+     "layout": {
+      "archive_root": "node-v22.22.0-win-x64",
+      "entry": "node.exe",
+      "entry_sha256": "bae898add4643fcf890a83ad8ae56e20dce7e781cab161a53991ceba70c99ffb",
+      "version_args": [
+       "--version"
+      ]
+     },
+     "install_dir": "node"
+    }
+   },
+   "system_prerequisites": {
+    "webview2_evergreen_bootstrapper": {
+     "role": "Required by Tauri on Windows. Evergreen runtime is NOT bundled; Install-RebuildStudio.ps1 checks for it and downloads the small bootstrapper if absent.",
+     "docs": "https://developer.microsoft.com/microsoft-edge/webview2/#download-section",
+     "url": "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
+     "file_name": "MicrosoftEdgeWebview2Setup.exe",
+     "sha256": null,
+     "verify_required": true,
+     "hash_note": "Microsoft re-publishes this bootstrapper under a stable URL, so the hash changes; instead of a hash the installer REQUIRES a valid Authenticode signature from 'Microsoft Corporation' (Get-AuthenticodeSignature) before running it.",
+     "authenticode_subject_contains": "Microsoft Corporation",
+     "runtime_registry_keys": [
+      "HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+      "HKLM:\\SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+      "HKCU:\\SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+     ],
+     "minimum_version": "110.0.0.0"
+    },
+    "vc_redist_x64": {
+     "role": "Microsoft Visual C++ 2015-2022 x64 runtime (needed by the Rust MSVC binary, PyInstaller bundle, rizin MSVC build). Detected only; Doctor prints the download link, nothing is bundled.",
+     "docs": "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist",
+     "url": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+     "registry_key": "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
+     "minimum_version": "14.38.0.0"
+    }
+   },
+   "build_toolchain": {
+    "rust": {
+     "toolchain": "1.97.0",
+     "msrv": "1.90",
+     "target": "x86_64-pc-windows-msvc",
+     "note": "CI uses the stable channel; the pin records the version the shell was validated with (cargo check on Linux). Windows MSVC builds are unverified until docs/WINDOWS_RELEASE_GATES.md gate W1 passes."
+    },
+    "node": {
+     "major": 22,
+     "tested": "22.22.0"
+    },
+    "python": {
+     "version": "3.12",
+     "min": "3.11",
+     "note": "CI (windows.yml, linux.yml) and the PyInstaller sidecar build use 3.12. The Linux dev host that wrote the controller ran 3.13.16; both are exercised by linux.yml's pytest matrix. 3.11 is the declared floor in controller/pyproject.toml but is not exercised."
+    },
+    "tauri_cli": {
+     "crate": "tauri-cli",
+     "version": "2.12.1",
+     "install": "cargo install tauri-cli --version 2.12.1 --locked"
+    },
+    "pyinstaller": {
+     "version": "6.22.3",
+     "hooks_contrib": "2026.8",
+     "pin_file": "scripts/windows/requirements-build.txt"
+    },
+    "sbom_tools": {
+     "cargo-cyclonedx": "0.5.9",
+     "cyclonedx-bom": "7.5.0",
+     "pip-licenses": "5.5.5",
+     "npm_sbom": "npm sbom --sbom-format cyclonedx (npm >= 10)",
+     "pin_file": "scripts/windows/requirements-build.txt (pip-licenses, cyclonedx-bom); cargo-cyclonedx is installed with `cargo install cargo-cyclonedx --version 0.5.9 --locked`"
+    },
+    "crates": {
+     "tauri": "=2.12.1",
+     "tauri-build": "=2.7.1",
+     "tauri-plugin-dialog": "=2.8.1",
+     "tauri-plugin-shell": "=2.4.0",
+     "tauri-plugin-opener": "=2.7.0",
+     "tauri-plugin-window-state": "=2.5.0",
+     "tauri-plugin-single-instance": "=2.5.2",
+     "serde": "=1.0.229",
+     "serde_json": "=1.0.151",
+     "libc": "=0.2.190",
+     "windows": "=0.62.2"
+    },
+    "npm": {
+     "@tauri-apps/api": "2.12.1"
+    }
+   },
+   "sidecar_build": {
+    "output": "desktop/src-tauri/binaries/rebuild-controller-x86_64-pc-windows-msvc.exe",
+    "mode": "pyinstaller --onefile",
+    "entry": "scripts/windows/sidecar_entry.py (same main() as python -m rebuild_controller.cli.main)",
+    "also_built": "rebuild-mcp.exe from scripts/windows/mcp_entry.py (shipped under runtime\\Scripts for Install-Clients.ps1)"
+   }
+  },
+  "host_tools": {
+   "rizin": [
+    "rizin 0.9.1 @ linux-x86-64"
+   ],
+   "wine": "wine-9.0 (Ubuntu 9.0~repack-4build3)",
+   "dotnet": "8.0.131",
+   "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)",
+   "node": "v22.22.0",
+   "python": "3.13.16"
+  },
+  "rizin_build_manifest": {
+   "rizin": {
+    "tag": "v0.9.1",
+    "commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7",
+    "source": "https://github.com/rizinorg/rizin",
+    "meson_options": "-Dbuildtype=release -Denable_tests=false -Denable_rz_test=false -Duse_sys_zlib=enabled -Duse_sys_lzma=enabled -Duse_sys_libzstd=enabled -Duse_sys_openssl=enabled -Dinstall_sigdb=false",
+    "subprojects_from_git": {
+     "tree-sitter-0.26.9": "7f534862c3ec939c3a6ee147f7600ef5c1bf900f",
+     "lz4-1.10.0": "ebb370ca83af193212df4dcbadcc5d87bc0de2f0",
+     "libzip-1.11.4": "6f8a0cdd24a0dc6cce9dac4a7679da784ab124ea"
+    }
+   },
+   "rz_ghidra": {
+    "tag": "v0.9.0",
+    "commit": "999df7b8e78919b75a330b4710acaf8f956f65cc",
+    "source": "https://github.com/rizinorg/rz-ghidra",
+    "submodules": "3e5d774389b3c4ff1c089ddf822f071c10f548a8 ghidra/ghidra (heads/rizin)\n fdf02957533645069bbea7cd2ed85a3014b42cf3 third-party/pugixml (fdf0295)"
+   },
+   "built_by": "/opt/rebuild-tools/rz-ghidra-build/build.sh"
+  }
+ },
+ "backends": {
+  "mode": "full",
+  "version": "0.1.0",
+  "backends": [
+   {
+    "backend_id": "gdre",
+    "title": "GDRE Tools (Godot project recovery)",
+    "formats": [
+     "godot_pck"
+    ],
+    "platforms": [
+     "linux",
+     "windows",
+     "macos"
+    ],
+    "profiles": [
+     "godot"
+    ],
+    "operations": [
+     {
+      "name": "detect",
+      "description": "Find/parse a Godot PCK (standalone, trailer-embedded or pck section)",
+      "inputs": {
+       "path": "path"
+      },
+      "outputs": {
+       "detect": "dict"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "recover",
+      "description": "Headless full-project recovery with a gap report",
+      "inputs": {
+       "pck": "path",
+       "out_dir": "path"
+      },
+      "outputs": {
+       "recovery_report": "dict"
+      },
+      "dangerous": false
+     }
+    ],
+    "tools": [
+     {
+      "name": "gdre_tools",
+      "availability": "verified",
+      "path": "/opt/rebuild-tools/gdre/gdre_tools.x86_64",
+      "version": "2.7.0",
+      "detail": "GDRE_tools-v2.7.0-linux.zip matches the pinned sha256",
+      "prerequisites": [],
+      "license": "MIT",
+      "source": "https://github.com/GDRETools/gdsdecomp",
+      "pinned": "2.7.0",
+      "integrity": "abb4c197fe517d6a46b67faf41fc76d9890c882661a55ca2d49ba605955dfacc",
+      "integration": "cli",
+      "optional": false,
+      "next_action": "",
+      "extra": {}
+     }
+    ],
+    "resources": {
+     "typical_seconds": "4-600",
+     "ram_mb": 500,
+     "next_action": ""
+    },
+    "tested_support": [],
+    "experimental": false,
+    "availability": "verified",
+    "verification": {
+     "when": "2026-10-06T12:18:08.233Z",
+     "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_gdre.py",
+     "host": "vm",
+     "versions": {
+      "gdre_tools": "2.7.0"
+     }
+    }
+   },
+   {
+    "backend_id": "ghidra",
+    "title": "Ghidra headless (optional)",
+    "formats": [
+     "pe",
+     "elf",
+     "macho"
+    ],
+    "platforms": [
+     "linux",
+     "windows",
+     "macos"
+    ],
+    "profiles": [
+     "native_pe",
+     "native_elf"
+    ],
+    "operations": [
+     {
+      "name": "decompile",
+      "description": "Decompile one function with Ghidra headless; untrusted output",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "function": "str"
+      },
+      "outputs": {
+       "decompiled": "object"
+      },
+      "dangerous": false
+     }
+    ],
+    "tools": [
+     {
+      "name": "ghidra",
+      "availability": "missing",
+      "path": null,
+      "version": null,
+      "detail": "GHIDRA_INSTALL_DIR is not set; full Ghidra headless is optional (rizin covers native analysis)",
+      "prerequisites": [
+       "GHIDRA_INSTALL_DIR",
+       "JDK 21+"
+      ],
+      "license": "Apache-2.0",
+      "source": "https://github.com/NationalSecurityAgency/ghidra",
+      "pinned": "12.1.4",
+      "integrity": "",
+      "integration": "cli",
+      "optional": false
+     }
+    ],
+    "resources": {
+     "ram_mb": 4096,
+     "disk_mb": 1500,
+     "time": "minutes per module (full auto-analysis)"
+    },
+    "tested_support": [],
+    "experimental": true,
+    "availability": "missing"
+   },
+   {
+    "backend_id": "ilspy",
+    "title": "ILSpy (.NET / Unity Mono decompiler)",
+    "formats": [
+     "dotnet",
+     "unity_mono"
+    ],
+    "platforms": [
+     "linux",
+     "windows",
+     "macos"
+    ],
+    "profiles": [
+     "dotnet",
+     "unity_mono"
+    ],
+    "operations": [
+     {
+      "name": "metadata",
+      "description": "Assembly identity, references, target framework and type table",
+      "inputs": {
+       "module_path": "path"
+      },
+      "outputs": {
+       "metadata": "dict"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "decompile",
+      "description": "Decompile to a C# project with a per-type recovery report",
+      "inputs": {
+       "module_path": "path",
+       "out_dir": "path"
+      },
+      "outputs": {
+       "recovery_report": "dict"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "detect",
+      "description": "Classify .NET vs Unity Mono vs Unity IL2CPP (unsupported)",
+      "inputs": {
+       "path": "path"
+      },
+      "outputs": {
+       "profile": "dict"
+      },
+      "dangerous": false
+     }
+    ],
+    "tools": [
+     {
+      "name": "ilspycmd",
+      "availability": "verified",
+      "path": "/root/.dotnet/tools/ilspycmd",
+      "version": "9.1.0.7988",
+      "detail": "",
+      "prerequisites": [
+       ".NET 8 runtime"
+      ],
+      "license": "MIT",
+      "source": "https://github.com/icsharpcode/ILSpy",
+      "pinned": "9.1.0.7988",
+      "integrity": "58ef1a86bea09f2e5a114720b607dd0bdaaf91cfe498c6b7a3412bd960d0f57d",
+      "integration": "cli",
+      "optional": false,
+      "next_action": "",
+      "extra": {}
+     }
+    ],
+    "resources": {
+     "typical_seconds_per_assembly": "1-30",
+     "ram_mb": 300,
+     "next_action": "",
+     "il2cpp": "unsupported (reported, never faked)"
+    },
+    "tested_support": [],
+    "experimental": false,
+    "availability": "verified",
+    "verification": {
+     "when": "2026-10-06T12:18:28.807Z",
+     "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_ilspy.py",
+     "host": "vm",
+     "versions": {
+      "ilspycmd": "9.1.0.7988"
+     }
+    }
+   },
+   {
+    "backend_id": "jsweb",
+    "title": "JS / web / Electron inspection",
+    "formats": [
+     "js_bundle",
+     "electron_asar",
+     "web_app"
+    ],
+    "platforms": [
+     "linux",
+     "windows",
+     "macos"
+    ],
+    "profiles": [
+     "js_web",
+     "electron"
+    ],
+    "operations": [
+     {
+      "name": "inspect",
+      "description": "Find package.json, Electron main, asar, source maps, bundlers, service worker, manifest",
+      "inputs": {
+       "root": "path"
+      },
+      "outputs": {
+       "inspection": "dict"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "extract",
+      "description": "Bounded extraction of loose files, asar contents and source-map sourcesContent",
+      "inputs": {
+       "root": "path",
+       "out_dir": "path"
+      },
+      "outputs": {
+       "extraction_report": "dict"
+      },
+      "dangerous": false
+     }
+    ],
+    "tools": [
+     {
+      "name": "jsweb-native",
+      "availability": "verified",
+      "path": null,
+      "version": "1",
+      "detail": "native asar/source-map/bundler inspection; no external tool required",
+      "prerequisites": [],
+      "license": "project (built-in, pure Python)",
+      "source": "built-in",
+      "pinned": "",
+      "integrity": "",
+      "integration": "library",
+      "optional": false,
+      "next_action": "",
+      "extra": {}
+     },
+     {
+      "name": "node",
+      "availability": "installed",
+      "path": "/opt/node22/bin/node",
+      "version": "22.22.0",
+      "detail": "",
+      "prerequisites": [],
+      "license": "MIT",
+      "source": "https://nodejs.org",
+      "pinned": "",
+      "integrity": "",
+      "integration": "cli",
+      "optional": true,
+      "next_action": "",
+      "extra": {}
+     },
+     {
+      "name": "asar",
+      "availability": "installed",
+      "path": "/opt/rebuild-tools/asar/node_modules/.bin/asar",
+      "version": "4.3.1",
+      "detail": "",
+      "prerequisites": [],
+      "license": "MIT",
+      "source": "https://github.com/electron/asar",
+      "pinned": "4.3.1",
+      "integrity": "sha512-6pI64z/tMSBkUTZLQFYhs2YiB7fS9sKA6gy7/2nH1Ju7GGwT32UPsj4Mxsws5NMmtR6C0zYdXVxEU/rGqJRCJA==",
+      "integration": "cli",
+      "optional": true,
+      "next_action": "",
+      "extra": {}
+     }
+    ],
+    "resources": {
+     "ram_mb": 200,
+     "next_action": ""
+    },
+    "tested_support": [],
+    "experimental": false,
+    "availability": "verified",
+    "verification": {
+     "when": "2026-10-06T12:18:30.051Z",
+     "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_jsweb.py tests/test_archive.py",
+     "host": "vm",
+     "versions": {
+      "jsweb-native": "1"
+     }
+    }
+   },
+   {
+    "backend_id": "rizin",
+    "title": "Rizin (rzpipe) native analysis",
+    "formats": [
+     "pe",
+     "elf",
+     "macho",
+     "raw"
+    ],
+    "platforms": [
+     "linux",
+     "windows",
+     "macos"
+    ],
+    "profiles": [
+     "native_pe",
+     "native_elf",
+     "unity_il2cpp",
+     "unreal",
+     "gamemaker"
+    ],
+    "operations": [
+     {
+      "name": "info",
+      "description": "Binary info and headers (iIj, iHj)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "info": "object",
+       "headers": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "imports",
+      "description": "Imported symbols (iij)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "imports": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "exports",
+      "description": "Exported symbols (iEj)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "exports": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "sections",
+      "description": "Sections and segments (iSj, iSSj)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "sections": "list",
+       "segments": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "strings",
+      "description": "Strings in the whole binary (izzj), bounded count; untrusted",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "limit": "int"
+      },
+      "outputs": {
+       "strings": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "entrypoints",
+      "description": "Entry points (iej)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "entrypoints": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "analyze",
+      "description": "Run analysis (aaa with timeout); cached by module sha + rizin version + settings",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "analysis": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "functions",
+      "description": "Analysed functions (aflj)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "functions": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "xrefs",
+      "description": "Cross references to/from an address (axtj/axfj)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "addr": "str"
+      },
+      "outputs": {
+       "to": "list",
+       "from": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "callgraph",
+      "description": "Callees (agc json) and callers of a function",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "function": "str"
+      },
+      "outputs": {
+       "callees": "list",
+       "callers": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "disasm",
+      "description": "Function disassembly (pdfj); untrusted",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "function": "str"
+      },
+      "outputs": {
+       "disasm": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "decompile",
+      "description": "Decompile a function: rz-ghidra pdgj if loaded, else labelled pseudo output; untrusted",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "function": "str"
+      },
+      "outputs": {
+       "decompiled": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "function_briefing",
+      "description": "Bounded packet: signature, size, callers/callees, strings/imports/constants, decompiled text",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "function": "str"
+      },
+      "outputs": {
+       "briefing": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "admin_raw",
+      "description": "Run a raw rizin command (admin/debug only)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "cmd": "str"
+      },
+      "outputs": {
+       "text": "str"
+      },
+      "dangerous": true
+     }
+    ],
+    "tools": [
+     {
+      "name": "rizin",
+      "availability": "verified",
+      "path": "/opt/rebuild-tools/rizin-src-install/bin/rizin",
+      "version": "0.9.1",
+      "detail": "commit c3a90e9226d977f58f4e9c75f78fa6b07afe13c7; shared source build (v0.9.1)",
+      "prerequisites": [],
+      "license": "LGPL-3.0",
+      "source": "https://github.com/rizinorg/rizin",
+      "pinned": "v0.9.1",
+      "integrity": "",
+      "integration": "cli",
+      "optional": false
+     }
+    ],
+    "resources": {
+     "ram_mb": 512,
+     "disk_mb": 50,
+     "time": "seconds to minutes per module (aaa)",
+     "optional_tools": [
+      {
+       "name": "rz-ghidra",
+       "availability": "installed",
+       "path": "/opt/rebuild-tools/rizin-src-install/lib/x86_64-linux-gnu/rizin/plugins/core_ghidra.so",
+       "version": "0.9.0",
+       "detail": "plugin for rizin 0.9.1 at /opt/rebuild-tools/rizin-src-install/bin/rizin; built from v0.9.0 commit 999df7b8e78919b75a330b4710acaf8f956f65cc",
+       "prerequisites": [
+        "rizin shared build with headers (not the static release)",
+        "cmake",
+        "C++17 compiler"
+       ],
+       "license": "LGPL-3.0 (plugin) + Apache-2.0 (Ghidra decompiler)",
+       "source": "https://github.com/rizinorg/rz-ghidra",
+       "pinned": "v0.9.0",
+       "integrity": "",
+       "integration": "plugin",
+       "optional": false
+      }
+     ],
+     "decompiler": "rz-ghidra(pdg)"
+    },
+    "tested_support": [],
+    "experimental": false,
+    "availability": "verified",
+    "verification": {
+     "when": "2026-10-06T12:19:33.748Z",
+     "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_rizin.py tests/test_fixture_oracle.py::test_pecli_oracle_rejects_wrong_remake_and_accepts_original",
+     "host": "vm",
+     "versions": {
+      "rizin": "0.9.1"
+     }
+    }
+   }
+  ],
+  "summary": {
+   "missing": 1,
+   "detected": 0,
+   "installed": 0,
+   "usable": 0,
+   "verified": 4
+  }
+ },
+ "test_runs": [
+  {
+   "name": "controller unit+integration (not e2e, not live)",
+   "command": "cd controller && pytest -q tests -m 'not e2e and not live'",
+   "passed": 598,
+   "failed": 0,
+   "skipped": 1,
+   "when": "2026-10-06T12:15:19+00:00",
+   "log_tail": "counted from pytest progress output (log: scratchpad/fullsuite.log); includes real rizin+rz-ghidra, ILSpy, GDRE, Playwright, wine runs"
+  },
+  {
+   "name": "ui vitest",
+   "command": "cd ui && npm test",
+   "passed": 53,
+   "failed": 0,
+   "skipped": 0,
+   "when": "2026-10-06T12:15:19+00:00",
+   "log_tail": "Test Files 3 passed (3); Tests 53 passed (53)"
+  },
+  {
+   "name": "desktop cargo check (Linux)",
+   "command": "cd desktop/src-tauri && cargo check",
+   "passed": 1,
+   "failed": 0,
+   "skipped": 0,
+   "when": "2026-10-06T12:15:19+00:00",
+   "log_tail": "Finished `dev` profile"
+  },
+  {
+   "name": "controller e2e pipelines (pecli full + crash/resume, web preview/feedback cycle)",
+   "command": "cd controller && pytest -q tests -m e2e",
+   "passed": 3,
+   "failed": 0,
+   "skipped": 0,
+   "when": "2026-10-06T12:15:55+00:00",
+   "log_tail": "k.py::test_preview_feedback_retest_cycle\n  /home/user/decomp/controller/rebuild_controller/comparators/images.py:24: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.\n    px = diff.getdata()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n3 passed, 602 deselected, 5 warnings in 9.16s\nexit 0\n"
+  },
+  {
+   "name": "rebuildctl doctor --verify --smoke (fixture regressions per backend)",
+   "command": "cd controller && rebuildctl doctor --verify --smoke --json",
+   "passed": 4,
+   "failed": 0,
+   "skipped": 1,
+   "when": "2026-10-06T12:20:17+00:00",
+   "log_tail": "rizin, ilspy, gdre, jsweb verified; ghidra missing (optional, not installed)"
+  }
+ ],
+ "fixtures": {
+  "dotnetapp": {
+   "kind": "dotnet8_console",
+   "oracle": "dotnet 8 runtime on Linux (non-certifying)",
+   "features": 9
+  },
+  "godotgame": {
+   "kind": "godot4_pck",
+   "oracle": "GDRE tools 2.7.0 recovery (game itself not executable here)",
+   "features": 10
+  },
+  "pecli": {
+   "kind": "native_pe_x64_cli",
+   "oracle": "wine (non-certifying)",
+   "features": 9
+  },
+  "webapp": {
+   "kind": "pwa_and_electron_asar",
+   "oracle": "Playwright 1.56.1 + Chromium",
+   "features": 11
+  }
+ },
+ "demos": [
+  {
+   "example": "dotnetapp-rust-from-evidence",
+   "case": "dotnetapp",
+   "target": "rust",
+   "parity": {
+    "full_parity": true,
+    "features_total": 8,
+    "verified": 8,
+    "partial": 0,
+    "failed": 0,
+    "untested": 0,
+    "stale": 0,
+    "critical_incomplete": [],
+    "scope_note": "feature counts are semantic features, not files/functions; undiscovered scope is not counted"
+   },
+   "candidate": {
+    "candidate_id": "cand_01a11124a9daabb70652b3",
+    "revision": 2,
+    "build_hash": "2d9bade3618999b5",
+    "build_status": "built",
+    "verification": "verified",
+    "last_known_good": true
+   },
+   "host": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "ai_usage": [],
+   "comparisons": 42
+  },
+  {
+   "example": "pecli-rust-from-evidence",
+   "case": "pecli",
+   "target": "rust",
+   "parity": {
+    "full_parity": true,
+    "features_total": 8,
+    "verified": 8,
+    "partial": 0,
+    "failed": 0,
+    "untested": 0,
+    "stale": 0,
+    "critical_incomplete": [],
+    "scope_note": "feature counts are semantic features, not files/functions; undiscovered scope is not counted"
+   },
+   "candidate": {
+    "candidate_id": "cand_01a11113fa217f3ccb63d3",
+    "revision": 2,
+    "build_hash": "e7bd2792ea0e7570",
+    "build_status": "built",
+    "verification": "verified",
+    "last_known_good": true
+   },
+   "host": {
+    "host_certifies_windows": false,
+    "locale": "",
+    "machine": "x86_64",
+    "os": "Linux",
+    "os_release": "6.18.44-fc-v70",
+    "python": "3.13.16",
+    "tz": "UTC",
+    "wine": true
+   },
+   "ai_usage": [],
+   "comparisons": 77
+  }
+ ],
+ "windows_gates": [
+  "Gate summary"
+ ],
+ "hermes_gates": [],
+ "limits": [
+  "No interactive Windows host in this session: installer/WebView2/UI capture/Hermes desktop/DPAPI are handoffs (docs/WINDOWS_RELEASE_GATES.md).",
+  "PE originals were executed under wine; the reports label that runner non-certifying.",
+  "No provider API key was supplied: provider adapters are covered by mocked protocol tests only; zero paid calls were made.",
+  "Unity IL2CPP, GameMaker, Android/JVM, Unreal profiles are detected but marked experimental/unverified (no backend run).",
+  "Godot \u2192 Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because the original cannot run here and no scenarios were declared."
+ ]
+}

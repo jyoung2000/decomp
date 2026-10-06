@@ -4,8 +4,8 @@ import { Empty } from '../../components/Empty';
 import { CountsProgress, PhaseProgressRow } from '../../components/Progress';
 import { StatusChip } from '../../components/StatusChip';
 import { useToast } from '../../components/Toasts';
-import { describeEvent, describeScopeNote, phaseViews, values } from '../../lib/derive';
-import { clockTime, duration, parseTime, timeAgo, usd } from '../../lib/format';
+import { describeEvent, describeScopeNote, jobCounts, phaseViews, values } from '../../lib/derive';
+import { clockTime, duration, itemLabel, parseTime, timeAgo, usd } from '../../lib/format';
 import { useApi, useCaseState, useResource, useStoreSelector } from '../../lib/store';
 import { openPath } from '../../lib/tauri';
 import type { Job } from '../../lib/types';
@@ -14,7 +14,7 @@ export function OverviewTab({ caseId }: { caseId: string }) {
   const api = useApi();
   const toast = useToast();
   const cs = useCaseState(caseId);
-  const { stale, reason, now, heartbeatSeconds } = useStaleness();
+  const { stale, reason, now, heartbeatSeconds, snap } = useStaleness();
   const lastHeartbeat = useStoreSelector((s) => s.state.lastHeartbeat);
   const workersActive = useStoreSelector((s) => s.state.workersActive);
   const budgetVersion = useStoreSelector((s) => s.state.versions.budgets ?? 0);
@@ -79,7 +79,9 @@ export function OverviewTab({ caseId }: { caseId: string }) {
               <span className="chip ok">live</span>
             )}
           </span>
-          <span className="small muted">Expected every {heartbeatSeconds ?? '?'} s</span>
+          <span className="small muted">
+            {!hbAt && snap?.lastEventAt ? `Last event ${timeAgo(snap.lastEventAt, now)} · ` : ''}Expected every {heartbeatSeconds ?? '?'} s
+          </span>
         </div>
         <div className="card stat">
           <span className="label">Elapsed · workers</span>
@@ -104,7 +106,7 @@ export function OverviewTab({ caseId }: { caseId: string }) {
             ))}
             {planBlocked.map((i) => (
               <li key={i.item_id} className="row">
-                <StatusChip status="blocked" /> <span className="mono small">{i.item_id}</span> {i.title} <span className="muted">{i.blockers.join('; ')}</span>
+                <StatusChip status="blocked" /> <span className="mono small" title={i.item_id}>{itemLabel(i.item_id)}</span> {i.title} <span className="muted">{i.blockers.join('; ')}</span>
               </li>
             ))}
           </ul>
@@ -186,7 +188,7 @@ export function OverviewTab({ caseId }: { caseId: string }) {
               )}
             </dd>
             <dt>Jobs</dt>
-            <dd>
+            <dd data-testid="job-counts">
               {(['running', 'queued', 'blocked', 'completed', 'failed', 'cancelled', 'needs_retest'] as const)
                 .map((s) => [s, jobs.filter((j) => j.state === s).length] as const)
                 .filter(([, n]) => n > 0)
@@ -232,13 +234,13 @@ export function OverviewTab({ caseId }: { caseId: string }) {
 }
 
 function CurrentJob({ job }: { job: Job }) {
-  const p = job.progress ?? {};
+  const p = jobCounts(job.progress as Record<string, unknown>);
   return (
     <div className="stack" style={{ gap: 2 }}>
       <span className="value" style={{ fontSize: 14 }}>
         {job.title}
       </span>
-      {(p.current || p.target) && <span className="small wrap-any">{String(p.current ?? p.target)}</span>}
+      {p.current && <span className="small wrap-any">{p.current}</span>}
       <CountsProgress done={p.done} total={p.total} unit={p.unit} />
     </div>
   );

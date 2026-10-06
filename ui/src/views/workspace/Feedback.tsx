@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Dialog } from '../../components/Dialog';
 import { Empty } from '../../components/Empty';
 import { ErrorCallout, Explain } from '../../components/ErrorCallout';
 import { StatusChip } from '../../components/StatusChip';
 import { useToast } from '../../components/Toasts';
 import { values } from '../../lib/derive';
-import { bytes, dateTime, fileToBase64, humanize, shortHash } from '../../lib/format';
+import { bytes, dateTime, fileToBase64, humanize, itemLabel, shortHash } from '../../lib/format';
 import { useApi, useCaseState, useResource, useStore } from '../../lib/store';
 import type { Candidate, Feedback, FeedbackClass } from '../../lib/types';
 
@@ -15,7 +16,8 @@ const CLASSES: { id: FeedbackClass; label: string; sub: string }[] = [
   { id: 'question', label: 'Question', sub: 'Ask about the plan or build' },
   { id: 'acceptance', label: 'Acceptance', sub: 'Confirm it works' },
 ];
-const PRIORITIES = ['low', 'normal', 'high', 'critical'];
+// the controller validates priority against low|medium|high|critical
+const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 const MAX_FILE = 10 * 1024 * 1024;
 
 export function FeedbackTab({ caseId }: { caseId: string }) {
@@ -56,7 +58,7 @@ function FeedbackForm({ caseId }: { caseId: string }) {
   const [targetId, setTargetId] = useState(params.get('target_id') ?? '');
   const [candidateId, setCandidateId] = useState(params.get('candidate_id') ?? '');
   const [cls, setCls] = useState<FeedbackClass>((params.get('classification') as FeedbackClass) ?? 'bug');
-  const [priority, setPriority] = useState('normal');
+  const [priority, setPriority] = useState('medium');
   const [comment, setComment] = useState('');
   const [expected, setExpected] = useState('');
   const [actual, setActual] = useState('');
@@ -86,7 +88,7 @@ function FeedbackForm({ caseId }: { caseId: string }) {
       case 'deliverable':
         return values(cs.planItems)
           .filter((i) => i.kind === targetKind)
-          .map((i) => ({ id: i.item_id, label: `${i.item_id} ${i.title}` }));
+          .map((i) => ({ id: i.item_id, label: `${itemLabel(i.item_id)} ${i.title}` }));
       case 'comparison':
         return [];
       default:
@@ -277,6 +279,7 @@ function FeedbackRow({ caseId, f, initiallyOpen, candidates }: { caseId: string;
   const toast = useToast();
   const [open, setOpen] = useState(initiallyOpen);
   const [compare, setCompare] = useState(false);
+  const [triage, setTriage] = useState(false);
   const fixed = f.context?.fixed_candidate_id ?? null;
   const reopen = async () => {
     try {
@@ -299,6 +302,11 @@ function FeedbackRow({ caseId, f, initiallyOpen, candidates }: { caseId: string;
           </span>
         </div>
         <div className="btn-group">
+          {f.status !== 'resolved' && f.status !== 'ready_to_retest' && (
+            <button type="button" className="btn sm" onClick={() => setTriage(true)} data-testid="triage-feedback" data-tooltip="Set status, add a note, or turn into plan work">
+              Triage…
+            </button>
+          )}
           {(f.status === 'resolved' || f.status === 'ready_to_retest') && (
             <button type="button" className="btn sm" onClick={reopen} data-testid="reopen-feedback">
               Reopen
@@ -320,6 +328,12 @@ function FeedbackRow({ caseId, f, initiallyOpen, candidates }: { caseId: string;
       <p className="xs muted">
         {dateTime(f.created_at)} · build {shortHash(f.context?.build_hash ?? candidates.find((c) => c.candidate_id === f.candidate_id)?.build_hash)} · plan r{f.plan_revision ?? '—'}
         {f.attachments?.length ? ` · ${f.attachments.length} attachment${f.attachments.length > 1 ? 's' : ''}` : ''}
+        {f.linked_items?.length ? (
+          <span data-testid="linked-items">
+            {' '}
+            · plan work <span className="mono">{f.linked_items.map(itemLabel).join(', ')}</span>
+          </span>
+        ) : null}
       </p>
       {(f.expected || f.actual) && (
         <dl className="kv small" style={{ marginTop: 4 }}>
@@ -342,13 +356,90 @@ function FeedbackRow({ caseId, f, initiallyOpen, candidates }: { caseId: string;
           {(f.history ?? []).length === 0 && <li className="muted">No history recorded.</li>}
           {(f.history ?? []).map((h, i) => (
             <li key={i}>
-              <span className="muted">{dateTime(h.ts)}</span> {h.status && <StatusChip status={h.status} />} {h.note} {h.actor && <span className="muted">— {h.actor}</span>}
+              <span className="muted">{dateTime(h.ts)}</span> {h.status && <StatusChip status={h.status} />} {h.note} {(h.actor ?? h.by) && <span className="muted">— {h.actor ?? h.by}</span>}
             </li>
           ))}
         </ol>
       )}
       {compare && fixed && <FixCompare caseId={caseId} f={f} reported={f.candidate_id} fixed={fixed} candidates={candidates} />}
+      <TriageDialog open={triage} caseId={caseId} f={f} onClose={() => setTriage(false)} />
     </li>
+  );
+}
+
+// statuses the controller accepts for triage (rebuild_controller/feedback.py STATUSES)
+const TRIAGE_STATUSES: { id: string; label: string }[] = [
+  { id: 'triaged', label: 'Triaged — reviewed, no work yet' },
+  { id: 'queued', label: 'Queued — work is planned' },
+  { id: 'in_progress', label: 'In progress' },
+  { id: 'resolved', label: 'Resolved — no further action' },
+];
+
+function TriageDialog({ open, caseId, f, onClose }: { open: boolean; caseId: string; f: Feedback; onClose: () => void }) {
+  const api = useApi();
+  const store = useStore();
+  const toast = useToast();
+  const [status, setStatus] = useState('triaged');
+  const [note, setNote] = useState('');
+  const [createWork, setCreateWork] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.triageFeedback(f.feedback_id, createWork ? 'queued' : status, note.trim(), createWork);
+      toast.success('Feedback triaged', `Status: ${humanize(r?.status ?? status)}${r?.linked_items?.length ? ` · plan work ${r.linked_items.join(', ')}` : ''}`);
+      setNote('');
+      setCreateWork(false);
+      void store.refresh(caseId, 'feedback');
+      if (createWork) void store.refresh(caseId, 'plan');
+      onClose();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog
+      open={open}
+      title="Triage feedback"
+      onClose={onClose}
+      actions={
+        <>
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="btn primary" onClick={submit} disabled={busy} data-testid="triage-submit">
+            {busy ? 'Saving…' : 'Save triage'}
+          </button>
+        </>
+      }
+    >
+      <div className="form">
+        {error ? <ErrorCallout error={error} title="Triage was not saved" /> : null}
+        <p className="small muted wrap-any">“{f.comment}”</p>
+        <div className="field">
+          <label htmlFor={`tri-status-${f.feedback_id}`}>New status</label>
+          <select id={`tri-status-${f.feedback_id}`} value={createWork ? 'queued' : status} disabled={createWork} onChange={(e) => setStatus(e.target.value)} data-autofocus>
+            {TRIAGE_STATUSES.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <label className="check">
+          <input type="checkbox" checked={createWork} onChange={(e) => setCreateWork(e.target.checked)} data-testid="triage-create-work" /> Turn into plan work
+        </label>
+        <span className="hint">Adds a linked plan item, revises the plan and queues the work. Feedback never changes baselines or verdicts.</span>
+        <div className="field">
+          <label htmlFor={`tri-note-${f.feedback_id}`}>Note</label>
+          <textarea id={`tri-note-${f.feedback_id}`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why this status? (kept in the history)" />
+        </div>
+      </div>
+    </Dialog>
   );
 }
 

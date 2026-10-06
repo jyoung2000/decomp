@@ -70,7 +70,7 @@ test('live scenario: start → plan → preview → feedback persisted → retes
   await expect(item.getByTestId('fix-compare')).toContainText('Fixed (v2)');
   await shot(page, '14-feedback-retest-compare');
   await item.getByTestId('reopen-feedback').click();
-  await expect(item.locator('[data-status="reopened"]')).toBeVisible();
+  await expect(item.locator('[data-status="reopened"]').first()).toBeVisible();
 
   await page.getByTestId('tab-preview').click();
   await expect(page.getByTestId('preview-pv_1_real').getByTestId('stale-preview')).toContainText('superseded by version 2');

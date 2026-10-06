@@ -6,7 +6,7 @@ import { ErrorCallout } from '../../components/ErrorCallout';
 import { StatusChip } from '../../components/StatusChip';
 import { useToast } from '../../components/Toasts';
 import { values } from '../../lib/derive';
-import { dateTime } from '../../lib/format';
+import { dateTime, itemLabel } from '../../lib/format';
 import { useApi, useCaseState, useResource, useStore } from '../../lib/store';
 import { openPath } from '../../lib/tauri';
 import type { AcceptanceCheck, Feedback, PlanItem, UnknownScopeEntry } from '../../lib/types';
@@ -64,7 +64,7 @@ export function PlanTab({ caseId }: { caseId: string }) {
   const prioritize = async (it: PlanItem) => {
     try {
       await api.prioritize(caseId, it.item_id);
-      toast.success('Prioritized', `${it.item_id} moves to the front of the queue.`);
+      toast.success('Prioritized', `${itemLabel(it.item_id)} moves to the front of the queue.`);
       void store.refresh(caseId, 'plan');
     } catch (e) {
       toast.error('Could not prioritize', e);
@@ -131,7 +131,7 @@ export function PlanTab({ caseId }: { caseId: string }) {
       </section>
 
       <div className="grid grid-3">
-        <section className="card" aria-labelledby="plan-disc" data-testid="plan-discovery">
+        <section className="card plan-special" aria-labelledby="plan-disc" data-testid="plan-discovery">
           <h3 id="plan-disc">Discovery (unknown scope)</h3>
           {special('discovery').length === 0 && cs.unknownScope.length === 0 ? (
             <p className="small muted">No open discovery items.</p>
@@ -152,7 +152,7 @@ export function PlanTab({ caseId }: { caseId: string }) {
           )}
         </section>
         {(['deferred', 'unsupported'] as const).map((k) => (
-          <section className="card" key={k} aria-labelledby={`plan-${k}-h`} data-testid={`plan-${k}`}>
+          <section className="card plan-special" key={k} aria-labelledby={`plan-${k}-h`} data-testid={`plan-${k}`}>
             <h3 id={`plan-${k}-h`}>{k === 'deferred' ? 'Deferred' : 'Unsupported'}</h3>
             {special(k).length === 0 ? (
               <p className="small muted">{k === 'deferred' ? 'Nothing deferred.' : 'Nothing marked unsupported.'}</p>
@@ -217,10 +217,10 @@ function UnknownScope({ u }: { u: UnknownScopeEntry }) {
 function ItemRow({ it, expanded, onToggle }: { it: PlanItem; expanded: boolean; onToggle: () => void }) {
   return (
     <div className="tree-row" data-testid={`plan-item-${it.item_id}`}>
-      <button type="button" className="disclosure" id={`plan-${it.item_id}`} aria-expanded={expanded} aria-controls={`plan-details-${it.item_id}`} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${it.item_id} ${it.title}`} onClick={onToggle}>
+      <button type="button" className="disclosure" id={`plan-${it.item_id}`} aria-expanded={expanded} aria-controls={`plan-details-${it.item_id}`} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${itemLabel(it.item_id)} ${it.title}`} onClick={onToggle}>
         {expanded ? '▼' : '▶'}
       </button>
-      <span className="item-id">{it.item_id}</span>
+      <span className="item-id" title={it.item_id}>{itemLabel(it.item_id)}</span>
       <span className="item-title" title={it.title}>
         {it.title}
         {it.kind !== 'milestone' && <span className="xs muted"> · {it.kind}</span>}
@@ -388,7 +388,7 @@ function ChangeDialog({ caseId, item, onClose }: { caseId: string; item: PlanIte
   return (
     <Dialog
       open={!!item}
-      title={`Request change · ${item?.item_id ?? ''}`}
+      title={`Request change · ${item ? itemLabel(item.item_id) : ''}`}
       onClose={close}
       actions={
         result ? (

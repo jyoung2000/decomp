@@ -118,6 +118,10 @@ export class StudioStore {
       this.emit();
     });
     client.onEvent((ev) => this.dispatch(ev));
+    client.onHeartbeat((ev) => {
+      this.state = { ...this.state, lastHeartbeat: ev };
+      this.emit();
+    });
     client.start();
   }
 

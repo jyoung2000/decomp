@@ -466,6 +466,76 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// Gate W10 (docs/WINDOWS_RELEASE_GATES.md): `stop` must end the whole tree on Windows (taskkill /T /F),
+    /// including a grandchild that is not a direct child of the launched process. Windows-only.
+    #[cfg(windows)]
+    #[test]
+    fn windows_stop_kills_the_whole_tree() {
+        fn alive(pid: u32) -> bool {
+            let out = Command::new("tasklist")
+                .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+                .output()
+                .expect("tasklist");
+            String::from_utf8_lossy(&out.stdout).contains(&pid.to_string())
+        }
+        let dir = std::env::temp_dir().join(format!("rs-procs-win-{}", now_ms()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let reg = PreviewRegistry::default();
+        // PowerShell is the parent and ping.exe (300 s) its child; the shell is used only inside this test,
+        // the production launch path refuses shells.
+        let script = "$p = Start-Process -FilePath ping.exe -ArgumentList '-n','300','127.0.0.1' -WindowStyle Hidden -PassThru; \
+                      Set-Content -LiteralPath grandchild.pid -Value $p.Id; Wait-Process -Id $p.Id";
+        let mut cmd = Command::new("powershell.exe");
+        cmd.args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .current_dir(&dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        configure_for_tree(&mut cmd);
+        let child = cmd.spawn().unwrap();
+        let pid = child.id();
+        {
+            let mut inner = reg.inner.lock().unwrap();
+            inner.counter += 1;
+            inner.entries.push(Entry {
+                info: PreviewInfo {
+                    id: "pv-test".into(),
+                    pid,
+                    command: "powershell.exe".into(),
+                    args: vec![],
+                    cwd: None,
+                    started_at_ms: now_ms(),
+                    running: true,
+                    exit_code: None,
+                    log_path: String::new(),
+                },
+                child,
+            });
+        }
+        let gc_file = dir.join("grandchild.pid");
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        while !gc_file.exists() && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        assert!(gc_file.exists(), "PowerShell did not start the grandchild within 30 s");
+        std::thread::sleep(Duration::from_millis(300));
+        let gc: u32 = std::fs::read_to_string(&gc_file)
+            .unwrap()
+            .trim_matches(|c: char| !c.is_ascii_digit())
+            .parse()
+            .unwrap();
+        assert!(reg.list()[0].running);
+        assert!(alive(gc), "grandchild ping.exe should be alive before stop");
+        assert!(reg.stop("pv-test").unwrap());
+        let gone_by = std::time::Instant::now() + Duration::from_secs(10);
+        while alive(gc) && std::time::Instant::now() < gone_by {
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        assert!(!alive(gc), "grandchild must be dead after stop (taskkill /T)");
+        assert_eq!(reg.stop("pv-test").unwrap_err().code, "not_found");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[cfg(unix)]
     #[test]
     fn real_launch_records_exit_code_and_log() {

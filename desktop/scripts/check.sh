@@ -11,6 +11,9 @@ if [ ! -f "$here/../ui/dist/index.html" ]; then
   export TAURI_CONFIG='{"build":{"frontendDist":"../placeholder-dist"}}'
   echo "ui/dist missing: using desktop/placeholder-dist (check/test only)" >&2
 fi
-cmd=${1:-check}
-shift || true
+cmd=check
+if [ $# -gt 0 ]; then
+  cmd=$1
+  shift
+fi
 exec cargo "$cmd" --locked "$@"

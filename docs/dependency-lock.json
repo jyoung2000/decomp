@@ -170,15 +170,17 @@
     "rust": {
       "toolchain": "1.97.0",
       "msrv": "1.90",
-      "target": "x86_64-pc-windows-msvc"
+      "target": "x86_64-pc-windows-msvc",
+      "note": "CI uses the stable channel; the pin records the version the shell was validated with (cargo check on Linux). Windows MSVC builds are unverified until docs/WINDOWS_RELEASE_GATES.md gate W1 passes."
     },
     "node": {
       "major": 22,
       "tested": "22.22.0"
     },
     "python": {
-      "version": "3.13",
-      "min": "3.11"
+      "version": "3.12",
+      "min": "3.11",
+      "note": "CI (windows.yml, linux.yml) and the PyInstaller sidecar build use 3.12. The Linux dev host that wrote the controller ran 3.13.16; both are exercised by linux.yml's pytest matrix. 3.11 is the declared floor in controller/pyproject.toml but is not exercised."
     },
     "tauri_cli": {
       "crate": "tauri-cli",
@@ -186,13 +188,16 @@
       "install": "cargo install tauri-cli --version 2.12.1 --locked"
     },
     "pyinstaller": {
-      "version": "6.22.3"
+      "version": "6.22.3",
+      "hooks_contrib": "2026.8",
+      "pin_file": "scripts/windows/requirements-build.txt"
     },
     "sbom_tools": {
       "cargo-cyclonedx": "0.5.9",
       "cyclonedx-bom": "7.5.0",
       "pip-licenses": "5.5.5",
-      "npm_sbom": "npm sbom --sbom-format cyclonedx (npm >= 10)"
+      "npm_sbom": "npm sbom --sbom-format cyclonedx (npm >= 10)",
+      "pin_file": "scripts/windows/requirements-build.txt (pip-licenses, cyclonedx-bom); cargo-cyclonedx is installed with `cargo install cargo-cyclonedx --version 0.5.9 --locked`"
     },
     "crates": {
       "tauri": "=2.12.1",
@@ -210,5 +215,11 @@
     "npm": {
       "@tauri-apps/api": "2.12.1"
     }
+  },
+  "sidecar_build": {
+    "output": "desktop/src-tauri/binaries/rebuild-controller-x86_64-pc-windows-msvc.exe",
+    "mode": "pyinstaller --onefile",
+    "entry": "scripts/windows/sidecar_entry.py (same main() as python -m rebuild_controller.cli.main)",
+    "also_built": "rebuild-mcp.exe from scripts/windows/mcp_entry.py (shipped under runtime\\Scripts for Install-Clients.ps1)"
   }
 }

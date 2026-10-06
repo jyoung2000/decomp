@@ -62,7 +62,7 @@ export class Api {
       }
     }
     if (!res.ok) {
-      const err = (data && typeof data === 'object' && 'error' in (data as object) ? (data as { error: ApiErrorBody }).error : null) ?? {
+      const err = (data && typeof data === 'object' && 'error' in (data as object) ? normalizeErrorBody((data as { error: unknown }).error, res.status) : null) ?? fromDetail(data, res.status, method, path) ?? {
         code: `http_${res.status}`,
         message: `The controller answered ${res.status} ${res.statusText || ''} for ${method} ${path}.`.replace(/\s+/g, ' '),
         next_action: res.status === 401 || res.status === 403 ? 'Restart Rebuild Studio so the controller token is refreshed.' : 'Retry; if it keeps failing, open Advanced → Raw logs.',
@@ -121,7 +121,18 @@ export class Api {
   candidate = (id: string) => this.get<Candidate>(`/candidates/${enc(id)}`);
   comparisons = (id: string, candidateId?: string) => this.get<Comparison[]>(`/cases/${enc(id)}/comparisons${qs({ candidate_id: candidateId })}`);
   previews = (id: string) => this.get<Preview[]>(`/cases/${enc(id)}/previews`);
-  openPreview = (id: string) => this.post<PreviewOpenResult>(`/previews/${enc(id)}/open`);
+  /** The controller answers 200 with `{opened: false, message, next_action}` when it cannot launch; surface that as an error. */
+  openPreview = async (id: string) => {
+    const r = await this.post<PreviewOpenResult & { opened?: boolean; message?: string; next_action?: string }>(`/previews/${enc(id)}/open`);
+    if (r && r.opened === false)
+      throw new ApiError(409, {
+        code: 'preview_not_opened',
+        message: r.message ?? 'The controller did not open this preview.',
+        affected: 'Only this preview; other previews and the build are unchanged.',
+        next_action: r.next_action ?? 'Check the preview’s launch requirements, or rebuild the candidate.',
+      });
+    return r;
+  };
   stopPreview = (id: string, instanceId?: string) => this.post<unknown>(`/previews/${enc(id)}/stop`, instanceId ? { instance_id: instanceId } : {});
   feedback = (id: string) => this.get<Feedback[]>(`/cases/${enc(id)}/feedback`);
   createFeedback = (id: string, b: NewFeedbackBody) => this.post<Feedback>(`/cases/${enc(id)}/feedback`, b);
@@ -134,7 +145,11 @@ export class Api {
   deleteConnection = (id: string) => this.del<unknown>(`/connections/${enc(id)}`);
   routes = () => this.get<TaskRoute[]>('/routes');
   putRoute = (task: string, b: Omit<TaskRoute, 'task' | 'updated_at'>) => this.put<TaskRoute>(`/routes/${enc(task)}`, b);
-  budgets = () => this.get<Budget[]>('/budgets');
+  /** docs: `[budget]`; the controller returns `{budgets:[..], quotas:[..]}` — accept both. */
+  budgets = async () => {
+    const r = await this.get<Budget[] | { budgets?: Budget[] }>('/budgets');
+    return Array.isArray(r) ? r : Array.isArray(r?.budgets) ? r.budgets : [];
+  };
   aiCalls = (caseId?: string) => this.get<AiCall[]>(`/ai/calls${qs({ case_id: caseId })}`);
   knowledge = () => this.get<KnowledgeEntry[]>('/knowledge');
   knowledgeItem = (id: string) => this.get<KnowledgeEntry>(`/knowledge/${enc(id)}`);
@@ -154,4 +169,49 @@ function enc(s: string) {
 function qs(o: Record<string, string | undefined>): string {
   const p = Object.entries(o).filter(([, v]) => v !== undefined && v !== '');
   return p.length ? '?' + p.map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`).join('&') : '';
+}
+
+/** The documented error body, tolerating a missing/odd `code` or `message` (e.g. `{"error": "..."}`). */
+function normalizeErrorBody(e: unknown, status: number): ApiErrorBody | null {
+  if (typeof e === 'string') return { code: `http_${status}`, message: e };
+  if (!e || typeof e !== 'object') return null;
+  const o = e as Record<string, unknown>;
+  return {
+    code: typeof o.code === 'string' ? o.code : `http_${status}`,
+    message: typeof o.message === 'string' && o.message ? o.message : `The controller answered ${status}.`,
+    affected: typeof o.affected === 'string' ? o.affected : undefined,
+    next_action: typeof o.next_action === 'string' ? o.next_action : undefined,
+  };
+}
+
+/**
+ * FastAPI's own errors are not in the documented shape: 404 `{"detail": "Not Found"}` and request validation
+ * 422 `{"detail": [{loc, msg, type}]}`. Translate them into what happened / affected / next.
+ */
+function fromDetail(data: unknown, status: number, method: string, path: string): ApiErrorBody | null {
+  if (!data || typeof data !== 'object' || !('detail' in (data as object))) return null;
+  const d = (data as { detail: unknown }).detail;
+  if (Array.isArray(d)) {
+    const parts = d.slice(0, 5).map((x) => {
+      const o = (x ?? {}) as { loc?: unknown[]; msg?: string };
+      const field = Array.isArray(o.loc) ? o.loc.filter((l) => l !== 'body').join('.') : '';
+      return `${field ? `${field}: ` : ''}${o.msg ?? 'invalid value'}`;
+    });
+    return {
+      code: 'validation_error',
+      message: `The controller rejected the request: ${parts.join('; ')}.`,
+      affected: `Nothing was saved (${method} ${path}).`,
+      next_action: 'Correct the listed fields and try again.',
+    };
+  }
+  if (d && typeof d === 'object') return normalizeErrorBody(d, status);
+  const msg = String(d);
+  if (status === 404)
+    return {
+      code: 'not_found',
+      message: `${method} ${path}: ${msg}.`,
+      affected: 'Only this request; this controller version may not provide it.',
+      next_action: 'Refresh the view. If it persists, the UI and controller versions may not match.',
+    };
+  return { code: `http_${status}`, message: msg, next_action: 'Retry; if it keeps failing, open Advanced → Raw logs.' };
 }

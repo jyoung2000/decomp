@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { comboState, emptyForm, isAbsolutePath, isInside, splitArgs, validateNewProject } from './validate';
+import { buildLaunchProfile, comboState, emptyForm, isAbsolutePath, isInside, splitArgs, validateNewProject } from './validate';
 import { describeTolerance } from './format';
 import type { Capabilities } from './types';
 
@@ -84,5 +84,29 @@ describe('describeTolerance', () => {
     expect(t.text).toContain('Not exact');
     expect(t.text.toLowerCase()).not.toContain('pixel-perfect');
     expect(t.text.toLowerCase()).not.toContain('exact match');
+  });
+});
+
+describe('buildLaunchProfile', () => {
+  const base = { ...emptyForm(), name: 'Demo', source_root: '/src', output_root: '/out' };
+  it('sends only execute_original=false when capture is off', () => {
+    expect(buildLaunchProfile(base)).toEqual({ execute_original: false });
+  });
+  it('web: kind, launch root/entry and a default scenario with an id', () => {
+    const lp = buildLaunchProfile({ ...base, execute_original: true, launch_kind: 'web' });
+    expect(lp).toMatchObject({ execute_original: true, kind: 'web', launch: { root: '.', entry: 'index.html' } });
+    expect(lp.scenarios).toEqual([{ id: 'initial_load', title: 'Initial load', name: 'Initial load', actions: [] }]);
+  });
+  it('cli: documented command plus controller launch spec and steps; unique ids', () => {
+    const lp = buildLaunchProfile({ ...base, execute_original: true, program: 'bin/app', args: '--x "a b"', scenarios: [{ name: 'List items', args: 'list', stdin: '' }, { name: 'List items', args: 'list -v', stdin: 'q' }] });
+    expect(lp.command).toEqual(['bin/app', '--x', 'a b']);
+    expect(lp.launch).toEqual({ type: 'command', command: ['bin/app', '--x', 'a b'] });
+    expect(lp.scenarios?.map((s) => s.id)).toEqual(['list_items', 'list_items_2']);
+    expect(lp.scenarios?.[1].steps).toEqual([{ args: ['list', '-v'], stdin: 'q' }]);
+  });
+  it('web entry must be relative', () => {
+    const errs = validateNewProject({ ...base, execute_original: true, launch_kind: 'web', entry: '/etc/index.html' });
+    expect(errs.map((e) => e.field)).toContain('entry');
+    expect(validateNewProject({ ...base, execute_original: true, launch_kind: 'web' }).map((e) => e.field)).not.toContain('program');
   });
 });

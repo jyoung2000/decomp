@@ -266,7 +266,8 @@ function ComparisonCountsRow({ caseId, a, b }: { caseId: string; a: string; b: s
 function PreviewCard({ p, instance, focus, onOpen, onStop, onTest }: { p: Preview; instance?: PreviewOpenResult; focus: boolean; onOpen: (p: Preview) => void; onStop: (p: Preview) => void; onTest: (p: Preview) => void }) {
   const stale = !!p.stale;
   const isRunning = !!instance || !!p.instance_id;
-  const launch = p.launch as { kind?: string; url?: string; command?: string[] | string };
+  // mock: {kind, url}; controller: {type: "browser", root, entry} or {type: "native", command, cwd}
+  const launch = p.launch as { kind?: string; type?: string; url?: string; command?: string[] | string; root?: string; entry?: string };
   return (
     <article
       className="card"
@@ -352,7 +353,14 @@ function PreviewCard({ p, instance, focus, onOpen, onStop, onTest }: { p: Previe
           <StatusChip status={p.verification} />
         </dd>
         <dt>Launch</dt>
-        <dd className="mono wrap-any">{launch?.url ?? (Array.isArray(launch?.command) ? launch.command.join(' ') : launch?.command) ?? launch?.kind ?? '—'}</dd>
+        <dd className="mono wrap-any">
+          {launch?.url ??
+            (Array.isArray(launch?.command) ? launch.command.join(' ') : launch?.command) ??
+            (launch?.entry ? `${launch.type ?? 'browser'}: ${launch.entry}${launch.root ? ` from ${launch.root}` : ''}` : null) ??
+            launch?.kind ??
+            launch?.type ??
+            '—'}
+        </dd>
       </dl>
       {instance && instance.kind === 'native' && !hasTauri() && (
         <div className="callout info small" role="status" style={{ marginTop: 8 }}>

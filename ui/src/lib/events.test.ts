@@ -354,3 +354,32 @@ describe('derive: snapshots, features, previews, feedback', () => {
     expect(s.cases.c1.jobs).toEqual({});
   });
 });
+
+describe('idle keep-alive heartbeat (controller re-sends the last seq)', () => {
+  it('is reported as liveness, not delivered and not counted as a duplicate', () => {
+    let t = 1000;
+    const sockets: { onmessage: ((e: { data: unknown }) => void) | null; onopen: (() => void) | null }[] = [];
+    const c = new EventClient({
+      url: () => 'ws://x',
+      now: () => t,
+      createSocket: () => {
+        const s = { onopen: null, onmessage: null, onclose: null, onerror: null, close() {} };
+        sockets.push(s as never);
+        return s as never;
+      },
+    });
+    const got: number[] = [];
+    const beats: number[] = [];
+    c.onEvent((e) => got.push(e.seq));
+    c.onHeartbeat((e) => beats.push(e.seq));
+    c.start();
+    sockets[0].onopen?.();
+    sockets[0].onmessage?.({ data: JSON.stringify({ seq: 1, ts: 'a', case_id: null, job_id: null, kind: 'job.log', payload: {} }) });
+    t = 50_000;
+    sockets[0].onmessage?.({ data: JSON.stringify({ seq: 1, ts: 'b', case_id: null, job_id: null, kind: 'controller.heartbeat', payload: { idle: true } }) });
+    expect(got).toEqual([1]);
+    expect(beats).toEqual([1]);
+    expect(c.snapshot.duplicatesDropped).toBe(0);
+    expect(c.snapshot.lastEventAt).toBe(50_000);
+  });
+});

@@ -149,3 +149,64 @@ function Stop-RsProcessTree([int]$ProcessId) {
         Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
     }
 }
+
+# ---- helpers shared by the build / install / uninstall scripts (added with M15) -----------------------------------------
+
+# Path.Combine without the Windows-only '\' assumption, so -DryRun also runs under PowerShell 7 on Linux.
+function Join-RsPath([string[]]$Parts) {
+    return [System.IO.Path]::Combine($Parts)
+}
+
+# Highest installed WebView2 Evergreen runtime version string, or $null. Registry keys come from the lock
+# (system_prerequisites.webview2_evergreen_bootstrapper.runtime_registry_keys); a version of 0.0.0.0 means "uninstalled".
+function Get-RsWebView2Version($Lock) {
+    if (-not $script:RsIsWindows) { return $null }
+    $best = $null
+    foreach ($k in @($Lock.system_prerequisites.webview2_evergreen_bootstrapper.runtime_registry_keys)) {
+        try {
+            $p = Get-ItemProperty -LiteralPath $k -ErrorAction Stop
+            if ($p.PSObject.Properties['pv']) {
+                $v = [string]$p.pv
+                if ($v -and $v -ne '0.0.0.0') {
+                    $cur = ConvertTo-RsVersion $v
+                    if ($cur -and (-not $best -or $cur -gt (ConvertTo-RsVersion $best))) { $best = $v }
+                }
+            }
+        } catch { }
+    }
+    return $best
+}
+
+# Write text as UTF-8 without BOM (Windows PowerShell 5.1's Set-Content/Out-File would add a BOM or use UTF-16).
+function Save-RsText([string]$Path, [string]$Text) {
+    $dir = Split-Path -Parent $Path
+    if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    [System.IO.File]::WriteAllText($Path, $Text, (New-Object System.Text.UTF8Encoding($false)))
+}
+
+# Zip a directory with forward-slash entry names (Windows PowerShell 5.1 Compress-Archive / ZipFile.CreateFromDirectory
+# write backslashes on older .NET Framework builds, which breaks extraction on other tools).
+function New-RsZip {
+    param([Parameter(Mandatory)][string]$SourceDir, [Parameter(Mandatory)][string]$ZipPath, [string]$RootFolder = '')
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    if (Test-Path -LiteralPath $ZipPath) { Remove-Item -LiteralPath $ZipPath -Force }
+    $srcFull = [System.IO.Path]::GetFullPath($SourceDir).TrimEnd('\', '/')
+    $zip = [System.IO.Compression.ZipFile]::Open($ZipPath, [System.IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($f in (Get-ChildItem -LiteralPath $srcFull -Recurse -File -Force | Sort-Object FullName)) {
+            $rel = $f.FullName.Substring($srcFull.Length).TrimStart('\', '/') -replace '\\', '/'
+            if ($RootFolder) { $rel = "$RootFolder/$rel" }
+            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $f.FullName, $rel, [System.IO.Compression.CompressionLevel]::Optimal)
+        }
+    } finally { $zip.Dispose() }
+}
+
+# Authenticode signature summary: @{ status; subject; signed }. Non-Windows => status 'NotApplicable'.
+function Get-RsSignatureInfo([string]$Path) {
+    if (-not $script:RsIsWindows) { return @{ status = 'NotApplicable'; subject = $null; signed = $false } }
+    $s = Get-AuthenticodeSignature -LiteralPath $Path
+    $subj = $null
+    if ($s.SignerCertificate) { $subj = $s.SignerCertificate.Subject }
+    return @{ status = [string]$s.Status; subject = $subj; signed = ($s.Status -eq 'Valid') }
+}

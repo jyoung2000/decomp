@@ -1,4 +1,4 @@
-import type { AiMode, Capabilities, OutputType, TargetLanguage } from './types';
+import type { AiMode, Capabilities, LaunchKind, LaunchProfile, OutputType, TargetLanguage } from './types';
 
 export interface FieldError {
   field: string;
@@ -14,6 +14,11 @@ export interface NewProjectForm {
   target_language: TargetLanguage | '';
   output_type: OutputType | '';
   execute_original: boolean;
+  launch_kind: LaunchKind;
+  /** web: entry page relative to the site folder */
+  entry: string;
+  /** web: site folder relative to the source folder */
+  site_root: string;
   program: string;
   args: string;
   scenarios: { name: string; args: string; stdin: string }[];
@@ -85,7 +90,9 @@ export function validateNewProject(f: NewProjectForm, caps?: Capabilities | null
   }
 
   if (f.execute_original) {
-    if (!f.program.trim()) e.push({ field: 'program', what: 'Running the original is enabled but no program was given.', affected: 'Behaviour capture of the original (used for comparisons) cannot run.', next: 'Enter the executable to run (relative to the source folder), or turn off “Execute original”.' });
+    if (f.launch_kind === 'web') {
+      if (/^([A-Za-z]:)?[\\/]/.test(f.entry.trim()) || f.entry.includes('..')) e.push({ field: 'entry', what: 'The entry page must be relative to the site folder.', affected: 'The original site cannot be served for capture.', next: 'Enter a relative page such as index.html.' });
+    } else if (!f.program.trim()) e.push({ field: 'program', what: 'Running the original is enabled but no program was given.', affected: 'Behaviour capture of the original (used for comparisons) cannot run.', next: 'Enter the executable to run (relative to the source folder), or turn off “Execute original”.' });
     f.scenarios.forEach((s, i) => {
       if (!s.name.trim()) e.push({ field: `scenario_${i}`, what: `Scenario ${i + 1} has no name.`, affected: 'Comparison rows are labelled by scenario name.', next: 'Name the scenario or remove it.' });
     });
@@ -112,6 +119,9 @@ export function emptyForm(): NewProjectForm {
     target_language: 'auto',
     output_type: 'portable',
     execute_original: false,
+    launch_kind: 'cli',
+    entry: 'index.html',
+    site_root: '.',
     program: '',
     args: '',
     scenarios: [],
@@ -121,5 +131,47 @@ export function emptyForm(): NewProjectForm {
     max_memory_mb: '',
     max_disk_gb: '',
     stage_timeout_minutes: '',
+  };
+}
+
+/** Stable scenario ids derived from names (the controller keys captures and features by id). */
+export function scenarioId(name: string, taken: Set<string>): string {
+  const base = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'scenario';
+  let id = base;
+  for (let i = 2; taken.has(id); i++) id = `${base}_${i}`;
+  taken.add(id);
+  return id;
+}
+
+/**
+ * Builds launch_profile. Sends both the documented fields (command, scenarios[].name/args) and the fields the
+ * controller's capture stage reads (kind, launch, scenarios[].id/steps).
+ */
+export function buildLaunchProfile(f: NewProjectForm): LaunchProfile {
+  if (!f.execute_original) return { execute_original: false };
+  const taken = new Set<string>();
+  if (f.launch_kind === 'web') {
+    return {
+      execute_original: true,
+      kind: 'web',
+      launch: { root: f.site_root.trim() || '.', entry: f.entry.trim() || 'index.html' },
+      // with no named scenario the entry page is still loaded and captured once
+      scenarios: f.scenarios.length
+        ? f.scenarios.map((s) => ({ id: scenarioId(s.name, taken), title: s.name.trim(), name: s.name.trim(), actions: [] }))
+        : [{ id: 'initial_load', title: 'Initial load', name: 'Initial load', actions: [] }],
+    };
+  }
+  const command = [f.program.trim(), ...splitArgs(f.args)];
+  return {
+    execute_original: true,
+    kind: 'cli',
+    command,
+    launch: { type: 'command', command },
+    // with no named scenario the original is still run once with the base arguments
+    scenarios: (f.scenarios.length ? f.scenarios : [{ name: 'Default run', args: '', stdin: '' }]).map((s) => {
+      const args = splitArgs(s.args);
+      const stdin = s.stdin ? { stdin: s.stdin } : {};
+      return { id: scenarioId(s.name, taken), title: s.name.trim(), name: s.name.trim(), args, ...stdin, steps: [{ args, ...stdin }] };
+    }),
   };
 }

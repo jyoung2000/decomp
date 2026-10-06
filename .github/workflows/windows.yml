@@ -1,0 +1,219 @@
+# Windows build + tests. EVERY ARTIFACT FROM THIS WORKFLOW IS UNSIGNED (no certificate is configured here) and NOTHING here
+# certifies a Windows release: see docs/WINDOWS_RELEASE_GATES.md for the gates that need a person on a real, clean machine.
+# This workflow has not been executed yet by the people who wrote it (no Windows host was available); a red first run is expected
+# to point at real Windows issues and is information, not noise.
+name: windows
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep in sync with docs/dependency-lock.json -> build_toolchain (Build-RebuildStudio.ps1 enforces tauri-cli at run time).
+  TAURI_CLI_VERSION: "2.12.1"
+  CARGO_CYCLONEDX_VERSION: "0.5.9"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build + test (windows-latest, unsigned)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      REBUILD_STUDIO_DATA: ${{ github.workspace }}\.ci-data
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            controller/pyproject.toml
+            scripts/windows/requirements-build.txt
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+          cache-bin: "false"
+      - name: Cache cargo tools (tauri-cli, cargo-cyclonedx)
+        id: cargo-tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-tauri.exe
+            ~/.cargo/bin/cargo-cyclonedx.exe
+          key: cargo-tools-${{ runner.os }}-tauri-${{ env.TAURI_CLI_VERSION }}-cyclonedx-${{ env.CARGO_CYCLONEDX_VERSION }}
+      - name: Install cargo tools
+        if: steps.cargo-tools.outputs.cache-hit != 'true'
+        run: |
+          cargo install tauri-cli --version $env:TAURI_CLI_VERSION --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo install cargo-cyclonedx --version $env:CARGO_CYCLONEDX_VERSION --locked
+      - name: Tool versions
+        run: |
+          node --version; npm --version; python --version; rustc --version; cargo --version
+          cargo tauri --version; cargo cyclonedx --version
+          $PSVersionTable.PSVersion.ToString()
+
+      # ---- fast tests first -----------------------------------------------------------------------------------------
+      - name: UI - npm ci
+        working-directory: ui
+        run: npm ci
+      - name: UI - npm test
+        working-directory: ui
+        run: npm test
+      - name: Controller - install
+        run: python -m pip install -e "controller[dev]"
+      # Excluded: e2e and live markers. Deselected: the two tests that compile a PE with mingw and run it through wine; on
+      # Windows the native-PE capture is gate W7 (fixtures/pecli) instead.
+      - name: Controller - pytest (not e2e, not live)
+        if: ${{ !cancelled() }}
+        working-directory: controller
+        run: >
+          python -m pytest -m "not e2e and not live" -q -p no:cacheprovider
+          --junitxml=${{ github.workspace }}\ci-evidence\controller-junit.xml
+          --deselect tests/test_fixture_oracle.py::test_pecli_oracle_rejects_wrong_remake_and_accepts_original
+          --deselect tests/test_verifier.py::test_verifier_accepts_correct_and_rejects_wrong_remake
+      - name: Controller - DPAPI secret store (gate W6 evidence)
+        if: ${{ !cancelled() }}
+        working-directory: controller
+        run: python -m pytest tests/test_secrets.py -v -p no:cacheprovider
+      - name: Controller - job cancel kills the whole process tree (gate W10 evidence)
+        if: ${{ !cancelled() }}
+        run: python -m pytest scripts/windows/tests/test_cancel_tree.py -v -s -p no:cacheprovider
+      - name: Scripts - parse every .ps1
+        if: ${{ !cancelled() }}
+        run: python scripts/windows/tests/parse_check.py
+      - name: Scripts - Setup-Dependencies offline checks (PowerShell 7)
+        if: ${{ !cancelled() }}
+        run: ./scripts/windows/tests/Test-SetupDependencies.ps1
+      - name: Scripts - Setup-Dependencies offline checks (Windows PowerShell 5.1)
+        if: ${{ !cancelled() }}
+        shell: powershell
+        run: .\scripts\windows\tests\Test-SetupDependencies.ps1
+
+      # ---- the build: UI, PyInstaller sidecar (+ smoke), NSIS installer, portable zip, SBOM ---------------------------
+      - name: Build (UI, sidecar, Tauri NSIS, portable zip, SBOM) - UNSIGNED
+        id: build
+        if: ${{ !cancelled() }}
+        run: ./scripts/windows/Build-RebuildStudio.ps1
+
+      # ---- Rust tests (the real sidecar exists now, so tauri-build is satisfied) ------------------------------------
+      - name: Desktop shell - cargo test --locked
+        if: ${{ !cancelled() }}
+        working-directory: desktop/src-tauri
+        run: cargo test --locked
+
+      # ---- install / doctor / launch / uninstall the portable package ------------------------------------------------
+      - name: Install portable package (per-user dir under RUNNER_TEMP)
+        id: install
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          $zip = (Get-ChildItem dist -Filter 'RebuildStudio-*-portable-UNSIGNED.zip' | Select-Object -First 1).FullName
+          if (-not $zip) { throw 'portable zip not found in dist' }
+          $inst = Join-Path $env:RUNNER_TEMP 'RebuildStudio'
+          "INSTALL_DIR=$inst" | Add-Content $env:GITHUB_ENV
+          ./scripts/windows/Install-RebuildStudio.ps1 -Source $zip -InstallDir $inst -NoUninstallEntry -NoShortcut -StopRunning
+      - name: Doctor on the installed package
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          New-Item -ItemType Directory -Force ci-evidence | Out-Null
+          # tools are not downloaded in CI (Setup-Dependencies.ps1 is only dry-run); session0 is skipped because runner session types vary.
+          & "$env:INSTALL_DIR\scripts\windows\Doctor-RebuildStudio.ps1" -InstallDir $env:INSTALL_DIR -OutFile ci-evidence\doctor.json -FailOn fail `
+            -SkipChecks 'session0','tool-rizin','tool-gdre','tool-ilspycmd','tool-node','dotnet'
+      - name: Setup-Dependencies -DryRun (installed copy)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          & "$env:INSTALL_DIR\scripts\windows\Setup-Dependencies.ps1" -DryRun -IncludeOptional
+          # Exit 3 = refusal for an unpinned hash (dotnet-runtime until gate W3 is done); anything else non-zero is a failure.
+          if ($LASTEXITCODE -notin 0, 3) { throw "exit $LASTEXITCODE" }
+          $global:LASTEXITCODE = 0
+      - name: Launch the installed app (advisory - a GUI launch on a hosted runner is unverified)
+        id: launch
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        continue-on-error: true
+        run: ./scripts/windows/tests/Test-AppLaunch.ps1 -InstallDir $env:INSTALL_DIR -EvidenceFile ci-evidence\app-launch.json
+      - name: Uninstall keeps user data
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          $data = $env:REBUILD_STUDIO_DATA
+          New-Item -ItemType Directory -Force "$data\projects-marker" | Out-Null
+          Set-Content "$data\projects-marker\keep.txt" 'must survive uninstall'
+          & "$env:INSTALL_DIR\scripts\windows\Uninstall-RebuildStudio.ps1" -InstallDir $env:INSTALL_DIR -DryRun
+          & "$env:INSTALL_DIR\scripts\windows\Uninstall-RebuildStudio.ps1" -InstallDir $env:INSTALL_DIR
+          if (Test-Path $env:INSTALL_DIR) { throw 'install dir still exists after uninstall' }
+          if (-not (Test-Path "$data\projects-marker\keep.txt")) { throw 'uninstall deleted user data' }
+          Write-Host 'install dir removed, user data preserved'
+
+      # ---- summary + artifacts (all UNSIGNED) -----------------------------------------------------------------------
+      - name: Summary
+        if: ${{ !cancelled() }}
+        run: |
+          $md = @('## Rebuild Studio Windows build - UNSIGNED', '',
+                  'These artifacts are **unsigned** and **not certified**. Run the gates in `docs/WINDOWS_RELEASE_GATES.md` on a clean Windows machine before calling anything a release.', '')
+          if (Test-Path dist\SHA256SUMS.txt) { $md += '```'; $md += (Get-Content dist\SHA256SUMS.txt); $md += '```' }
+          $md | Add-Content $env:GITHUB_STEP_SUMMARY
+      - name: Upload installer (UNSIGNED)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuild-studio-windows-UNSIGNED-installer
+          path: dist/RebuildStudio-*-x64-setup-UNSIGNED.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload portable zip (UNSIGNED)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuild-studio-windows-UNSIGNED-portable
+          path: dist/RebuildStudio-*-win-x64-portable-UNSIGNED.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload SBOM, notices and build record
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuild-studio-windows-sbom-and-notices
+          path: |
+            dist/sbom
+            dist/NOTICES.md
+            dist/BUILD-INFO.json
+            dist/SHA256SUMS.txt
+            dist/UNSIGNED.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload CI evidence (doctor, launch, junit, build log)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuild-studio-windows-ci-evidence
+          path: |
+            ci-evidence
+            dist/build.log
+          if-no-files-found: ignore
+          retention-days: 14

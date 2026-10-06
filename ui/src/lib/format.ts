@@ -91,8 +91,16 @@ export function describeTolerance(tol: Record<string, unknown> | null | undefine
   if (!entries.length) return { exact: true, text: 'Exact match required (no tolerance declared)' };
   const parts = entries.map(([k, v]) => {
     const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
-    if (/^(max|threshold|limit)/i.test(k) || /ratio|percent|pixels|delta|diff|epsilon|ms$/i.test(k)) return `${humanize(k)} ≤ ${val}`;
+    if (/^(max|threshold|limit)/i.test(k) || /ratio|percent|pixels|delta|diff|epsilon|fraction|ms$/i.test(k)) return `${humanize(k)} ≤ ${val}`;
     return `${humanize(k)}: ${val}`;
   });
+  // a tolerance whose every bound is 0 allows no difference at all: that is an exact comparison
+  if (entries.every(([, v]) => v === 0)) return { exact: true, text: `Exact match required (declared tolerance is zero: ${parts.join(', ')})` };
   return { exact: false, text: `Not exact — declared tolerance: ${parts.join(', ')}` };
+}
+
+/** Plan item ids from the controller are namespaced by case (`case_…:M-ANALYSIS`); show the stable local part. */
+export function itemLabel(id: string | null | undefined): string {
+  if (!id) return '—';
+  return id.replace(/^case_[^:]+:/, '');
 }

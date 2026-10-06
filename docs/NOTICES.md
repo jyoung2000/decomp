@@ -4,8 +4,11 @@ Rebuild Studio is assembled from the components below. This file lists what is *
 and what is **downloaded on the user's machine by `Setup-Dependencies.ps1`** (pinned in `docs/dependency-lock.json`).
 The authoritative, version-exact inventory for each build is the SBOM produced by `scripts/windows/Build-RebuildStudio.ps1`
 (`dist/sbom/*.cdx.json` and `dist/sbom/python-licenses.json`). Where this summary and the SBOM disagree, the SBOM wins.
-Each component's full license text is available from the project linked in its row and is reproduced in
-`dist/sbom/licenses/` when the build host had the license metadata available.
+The SBOM set is `ui.cdx.json` (npm, shipped packages only), `rebuild-studio.cdx.json` (Rust, resolved for the Windows target; when
+`cargo-cyclonedx` is absent the build writes `cargo-metadata.json` + `Cargo.lock` instead), `controller.cdx.json` and
+`python-licenses.json` (Python; the latter embeds each package's license text) and `python-freeze.txt` (the exact versions that
+PyInstaller bundled). Rust and npm entries carry SPDX identifiers; their full license texts are available from the upstream
+projects (a `cargo about`-style bundle is a release-owner task, tracked as gate W18 in `docs/WINDOWS_RELEASE_GATES.md`).
 
 ## Original application content is never redistributed
 
@@ -27,6 +30,7 @@ from a third party is part of any release artifact.
 | `@tauri-apps/api` | MIT OR Apache-2.0 | UI to shell IPC |
 | Other npm packages bundled by Vite | See `dist/sbom/ui.cdx.json` | Dev-only tooling (Vite, Vitest, Playwright, TypeScript) is not shipped |
 | CPython runtime (inside the PyInstaller bundle) | PSF-2.0 | Python Software Foundation License |
+| `rebuild-mcp.exe` (second PyInstaller build of the same Python packages) | as the controller rows | Only in the portable zip (`runtime\Scripts\`), used by the optional client packages |
 | PyInstaller bootloader + runtime hooks | GPL-2.0-or-later with the PyInstaller bootloader exception (Apache-2.0 for hooks) | The exception permits distributing the frozen controller under any license; the controller is not GPL |
 | `pydantic` | MIT | Controller |
 | `fastapi`, `starlette` | MIT / BSD-3-Clause | Controller HTTP API |
@@ -60,7 +64,13 @@ or relicensed with Rebuild Studio.
 | Microsoft Visual C++ 2015-2022 Redistributable (x64) | Microsoft Software License Terms | Detected by `Doctor-RebuildStudio.ps1`; the user installs it from Microsoft. Not bundled. |
 | NSIS (build-time only) | zlib/libpng-style license (installer stub), bzip2, CPL-1.0 (LZMA SDK parts) | Installer generator; its stub is embedded in the setup executable. |
 
+## Not bundled in the packaged controller
+
+The browser-channel comparator (`controller/harness`, Node + Playwright) and Chromium are **not** part of the frozen controller; that
+channel reports itself unavailable in a packaged build until Node, Playwright and a browser are provisioned (see `docs/PACKAGING.md`).
+
 ## Unsigned builds
 
-Artifacts produced by this repository's CI are **unsigned**. Windows SmartScreen will warn on first run. A code-signing
-certificate and timestamp server are a release-owner decision; see `docs/WINDOWS_RELEASE_GATES.md`.
+Artifacts produced by this repository's CI and by `Build-RebuildStudio.ps1` without `-SignCert` are **unsigned** and are named
+`...-UNSIGNED...`. Windows SmartScreen will warn on first run. A code-signing certificate and timestamp server are a release-owner
+decision (gate W17 in `docs/WINDOWS_RELEASE_GATES.md`).

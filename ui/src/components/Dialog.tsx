@@ -7,6 +7,9 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 export function Dialog({ open, title, onClose, children, actions, describedBy }: { open: boolean; title: string; onClose: () => void; children: ReactNode; actions?: ReactNode; describedBy?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // callers pass inline closures; keep the latest in a ref so re-renders (e.g. live events) never re-run the focus effect
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const opener = document.activeElement as HTMLElement | null;
@@ -16,7 +19,7 @@ export function Dialog({ open, title, onClose, children, actions, describedBy }:
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        closeRef.current();
       } else if (e.key === 'Tab' && node) {
         const items = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE));
         if (!items.length) return;
@@ -36,7 +39,7 @@ export function Dialog({ open, title, onClose, children, actions, describedBy }:
       document.removeEventListener('keydown', onKey, true);
       opener?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return createPortal(
     <div className="dialog-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

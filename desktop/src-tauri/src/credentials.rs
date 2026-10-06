@@ -310,6 +310,35 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
+    /// Gate W6 (docs/WINDOWS_RELEASE_GATES.md): the real Windows Credential Manager, through the same
+    /// `set`/`get`/`delete` the `credential_*` Tauri commands call. Windows-only; never runs on the Linux host.
+    #[cfg(windows)]
+    #[test]
+    fn windows_credential_manager_roundtrip() {
+        struct Cleanup(PathBuf, String);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = delete(&self.0, &self.1);
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let d = tmp("wincred");
+        let name = format!("rs-test.{}.{}", std::process::id(), crate::procs::now_ms());
+        let _cleanup = Cleanup(d.clone(), name.clone());
+
+        assert_eq!(get(&d, &name).unwrap(), (None, BACKEND_WINDOWS), "fresh name must be absent");
+        let secret = "sk-test-\u{e4}\u{f6}\u{fc}-\u{2713}-0123456789";
+        assert_eq!(set(&d, &name, secret).unwrap(), BACKEND_WINDOWS);
+        assert_eq!(get(&d, &name).unwrap(), (Some(secret.to_string()), BACKEND_WINDOWS));
+        assert_eq!(set(&d, &name, "second-value").unwrap(), BACKEND_WINDOWS);
+        assert_eq!(get(&d, &name).unwrap().0.as_deref(), Some("second-value"));
+        // Nothing may fall back to files under the data dir on Windows.
+        assert!(!crate::paths::credentials_dir(&d).exists(), "Windows must not use the file fallback");
+        assert_eq!(delete(&d, &name).unwrap(), (true, BACKEND_WINDOWS));
+        assert_eq!(get(&d, &name).unwrap().0, None);
+        assert_eq!(delete(&d, &name).unwrap(), (false, BACKEND_WINDOWS));
+    }
+
     #[test]
     fn public_api_reports_backend_and_rejects_oversized() {
         let d = tmp("api");

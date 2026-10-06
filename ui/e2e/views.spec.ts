@@ -100,6 +100,11 @@ for (const vp of [
       await v.ready(page);
       await expectNoHorizontalOverflow(page, v.name);
       if (vp.width === 1024) await shot(page, `vp1024-${v.name}`);
+      if (v.name === 'plan') {
+        // titles in the narrow Discovery / Deferred / Unsupported cards wrap instead of being cut to a few letters
+        const clipped = await page.locator('.plan-special .item-title').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
+        expect(clipped, `${vp.width}: clipped plan titles`).toEqual([]);
+      }
     }
   });
 }
@@ -114,4 +119,19 @@ test('no horizontal overflow at 200% scaling (1280x720 CSS px, DPR 2)', async ({
   }
   await shot(page, 'dpr2-new-project');
   await ctx.close();
+});
+
+test('dark mode switches to the dark tokens', async ({ page, request }) => {
+  await resetMock(request);
+  await step(request, 6);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await openApp(page, '#/projects/case_demo/overview');
+  const colors = await page.evaluate(() => ({ bg: getComputedStyle(document.body).backgroundColor, fg: getComputedStyle(document.body).color, scheme: getComputedStyle(document.documentElement).colorScheme }));
+  expect(colors).toEqual({ bg: 'rgb(28, 28, 30)', fg: 'rgb(242, 242, 247)', scheme: 'dark' });
+  await shot(page, '24-overview-dark');
+  await page.getByTestId('tab-plan').click();
+  await expect(page.getByTestId('plan-item-M1')).toBeVisible();
+  await shot(page, '25-plan-dark');
+  await page.emulateMedia({ colorScheme: 'light' });
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(245, 245, 247)');
 });

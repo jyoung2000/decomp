@@ -53,7 +53,7 @@ export function ConnectionBanner() {
         <span className={`dot ${bad ? 'bad' : 'warn'}`} aria-hidden="true" />
         <strong>{bad ? 'Disconnected' : status === 'reconnecting' ? 'Reconnecting' : 'Connecting'}</strong>
         <span>
-          Last event seq <span className="mono">{lastSeq}</span> · received {timeAgo(snap.lastEventAt, now)}
+          Last event seq <span className="mono">{lastSeq}</span>{snap.lastEventAt != null ? ` · received ${timeAgo(snap.lastEventAt, now)}` : ''}
           {retryIn != null && ` · next attempt in ${retryIn} s (attempt ${snap.reconnectAttempt})`}
         </span>
         <span>Shown state may be out of date; missed events replay automatically after reconnect.</span>
@@ -80,7 +80,7 @@ export function ConnectionBanner() {
 
   return (
     <div className="banner ok" role="status" data-testid="conn-banner" data-state="connected">
-      <span className="dot ok" aria-hidden="true" /> Connected · last event {timeAgo(snap.lastEventAt, now)} · seq <span className="mono">{lastSeq}</span>
+      <span className="dot ok" aria-hidden="true" /> Connected · {snap.lastEventAt != null ? `last event ${timeAgo(snap.lastEventAt, now)}` : 'up to date, waiting for the next event'} · seq <span className="mono">{lastSeq}</span>
     </div>
   );
 }

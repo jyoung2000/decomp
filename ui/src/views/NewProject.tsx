@@ -5,8 +5,8 @@ import { PathField } from '../components/PathField';
 import { useToast } from '../components/Toasts';
 import { setSelectedCase } from '../lib/selection';
 import { useApi, useResource } from '../lib/store';
-import type { AiMode, NewCaseBody, OutputType, TargetLanguage } from '../lib/types';
-import { comboState, emptyForm, splitArgs, validateNewProject, type FieldError, type NewProjectForm } from '../lib/validate';
+import type { AiMode, LaunchKind, NewCaseBody, OutputType, TargetLanguage } from '../lib/types';
+import { buildLaunchProfile, comboState, emptyForm, validateNewProject, type FieldError, type NewProjectForm } from '../lib/validate';
 
 const TARGETS: { id: TargetLanguage; label: string; sub: string }[] = [
   { id: 'rust', label: 'Rust', sub: 'Native code, CLI or desktop' },
@@ -20,6 +20,10 @@ const OUTPUTS: { id: OutputType; label: string; sub: string }[] = [
   { id: 'portable', label: 'Portable', sub: 'Folder, no install' },
   { id: 'web', label: 'Web', sub: 'Static site' },
   { id: 'pwa', label: 'PWA', sub: 'Installable web app' },
+];
+const LAUNCH_KINDS: { id: LaunchKind; label: string; sub: string }[] = [
+  { id: 'cli', label: 'Program or command', sub: 'Runs a command per scenario' },
+  { id: 'web', label: 'Web app', sub: 'Serves the site and records it in a browser' },
 ];
 const AI: { id: AiMode; label: string; sub: string }[] = [
   { id: 'no_ai', label: 'No AI', sub: 'Deterministic tools only' },
@@ -77,13 +81,7 @@ export function NewProjectView() {
       target_language: f.target_language as TargetLanguage,
       output_type: f.output_type as OutputType,
       ai_policy: f.ai_mode === 'no_ai' ? { mode: 'no_ai' } : { mode: f.ai_mode, budget_usd: Number(f.budget_usd) },
-      launch_profile: f.execute_original
-        ? {
-            execute_original: true,
-            command: [f.program.trim(), ...splitArgs(f.args)],
-            scenarios: f.scenarios.map((s) => ({ name: s.name.trim(), args: splitArgs(s.args), ...(s.stdin ? { stdin: s.stdin } : {}) })),
-          }
-        : { execute_original: false },
+      launch_profile: buildLaunchProfile(f),
       ...(Object.keys(limits).length ? { settings: { limits } } : {}),
     };
     setBusy(true);
@@ -197,6 +195,34 @@ export function NewProjectView() {
             <p className="small muted">When enabled, the original runs in a bounded sandbox for each scenario; its exit code, output, files and screens become the reference for comparisons. When disabled, only static analysis is used and behaviour comparisons are skipped.</p>
             {f.execute_original && (
               <>
+                <div className="stack" role="radiogroup" aria-label="How the original runs">
+                  <span className="field-label">How the original runs</span>
+                  <div className="choice-grid">
+                    {LAUNCH_KINDS.map((k) => (
+                      <label className="choice" key={k.id}>
+                        <input type="radio" name="launch_kind" value={k.id} checked={f.launch_kind === k.id} onChange={() => set('launch_kind', k.id)} data-testid={`launch-${k.id}`} />
+                        <span>
+                          <span className="choice-title">{k.label}</span>
+                          <span className="choice-sub">{k.sub}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {f.launch_kind === 'web' ? (
+                  <div className="field-row">
+                    <div className="field">
+                      <label htmlFor="np-site-root">Site folder</label>
+                      <input id="np-site-root" type="text" value={f.site_root} onChange={(e) => set('site_root', e.target.value)} spellCheck={false} />
+                      <span className="hint">Relative to the source folder; served read-only on a loopback port.</span>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="np-entry">Entry page</label>
+                      <input id="np-entry" type="text" value={f.entry} onChange={(e) => set('entry', e.target.value)} aria-invalid={!!err('entry')} spellCheck={false} />
+                      {err('entry') && <span className="field-error">{errText('entry')}</span>}
+                    </div>
+                  </div>
+                ) : (
                 <div className="field-row">
                   <div className="field">
                     <label htmlFor="np-program">Program to run *</label>
@@ -209,6 +235,7 @@ export function NewProjectView() {
                     <input id="np-args" type="text" value={f.args} onChange={(e) => set('args', e.target.value)} placeholder='--mode demo "file with spaces.txt"' spellCheck={false} />
                   </div>
                 </div>
+                )}
                 <div className="stack">
                   <div className="row between">
                     <span className="field-label">Scenarios</span>
@@ -216,13 +243,15 @@ export function NewProjectView() {
                       Add scenario
                     </button>
                   </div>
-                  {f.scenarios.length === 0 && <p className="small muted">No scenarios: the original is run once with the arguments above.</p>}
+                  {f.scenarios.length === 0 && <p className="small muted">{f.launch_kind === 'web' ? 'No scenarios: the entry page is loaded once and captured.' : 'No scenarios: the original is run once with the arguments above.'}</p>}
                   {f.scenarios.map((s, i) => (
                     <div className="field-row" key={i} style={{ alignItems: 'end' }}>
                       <div className="field">
                         <label htmlFor={`np-sc-name-${i}`}>Scenario {i + 1} name</label>
                         <input id={`np-sc-name-${i}`} type="text" value={s.name} aria-invalid={!!err(`scenario_${i}`)} onChange={(e) => set('scenarios', f.scenarios.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
                       </div>
+                      {f.launch_kind !== 'web' && (
+                      <>
                       <div className="field">
                         <label htmlFor={`np-sc-args-${i}`}>Extra arguments</label>
                         <input id={`np-sc-args-${i}`} type="text" value={s.args} onChange={(e) => set('scenarios', f.scenarios.map((x, j) => (j === i ? { ...x, args: e.target.value } : x)))} />
@@ -231,6 +260,8 @@ export function NewProjectView() {
                         <label htmlFor={`np-sc-stdin-${i}`}>Standard input</label>
                         <input id={`np-sc-stdin-${i}`} type="text" value={s.stdin} onChange={(e) => set('scenarios', f.scenarios.map((x, j) => (j === i ? { ...x, stdin: e.target.value } : x)))} />
                       </div>
+                      </>
+                      )}
                       <div>
                         <button type="button" className="btn sm danger" aria-label={`Remove scenario ${i + 1}`} onClick={() => set('scenarios', f.scenarios.filter((_, j) => j !== i))}>
                           Remove

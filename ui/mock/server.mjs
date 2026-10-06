@@ -7,7 +7,8 @@
 //   --auto <ms>  advance the scenario automatically every <ms> after Start is pressed (0 = manual via /__mock/step)
 //   --serve dir  also serve the built UI (index.html etc.) from dir
 // Control endpoints (no auth, loopback only): POST /__mock/step, /__mock/stall {seconds}, /__mock/disconnect {seconds},
-//   /__mock/reset; GET /__mock/state
+//   /__mock/emit {kind,payload}, /__mock/burst {events,order}, /__mock/fail {method,path,status,body,times},
+//   /__mock/reset {preload}; GET /__mock/state
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -57,6 +58,7 @@ function freshState() {
     hermes: null,
     step: 0,
     stalledUntil: 0,
+    faults: [],
     disconnectedUntil: 0,
     instances: new Map(),
     autoTimer: null,
@@ -532,6 +534,12 @@ async function handle(req, res) {
   }
   if (!originAllowed(origin)) return err(res, 403, 'origin_refused', `Requests from ${origin} are refused.`, 'This request.', 'Open Rebuild Studio from the desktop app.');
   if (req.headers.authorization !== `Bearer ${TOKEN}`) return err(res, 401, 'unauthorized', 'Missing or wrong controller token.', 'All controller requests.', 'Restart the app so a fresh token is injected.');
+  // fault injection (POST /__mock/fail): answer the next matching request(s) with a canned error
+  const fault = S.faults.find((f) => f.method === m && f.path === p && f.times > 0);
+  if (fault) {
+    fault.times -= 1;
+    return send(res, fault.status, fault.body);
+  }
 
   let body = {};
   if (m === 'POST' || m === 'PUT') {
@@ -684,7 +692,21 @@ async function handle(req, res) {
       return send(res, 200, f);
     }
     if (seg[2] === 'triage') {
-      f.status = body.status ?? 'triaged';
+      const ALLOWED = ['received', 'triaged', 'queued', 'in_progress', 'ready_to_retest', 'resolved', 'reopened'];
+      let status = body.status ?? 'triaged';
+      if (!ALLOWED.includes(status)) return err(res, 400, 'invalid_status', `“${status}” is not a feedback status.`, 'This feedback was not changed.', `Choose one of: ${ALLOWED.join(', ')}.`);
+      if (body.create_work) {
+        // mirrors the controller: a linked deliverable is added to the plan, the plan is revised, the feedback is queued
+        const plan = S.plans.get(f.case_id);
+        const n = [...plan.items.values()].filter((x) => x.item_id.startsWith('FB')).length + 1;
+        const it = planItem({ item_id: `FB${n}`, kind: 'deliverable', title: (f.classification === 'bug' ? 'Fix: ' : 'Change: ') + f.comment.slice(0, 70), outcome: f.comment, sort_order: 50 + n, acceptance: [{ id: `FB${n}.A`, command: `comparison for ${f.target_kind} ${f.target_id} passes on a new candidate`, status: 'untested' }] });
+        plan.items.set(it.item_id, it);
+        emit('plan.item', { item: it }, f.case_id);
+        f.linked_items = [...(f.linked_items ?? []), it.item_id];
+        revise(f.case_id, `feedback ${f.feedback_id} converted to plan work (${f.classification})`, {}, [`${it.item_id} added`]);
+        status = 'queued';
+      }
+      f.status = status;
       f.history.push({ ts: now(), status: f.status, note: body.note ?? '', actor: 'user' });
       f.updated_at = now();
       emit('feedback.updated', { feedback: f }, f.case_id);
@@ -788,6 +810,8 @@ function createCase(res, b) {
 function createFeedback(res, cid, b) {
   if (!b.comment || !String(b.comment).trim()) return err(res, 400, 'empty_comment', 'Feedback needs a comment.', 'The feedback was not saved.', 'Describe what you saw and submit again.');
   if (!b.target_id) return err(res, 400, 'missing_target', 'Feedback needs a target.', 'The feedback was not saved.', 'Choose what the feedback is about.');
+  // same constraint as the controller's FeedbackCreate model (FastAPI 422 with a `detail` list)
+  if (b.priority !== undefined && !['low', 'medium', 'high', 'critical'].includes(b.priority)) return send(res, 422, { detail: [{ loc: ['body', 'priority'], msg: "String should match pattern '^(low|medium|high|critical)$'", type: 'string_pattern_mismatch' }] });
   const cand = b.candidate_id ? S.candidates.get(b.candidate_id) : null;
   const attachments = (b.attachments ?? []).map((a) => {
     const buf = Buffer.from(String(a.bytes_b64 ?? ''), 'base64');
@@ -795,7 +819,7 @@ function createFeedback(res, cid, b) {
   });
   const f = {
     feedback_id: id('fb'), case_id: cid, target_kind: b.target_kind, target_id: b.target_id, candidate_id: b.candidate_id ?? null, plan_revision: S.plans.get(cid).revision,
-    classification: b.classification ?? 'bug', priority: b.priority ?? 'normal', comment: b.comment, expected: b.expected ?? '', actual: b.actual ?? '', attachments,
+    classification: b.classification ?? 'bug', priority: b.priority ?? 'medium', comment: b.comment, expected: b.expected ?? '', actual: b.actual ?? '', attachments,
     context: { build_hash: cand?.build_hash ?? null }, status: 'received', linked_items: [], history: [{ ts: now(), status: 'received', note: 'Saved', actor: 'user' }], created_at: now(), updated_at: now(),
   };
   S.feedback.set(f.feedback_id, f);
@@ -875,6 +899,27 @@ function mockControl(req, res, url) {
     if (p === '/__mock/emit') {
       const ev = emit(String(b.kind ?? 'job.log'), b.payload ?? {}, b.case_id ?? DEMO, b.job_id ?? null);
       return send(res, 200, ev);
+    }
+    if (p === '/__mock/fail') {
+      S.faults.push({ method: String(b.method ?? 'POST'), path: String(b.path), status: Number(b.status ?? 500), body: b.body ?? { error: { code: 'injected', message: 'Injected failure' } }, times: Number(b.times ?? 1) });
+      return send(res, 200, { faults: S.faults.length });
+    }
+    if (p === '/__mock/burst') {
+      // Emits events (assigning seqs, stored for replay) without broadcasting, then sends frames to every socket in
+      // `order` (indices into `events`, repeats allowed) to exercise duplicate and out-of-order delivery.
+      const evs = (b.events ?? []).map((e) => {
+        const ev = { seq: ++S.seq, ts: now(), case_id: e.case_id ?? DEMO, job_id: e.job_id ?? null, kind: String(e.kind), payload: e.payload ?? {} };
+        S.events.push(ev);
+        // keep REST snapshots consistent with the burst so refreshes agree with the event stream
+        if (ev.kind === 'job.created' && ev.payload.job) S.jobs.set(ev.payload.job.job_id, { ...ev.payload.job });
+        const j = S.jobs.get(ev.payload.job_id ?? ev.job_id);
+        if (j && ev.kind === 'job.started') j.state = 'running';
+        if (j && ['job.completed', 'job.failed', 'job.cancelled'].includes(ev.kind)) j.state = ev.kind.slice(4);
+        return ev;
+      });
+      const order = Array.isArray(b.order) ? b.order : evs.map((_, i) => i);
+      for (const i of order) for (const ws of sockets) if (ws.readyState === 1 && evs[i]) ws.send(JSON.stringify(evs[i]));
+      return send(res, 200, { seqs: evs.map((e) => e.seq), sent: order.length });
     }
     if (p === '/__mock/reset') {
       if (S.autoTimer) clearInterval(S.autoTimer);

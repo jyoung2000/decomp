@@ -1,0 +1,8 @@
+# Build-time Python tools for Build-RebuildStudio.ps1 (installed into an isolated venv, never into the shipped controller).
+# Keep in sync with docs/dependency-lock.json -> build_toolchain.pyinstaller / sbom_tools.
+# `pip install --require-hashes` is not used: the controller's own dependency ranges live in controller/pyproject.toml and the
+# resolved set is recorded per build in dist/sbom/python-freeze.txt.
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.8
+pip-licenses==5.5.5
+cyclonedx-bom==7.5.0

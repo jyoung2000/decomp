@@ -259,6 +259,16 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 .tree-row .item-id { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--fg-3); }
 .tree-row .item-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-row .meta { display: flex; align-items: center; gap: var(--s-2); }
+/* narrow containers (side-by-side Discovery / Deferred / Unsupported cards at 1024 px): title moves to its own line */
+.plan-special { container-type: inline-size; }
+@container (max-width: 460px) {
+  .tree-row { grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-areas: 'disc id meta' '. title title'; row-gap: 2px; }
+  .tree-row > .disclosure { grid-area: disc; }
+  .tree-row > .item-id { grid-area: id; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree-row > .item-title { grid-area: title; white-space: normal; overflow-wrap: anywhere; }
+  .tree-row > .meta { grid-area: meta; }
+  .tree-row > .meta > .small.muted { display: none; }
+}
 .disclosure { width: 22px; height: 22px; border: 0; background: transparent; color: var(--fg-3); border-radius: 4px; cursor: pointer; font-size: 11px; padding: 0; }
 .disclosure:hover { background: var(--bg-hover); }
 .item-details { margin: var(--s-1) 0 var(--s-2) 34px; padding: var(--s-3); border: 1px solid var(--border); border-radius: var(--r-2); background: var(--bg); }

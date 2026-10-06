@@ -6,9 +6,9 @@ import { CountsProgress } from '../../components/Progress';
 import { StatusChip } from '../../components/StatusChip';
 import { LocalTabs } from '../../components/Tabs';
 import { useToast } from '../../components/Toasts';
-import { describeEvent, values } from '../../lib/derive';
+import { describeEvent, jobCounts, values } from '../../lib/derive';
 import { bytes, clockTime, dateTime, parseTime, shortHash, timeAgo } from '../../lib/format';
-import { useApi, useCaseState, useNow, useResource, useStore } from '../../lib/store';
+import { useApi, useCaseState, useNow, useResource, useStore, useStoreSelector } from '../../lib/store';
 
 type Sub = 'jobs' | 'modules' | 'evidence' | 'logs';
 
@@ -87,7 +87,7 @@ function Jobs({ caseId }: { caseId: string }) {
                 {j.max_attempts ? `/${j.max_attempts}` : ''}
               </td>
               <td>
-                <CountsProgress done={j.progress?.done} total={j.progress?.total} unit={j.progress?.unit} />
+                <CountsProgress {...jobCounts(j.progress as Record<string, unknown>)} />
               </td>
               <td className="small">{j.state === 'running' ? timeAgo(parseTime(j.heartbeat_at), now) : '—'}</td>
               <td className="small wrap-any">{j.blocker ?? j.error ?? ''}</td>
@@ -233,6 +233,7 @@ function Logs({ caseId }: { caseId: string }) {
   const cs = useCaseState(caseId);
   const [filter, setFilter] = useState('');
   const [onlyLogs, setOnlyLogs] = useState(false);
+  const snap = useStoreSelector((st) => st.clientSnap);
   const rows = useMemo(() => {
     const f = filter.toLowerCase();
     return (cs?.log ?? [])
@@ -251,13 +252,18 @@ function Logs({ caseId }: { caseId: string }) {
           <input type="checkbox" checked={onlyLogs} onChange={(e) => setOnlyLogs(e.target.checked)} /> Job log lines only
         </label>
         <span className="small muted">Showing the latest {rows.length} events received this session (newest first).</span>
+        {snap && (
+          <span className="small muted" data-testid="event-stats" title="Events are deduplicated and applied in seq order; duplicates and replays are dropped.">
+            Last seq {snap.lastSeq} · {snap.duplicatesDropped} duplicate{snap.duplicatesDropped === 1 ? '' : 's'} dropped
+          </span>
+        )}
       </div>
       {rows.length === 0 ? (
         <Empty title="No events yet">Events stream here live from the controller.</Empty>
       ) : (
         <div role="log" aria-label="Raw controller events" data-testid="raw-log">
           {rows.map((e) => (
-            <div className="log-line" key={e.seq}>
+            <div className="log-line" key={e.seq} data-seq={e.seq}>
               <span className="muted">#{e.seq}</span>
               <span className="muted">{clockTime(e.ts)}</span>
               <span>{e.kind}</span>

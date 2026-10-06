@@ -1,0 +1,601 @@
+{
+  "mode": "full",
+  "version": "0.1.0",
+  "backends": [
+    {
+      "backend_id": "gdre",
+      "title": "GDRE Tools (Godot project recovery)",
+      "formats": [
+        "godot_pck"
+      ],
+      "platforms": [
+        "linux",
+        "windows",
+        "macos"
+      ],
+      "profiles": [
+        "godot"
+      ],
+      "operations": [
+        {
+          "name": "detect",
+          "description": "Find/parse a Godot PCK (standalone, trailer-embedded or pck section)",
+          "inputs": {
+            "path": "path"
+          },
+          "outputs": {
+            "detect": "dict"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "recover",
+          "description": "Headless full-project recovery with a gap report",
+          "inputs": {
+            "pck": "path",
+            "out_dir": "path"
+          },
+          "outputs": {
+            "recovery_report": "dict"
+          },
+          "dangerous": false
+        }
+      ],
+      "tools": [
+        {
+          "name": "gdre_tools",
+          "availability": "verified",
+          "path": "/opt/rebuild-tools/gdre/gdre_tools.x86_64",
+          "version": "2.7.0",
+          "detail": "GDRE_tools-v2.7.0-linux.zip matches the pinned sha256",
+          "prerequisites": [],
+          "license": "MIT",
+          "source": "https://github.com/GDRETools/gdsdecomp",
+          "pinned": "2.7.0",
+          "integrity": "abb4c197fe517d6a46b67faf41fc76d9890c882661a55ca2d49ba605955dfacc",
+          "integration": "cli",
+          "optional": false,
+          "next_action": "",
+          "extra": {}
+        }
+      ],
+      "resources": {
+        "typical_seconds": "4-600",
+        "ram_mb": 500,
+        "next_action": ""
+      },
+      "tested_support": [],
+      "experimental": false,
+      "availability": "verified",
+      "verification": {
+        "when": "2026-10-06T12:18:08.233Z",
+        "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_gdre.py",
+        "host": "vm",
+        "versions": {
+          "gdre_tools": "2.7.0"
+        }
+      }
+    },
+    {
+      "backend_id": "ghidra",
+      "title": "Ghidra headless (optional)",
+      "formats": [
+        "pe",
+        "elf",
+        "macho"
+      ],
+      "platforms": [
+        "linux",
+        "windows",
+        "macos"
+      ],
+      "profiles": [
+        "native_pe",
+        "native_elf"
+      ],
+      "operations": [
+        {
+          "name": "decompile",
+          "description": "Decompile one function with Ghidra headless; untrusted output",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str",
+            "function": "str"
+          },
+          "outputs": {
+            "decompiled": "object"
+          },
+          "dangerous": false
+        }
+      ],
+      "tools": [
+        {
+          "name": "ghidra",
+          "availability": "missing",
+          "path": null,
+          "version": null,
+          "detail": "GHIDRA_INSTALL_DIR is not set; full Ghidra headless is optional (rizin covers native analysis)",
+          "prerequisites": [
+            "GHIDRA_INSTALL_DIR",
+            "JDK 21+"
+          ],
+          "license": "Apache-2.0",
+          "source": "https://github.com/NationalSecurityAgency/ghidra",
+          "pinned": "12.1.4",
+          "integrity": "",
+          "integration": "cli",
+          "optional": false
+        }
+      ],
+      "resources": {
+        "ram_mb": 4096,
+        "disk_mb": 1500,
+        "time": "minutes per module (full auto-analysis)"
+      },
+      "tested_support": [],
+      "experimental": true,
+      "availability": "missing"
+    },
+    {
+      "backend_id": "ilspy",
+      "title": "ILSpy (.NET / Unity Mono decompiler)",
+      "formats": [
+        "dotnet",
+        "unity_mono"
+      ],
+      "platforms": [
+        "linux",
+        "windows",
+        "macos"
+      ],
+      "profiles": [
+        "dotnet",
+        "unity_mono"
+      ],
+      "operations": [
+        {
+          "name": "metadata",
+          "description": "Assembly identity, references, target framework and type table",
+          "inputs": {
+            "module_path": "path"
+          },
+          "outputs": {
+            "metadata": "dict"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "decompile",
+          "description": "Decompile to a C# project with a per-type recovery report",
+          "inputs": {
+            "module_path": "path",
+            "out_dir": "path"
+          },
+          "outputs": {
+            "recovery_report": "dict"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "detect",
+          "description": "Classify .NET vs Unity Mono vs Unity IL2CPP (unsupported)",
+          "inputs": {
+            "path": "path"
+          },
+          "outputs": {
+            "profile": "dict"
+          },
+          "dangerous": false
+        }
+      ],
+      "tools": [
+        {
+          "name": "ilspycmd",
+          "availability": "verified",
+          "path": "/root/.dotnet/tools/ilspycmd",
+          "version": "9.1.0.7988",
+          "detail": "",
+          "prerequisites": [
+            ".NET 8 runtime"
+          ],
+          "license": "MIT",
+          "source": "https://github.com/icsharpcode/ILSpy",
+          "pinned": "9.1.0.7988",
+          "integrity": "58ef1a86bea09f2e5a114720b607dd0bdaaf91cfe498c6b7a3412bd960d0f57d",
+          "integration": "cli",
+          "optional": false,
+          "next_action": "",
+          "extra": {}
+        }
+      ],
+      "resources": {
+        "typical_seconds_per_assembly": "1-30",
+        "ram_mb": 300,
+        "next_action": "",
+        "il2cpp": "unsupported (reported, never faked)"
+      },
+      "tested_support": [],
+      "experimental": false,
+      "availability": "verified",
+      "verification": {
+        "when": "2026-10-06T12:18:28.807Z",
+        "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_ilspy.py",
+        "host": "vm",
+        "versions": {
+          "ilspycmd": "9.1.0.7988"
+        }
+      }
+    },
+    {
+      "backend_id": "jsweb",
+      "title": "JS / web / Electron inspection",
+      "formats": [
+        "js_bundle",
+        "electron_asar",
+        "web_app"
+      ],
+      "platforms": [
+        "linux",
+        "windows",
+        "macos"
+      ],
+      "profiles": [
+        "js_web",
+        "electron"
+      ],
+      "operations": [
+        {
+          "name": "inspect",
+          "description": "Find package.json, Electron main, asar, source maps, bundlers, service worker, manifest",
+          "inputs": {
+            "root": "path"
+          },
+          "outputs": {
+            "inspection": "dict"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "extract",
+          "description": "Bounded extraction of loose files, asar contents and source-map sourcesContent",
+          "inputs": {
+            "root": "path",
+            "out_dir": "path"
+          },
+          "outputs": {
+            "extraction_report": "dict"
+          },
+          "dangerous": false
+        }
+      ],
+      "tools": [
+        {
+          "name": "jsweb-native",
+          "availability": "verified",
+          "path": null,
+          "version": "1",
+          "detail": "native asar/source-map/bundler inspection; no external tool required",
+          "prerequisites": [],
+          "license": "project (built-in, pure Python)",
+          "source": "built-in",
+          "pinned": "",
+          "integrity": "",
+          "integration": "library",
+          "optional": false,
+          "next_action": "",
+          "extra": {}
+        },
+        {
+          "name": "node",
+          "availability": "installed",
+          "path": "/opt/node22/bin/node",
+          "version": "22.22.0",
+          "detail": "",
+          "prerequisites": [],
+          "license": "MIT",
+          "source": "https://nodejs.org",
+          "pinned": "",
+          "integrity": "",
+          "integration": "cli",
+          "optional": true,
+          "next_action": "",
+          "extra": {}
+        },
+        {
+          "name": "asar",
+          "availability": "installed",
+          "path": "/opt/rebuild-tools/asar/node_modules/.bin/asar",
+          "version": "4.3.1",
+          "detail": "",
+          "prerequisites": [],
+          "license": "MIT",
+          "source": "https://github.com/electron/asar",
+          "pinned": "4.3.1",
+          "integrity": "sha512-6pI64z/tMSBkUTZLQFYhs2YiB7fS9sKA6gy7/2nH1Ju7GGwT32UPsj4Mxsws5NMmtR6C0zYdXVxEU/rGqJRCJA==",
+          "integration": "cli",
+          "optional": true,
+          "next_action": "",
+          "extra": {}
+        }
+      ],
+      "resources": {
+        "ram_mb": 200,
+        "next_action": ""
+      },
+      "tested_support": [],
+      "experimental": false,
+      "availability": "verified",
+      "verification": {
+        "when": "2026-10-06T12:18:30.051Z",
+        "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_jsweb.py tests/test_archive.py",
+        "host": "vm",
+        "versions": {
+          "jsweb-native": "1"
+        }
+      }
+    },
+    {
+      "backend_id": "rizin",
+      "title": "Rizin (rzpipe) native analysis",
+      "formats": [
+        "pe",
+        "elf",
+        "macho",
+        "raw"
+      ],
+      "platforms": [
+        "linux",
+        "windows",
+        "macos"
+      ],
+      "profiles": [
+        "native_pe",
+        "native_elf",
+        "unity_il2cpp",
+        "unreal",
+        "gamemaker"
+      ],
+      "operations": [
+        {
+          "name": "info",
+          "description": "Binary info and headers (iIj, iHj)",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str"
+          },
+          "outputs": {
+            "info": "object",
+            "headers": "object"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "imports",
+          "description": "Imported symbols (iij)",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str"
+          },
+          "outputs": {
+            "imports": "list"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "exports",
+          "description": "Exported symbols (iEj)",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str"
+          },
+          "outputs": {
+            "exports": "list"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "sections",
+          "description": "Sections and segments (iSj, iSSj)",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str"
+          },
+          "outputs": {
+            "sections": "list",
+            "segments": "list"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "strings",
+          "description": "Strings in the whole binary (izzj), bounded count; untrusted",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str",
+            "limit": "int"
+          },
+          "outputs": {
+            "strings": "list"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "entrypoints",
+          "description": "Entry points (iej)",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str"
+          },
+          "outputs": {
+            "entrypoints": "list"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "analyze",
+          "description": "Run analysis (aaa with timeout); cached by module sha + rizin version + settings",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str"
+          },
+          "outputs": {
+            "analysis": "object"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "functions",
+          "description": "Analysed functions (aflj)",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str"
+          },
+          "outputs": {
+            "functions": "list"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "xrefs",
+          "description": "Cross references to/from an address (axtj/axfj)",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str",
+            "addr": "str"
+          },
+          "outputs": {
+            "to": "list",
+            "from": "list"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "callgraph",
+          "description": "Callees (agc json) and callers of a function",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str",
+            "function": "str"
+          },
+          "outputs": {
+            "callees": "list",
+            "callers": "list"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "disasm",
+          "description": "Function disassembly (pdfj); untrusted",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str",
+            "function": "str"
+          },
+          "outputs": {
+            "disasm": "object"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "decompile",
+          "description": "Decompile a function: rz-ghidra pdgj if loaded, else labelled pseudo output; untrusted",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str",
+            "function": "str"
+          },
+          "outputs": {
+            "decompiled": "object"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "function_briefing",
+          "description": "Bounded packet: signature, size, callers/callees, strings/imports/constants, decompiled text",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str",
+            "function": "str"
+          },
+          "outputs": {
+            "briefing": "object"
+          },
+          "dangerous": false
+        },
+        {
+          "name": "admin_raw",
+          "description": "Run a raw rizin command (admin/debug only)",
+          "inputs": {
+            "case_id": "str",
+            "module_id": "str",
+            "cmd": "str"
+          },
+          "outputs": {
+            "text": "str"
+          },
+          "dangerous": true
+        }
+      ],
+      "tools": [
+        {
+          "name": "rizin",
+          "availability": "verified",
+          "path": "/opt/rebuild-tools/rizin-src-install/bin/rizin",
+          "version": "0.9.1",
+          "detail": "commit c3a90e9226d977f58f4e9c75f78fa6b07afe13c7; shared source build (v0.9.1)",
+          "prerequisites": [],
+          "license": "LGPL-3.0",
+          "source": "https://github.com/rizinorg/rizin",
+          "pinned": "v0.9.1",
+          "integrity": "",
+          "integration": "cli",
+          "optional": false
+        }
+      ],
+      "resources": {
+        "ram_mb": 512,
+        "disk_mb": 50,
+        "time": "seconds to minutes per module (aaa)",
+        "optional_tools": [
+          {
+            "name": "rz-ghidra",
+            "availability": "installed",
+            "path": "/opt/rebuild-tools/rizin-src-install/lib/x86_64-linux-gnu/rizin/plugins/core_ghidra.so",
+            "version": "0.9.0",
+            "detail": "plugin for rizin 0.9.1 at /opt/rebuild-tools/rizin-src-install/bin/rizin; built from v0.9.0 commit 999df7b8e78919b75a330b4710acaf8f956f65cc",
+            "prerequisites": [
+              "rizin shared build with headers (not the static release)",
+              "cmake",
+              "C++17 compiler"
+            ],
+            "license": "LGPL-3.0 (plugin) + Apache-2.0 (Ghidra decompiler)",
+            "source": "https://github.com/rizinorg/rz-ghidra",
+            "pinned": "v0.9.0",
+            "integrity": "",
+            "integration": "plugin",
+            "optional": false
+          }
+        ],
+        "decompiler": "rz-ghidra(pdg)"
+      },
+      "tested_support": [],
+      "experimental": false,
+      "availability": "verified",
+      "verification": {
+        "when": "2026-10-06T12:19:33.748Z",
+        "command": "/opt/rebuild-tools/venv/bin/python -m pytest -q -p no:cacheprovider tests/test_rizin.py tests/test_fixture_oracle.py::test_pecli_oracle_rejects_wrong_remake_and_accepts_original",
+        "host": "vm",
+        "versions": {
+          "rizin": "0.9.1"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "missing": 1,
+    "detected": 0,
+    "installed": 0,
+    "usable": 0,
+    "verified": 4
+  }
+}
