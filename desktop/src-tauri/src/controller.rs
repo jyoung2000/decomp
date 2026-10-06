@@ -143,6 +143,11 @@ impl ControllerState {
         self.inner.lock().unwrap().last_error = Some(message);
     }
 
+    /// Allow `start` again after `shutdown` was used to clean up a failed start (user chose "Try again").
+    pub fn reset_after_failed_start(&self) {
+        self.shutting_down.store(false, Ordering::SeqCst);
+    }
+
     /// Kill the controller tree (idempotent) and drop the now-stale controller.json.
     pub fn shutdown(&self, data_dir: &Path) {
         self.shutting_down.store(true, Ordering::SeqCst);
@@ -297,6 +302,13 @@ pub fn start(app: &AppHandle, state: &ControllerState, data_dir: &Path) -> Resul
     }
 
     let (mut cmd, mode) = plan(app)?;
+    // A controller.json left by an earlier shell that crashed before its job object could kill the controller:
+    // that controller would still own the store. Stop it (only if the pid is verifiably a controller sidecar).
+    if let Some(stale) = read_controller_file(&json_path) {
+        if crate::procs::reap_orphan_controller(stale.pid) {
+            eprintln!("rebuild-studio: stopped orphaned controller pid {}", stale.pid);
+        }
+    }
     let _ = std::fs::remove_file(&json_path); // never trust a stale token/port
     let log = open_log(&log_path, 5 * 1024 * 1024).map_err(|e| StartError::Spawn(format!("cannot open {}: {e}", log_path.display())))?;
     let log_err = log.try_clone().map_err(|e| StartError::Spawn(e.to_string()))?;

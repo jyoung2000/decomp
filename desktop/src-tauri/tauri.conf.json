@@ -57,6 +57,8 @@
       "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
       "nsis": {
         "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "installerHooks": "windows/hooks.nsh",
         "compression": "lzma",
         "displayLanguageSelector": false,
         "languages": ["English"]

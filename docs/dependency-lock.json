@@ -99,15 +99,16 @@
       "artifact": {
         "name": "dotnet-runtime-8.0.31-win-x64.zip",
         "url": "https://builds.dotnet.microsoft.com/dotnet/Runtime/8.0.31/dotnet-runtime-8.0.31-win-x64.zip",
-        "size_bytes": null,
-        "sha256": null,
-        "verify_required": true,
-        "hash_provenance": "NOT VERIFIED: builds.dotnet.microsoft.com is unreachable from the Linux build host. Run Setup-Dependencies.ps1 -ComputeHash dotnet-runtime on Windows, cross-check against https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json, then record the value."
+        "size_bytes": 33322727,
+        "sha256": "7deabbefdc83e378b343c551fe447b86002680eea91355b1f6f81d0c9ab0dcaa",
+        "verify_required": false,
+        "hash_provenance": "2026-10-06 on Windows 11 (interactive host): downloaded from builds.dotnet.microsoft.com; SHA-512 matched the official value in https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json (release 8.0.31, file dotnet-runtime-win-x64.zip); sha256 computed locally from the same verified bytes.",
+        "sha512_official": "9c55c58694676ee64b0eed2cd6d8cbf58b9aa8288420acc66841e15ca0099c75d4af0182d23a641c2342e5a151a325df4a12fa0bde2e47c0fb7e9a33e7b09896"
       },
       "layout": {
         "archive_root": "",
         "entry": "dotnet.exe",
-        "entry_sha256": null,
+        "entry_sha256": "111da7b604cd196b49167cfeecdaef4034b58cc7de71a91cbf9e162c9e8b0931",
         "version_args": [
           "--list-runtimes"
         ]

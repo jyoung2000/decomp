@@ -256,6 +256,57 @@ mod wincred {
             Err(e) => Err(map_err("CredDeleteW", e)),
         }
     }
+
+    /// Delete every generic credential whose target starts with `RebuildStudio:`. Returns how many were removed.
+    pub fn delete_all() -> CmdResult<usize> {
+        use windows::Win32::Security::Credentials::{CredEnumerateW, CRED_ENUMERATE_FLAGS};
+        let filter: Vec<u16> = "RebuildStudio:*".encode_utf16().chain(std::iter::once(0)).collect();
+        let mut count = 0u32;
+        let mut list: *mut *mut CREDENTIALW = std::ptr::null_mut();
+        // SAFETY: on success `list` is a CredFree-able array of `count` credential pointers.
+        let res = unsafe { CredEnumerateW(PCWSTR(filter.as_ptr()), Some(CRED_ENUMERATE_FLAGS(0)), &mut count, &mut list) };
+        let targets: Vec<Vec<u16>> = match res {
+            Ok(()) => unsafe {
+                let items = std::slice::from_raw_parts(list, count as usize);
+                let t = items
+                    .iter()
+                    .filter(|c| (***c).Type == CRED_TYPE_GENERIC)
+                    .map(|c| {
+                        let mut w = (**c).TargetName.as_wide().to_vec();
+                        w.push(0);
+                        w
+                    })
+                    .collect();
+                CredFree(list as *const core::ffi::c_void);
+                t
+            },
+            Err(e) if e.code() == ERROR_NOT_FOUND.to_hresult() => return Ok(0),
+            Err(e) => return Err(map_err("CredEnumerateW", e)),
+        };
+        let mut removed = 0;
+        for t in targets {
+            if unsafe { CredDeleteW(PCWSTR(t.as_ptr()), CRED_TYPE_GENERIC, None) }.is_ok() {
+                removed += 1;
+            }
+        }
+        Ok(removed)
+    }
+}
+
+/// Remove every stored Rebuild Studio secret (Credential Manager and file fallback). Used by the uninstaller
+/// when the user explicitly asks to delete application data.
+pub fn delete_all(data_dir: &Path) -> usize {
+    let mut n = 0;
+    #[cfg(windows)]
+    {
+        n += wincred::delete_all().unwrap_or(0);
+    }
+    let dir = crate::paths::credentials_dir(data_dir);
+    if dir.is_dir() {
+        n += std::fs::read_dir(&dir).map(|it| it.count()).unwrap_or(0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    n
 }
 
 #[cfg(test)]
@@ -337,6 +388,17 @@ mod tests {
         assert_eq!(delete(&d, &name).unwrap(), (true, BACKEND_WINDOWS));
         assert_eq!(get(&d, &name).unwrap().0, None);
         assert_eq!(delete(&d, &name).unwrap(), (false, BACKEND_WINDOWS));
+    }
+
+    #[test]
+    fn delete_all_removes_every_studio_secret_only() {
+        let d = tmp("delall");
+        set(&d, "rs-test-delall-a", "s1").unwrap();
+        set(&d, "rs-test-delall-b", "s2").unwrap();
+        assert!(delete_all(&d) >= 2);
+        assert_eq!(get(&d, "rs-test-delall-a").unwrap().0, None);
+        assert_eq!(get(&d, "rs-test-delall-b").unwrap().0, None);
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

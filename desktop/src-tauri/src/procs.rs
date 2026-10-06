@@ -133,6 +133,70 @@ pub fn kill_tree(child: &mut Child, grace: Duration) {
     }
 }
 
+/// True if `image` (a full executable path) is a packaged controller sidecar.
+pub fn is_controller_image(image: &str) -> bool {
+    let name = image.rsplit(['\\', '/']).next().unwrap_or("").to_ascii_lowercase();
+    name.starts_with("rebuild-controller")
+}
+
+/// A controller left behind by a previous shell (e.g. job assignment failed and the shell was killed)
+/// still holds the SQLite store. Kill it — tree included — but only after verifying that `pid` really is a
+/// controller sidecar executable, never an unrelated process that reused the PID. Returns true if killed.
+pub fn reap_orphan_controller(pid: u32) -> bool {
+    if pid == 0 || pid == std::process::id() {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        let Some(image) = win_image_path(pid) else { return false };
+        if !is_controller_image(&image) {
+            return false;
+        }
+        let taskkill = std::env::var_os("SystemRoot")
+            .map(|r| PathBuf::from(r).join("System32").join("taskkill.exe"))
+            .filter(|p| p.exists())
+            .unwrap_or_else(|| PathBuf::from("taskkill.exe"));
+        let mut cmd = Command::new(taskkill);
+        cmd.args(["/PID", &pid.to_string(), "/T", "/F"]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+        return matches!(cmd.status(), Ok(s) if s.success());
+    }
+    #[cfg(unix)]
+    {
+        let Ok(exe) = std::fs::read_link(format!("/proc/{pid}/exe")) else { return false };
+        if !is_controller_image(&exe.to_string_lossy()) {
+            return false;
+        }
+        // SAFETY: plain signal delivery to a verified process.
+        unsafe {
+            libc::kill(pid as libc::pid_t, libc::SIGKILL);
+        }
+        return true;
+    }
+    #[allow(unreachable_code)]
+    false
+}
+
+#[cfg(windows)]
+fn win_image_path(pid: u32) -> Option<String> {
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    unsafe {
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buf = [0u16; 1024];
+        let mut len = buf.len() as u32;
+        let ok = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len).is_ok();
+        let _ = CloseHandle(h);
+        ok.then(|| String::from_utf16_lossy(&buf[..len as usize]))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Windows job object: children assigned to it die when the shell dies, even on a crash.
 // ---------------------------------------------------------------------------
@@ -376,6 +440,26 @@ impl PreviewRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn orphan_reaper_only_targets_controller_images() {
+        assert!(is_controller_image(r"C:\Program Files\Rebuild Studio\rebuild-controller.exe"));
+        assert!(is_controller_image("/opt/rs/rebuild-controller-x86_64-unknown-linux-gnu"));
+        assert!(!is_controller_image(r"C:\Windows\System32\notepad.exe"));
+        assert!(!is_controller_image(r"C:\Python\python.exe"));
+        // Our own pid and pid 0 are never reaped; an unrelated live process (this test binary) is not killed.
+        assert!(!reap_orphan_controller(0));
+        assert!(!reap_orphan_controller(std::process::id()));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn orphan_reaper_leaves_unrelated_processes_alone() {
+        let mut c = Command::new("cmd.exe").args(["/c", "ping -n 30 127.0.0.1 >NUL"]).spawn().unwrap();
+        assert!(!reap_orphan_controller(c.id()));
+        assert!(matches!(c.try_wait(), Ok(None)), "unrelated process must survive");
+        kill_tree(&mut c, Duration::from_secs(1));
+    }
 
     #[test]
     fn denies_shells_and_script_hosts() {

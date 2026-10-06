@@ -117,7 +117,7 @@ function Get-NativeLines {
         $global:LASTEXITCODE = 0
         $out = & $File @CmdArgs
         if ($LASTEXITCODE -ne 0) { throw "'$File' exited with code $LASTEXITCODE" }
-        return @($out | ForEach-Object { [string]$_ })
+        return ,@($out | ForEach-Object { [string]$_ })
     } finally { Pop-Location }
 }
 
@@ -197,7 +197,7 @@ if ($DryRun) {
     $npmV = (Get-NativeLines 'npm' @('--version'))[0].Trim()
     if ([int]($npmV.Split('.')[0]) -lt 10) { throw "npm $npmV is too old for 'npm sbom' (need >= 10)." }
     $py = Resolve-Python
-    $pyV = (Get-NativeLines $py.file ($py.args + @('-c', 'import sys;print("%d.%d.%d" % sys.version_info[:3])')))[0].Trim()
+    $pyV = (Get-NativeLines $py.file ($py.args + @('-c', 'import sys;print(chr(46).join(map(str,sys.version_info[:3])))')))[0].Trim()
     $pyMm = [version]($pyV.Split('.')[0..1] -join '.')
     if ($pyMm -lt [version]'3.11' -or $pyMm -ge [version]'3.14') { throw "Python $pyV is outside the supported 3.11-3.13 range (CI uses $($tc.python.version))." }
     $rustV = (Get-NativeLines 'rustc' @('--version'))[0].Trim()

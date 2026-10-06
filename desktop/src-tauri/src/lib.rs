@@ -80,11 +80,11 @@ fn show_error(app: &AppHandle, message: &str, log_path: Option<&std::path::Path>
     let mut body = format!("<pre>{}</pre>", html_escape(message));
     if let Some(lp) = log_path {
         body.push_str(&format!(
-            "<p class=\"sub\">Full log: <code>{}</code><br>Run <code>Doctor-RebuildStudio.ps1</code> for a dependency check. Close this window to exit.</p>",
+            "<p class=\"sub\">Full log: <code>{}</code><br>Close this window, then start Rebuild Studio again from its icon. If it keeps failing, reinstall it; your projects are kept.</p>",
             html_escape(&lp.to_string_lossy())
         ));
     } else {
-        body.push_str("<p class=\"sub\">Run <code>Doctor-RebuildStudio.ps1</code> for a dependency check. Close this window to exit.</p>");
+        body.push_str("<p class=\"sub\">Close this window, then start Rebuild Studio again from its icon. If it keeps failing, reinstall it; your projects are kept.</p>");
     }
     let url = page("Rebuild Studio - cannot start", "Rebuild Studio could not start", &body);
     let built = WebviewWindowBuilder::new(app, ERROR_LABEL, WebviewUrl::External(url))
@@ -144,22 +144,89 @@ fn create_main(app: &AppHandle, file: &controller::ControllerFile) -> tauri::Res
     Ok(())
 }
 
+const RETRY_LABEL: &str = "Try again";
+const OPEN_LOG_LABEL: &str = "Open log folder";
+const QUIT_LABEL: &str = "Quit";
+
+#[derive(Debug, PartialEq, Eq)]
+enum StartupChoice {
+    Retry,
+    OpenLog,
+    Quit,
+}
+
+/// Map the native dialog result to an action. Closing the dialog (Cancel) quits.
+fn startup_choice(r: &tauri_plugin_dialog::MessageDialogResult) -> StartupChoice {
+    use tauri_plugin_dialog::MessageDialogResult as R;
+    match r {
+        R::Yes => StartupChoice::Retry,
+        R::No => StartupChoice::OpenLog,
+        R::Custom(s) if s == RETRY_LABEL => StartupChoice::Retry,
+        R::Custom(s) if s == OPEN_LOG_LABEL => StartupChoice::OpenLog,
+        _ => StartupChoice::Quit,
+    }
+}
+
+/// Native, blocking recovery dialog for a failed start (no terminal or script needed).
+fn ask_startup_recovery(app: &AppHandle, message: &str) -> StartupChoice {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+    if let Some(w) = app.get_webview_window(STARTUP_LABEL) {
+        let _ = w.hide();
+    }
+    let text = format!(
+        "{message}\n\nTry again: restarts the analysis controller (an earlier copy is stopped first).\n\
+         Open log folder: shows controller.log so you can send it with a bug report.\nQuit: closes Rebuild Studio. Your projects are not affected."
+    );
+    let r = app
+        .dialog()
+        .message(text)
+        .title("Rebuild Studio could not start")
+        .kind(MessageDialogKind::Error)
+        .buttons(MessageDialogButtons::YesNoCancelCustom(RETRY_LABEL.into(), OPEN_LOG_LABEL.into(), QUIT_LABEL.into()))
+        .blocking_show_with_result();
+    startup_choice(&r)
+}
+
 fn boot(app: AppHandle) {
     let state = app.state::<AppState>();
-    match controller::start(&app, &state.controller, &state.data_dir) {
-        Ok(file) => {
-            controller::spawn_monitor(app.clone());
-            if let Err(e) = create_main(&app, &file) {
-                let msg = format!("The main window could not be created: {e}");
-                state.controller.record_error(msg.clone());
-                show_error(&app, &msg, None);
+    loop {
+        let failure = match controller::start(&app, &state.controller, &state.data_dir) {
+            Ok(file) => {
+                controller::spawn_monitor(app.clone());
+                match create_main(&app, &file) {
+                    Ok(()) => return,
+                    Err(e) => {
+                        // Do not leave a headless controller running behind a missing window.
+                        state.controller.shutdown(&state.data_dir);
+                        state.controller.reset_after_failed_start();
+                        format!("The main window could not be created: {e}")
+                    }
+                }
+            }
+            Err(e) => match e.log_path() {
+                Some(lp) => format!("{e}\n\nLog file: {}", lp.display()),
+                None => e.to_string(),
+            },
+        };
+        state.controller.record_error(failure.clone());
+        loop {
+            match ask_startup_recovery(&app, &failure) {
+                StartupChoice::Retry => break,
+                StartupChoice::OpenLog => {
+                    use tauri_plugin_opener::OpenerExt;
+                    if app.opener().open_path(state.data_dir.to_string_lossy(), None::<&str>).is_err() {
+                        show_error(&app, &failure, Some(&paths::controller_log(&state.data_dir)));
+                        return;
+                    }
+                }
+                StartupChoice::Quit => {
+                    app.exit(1);
+                    return;
+                }
             }
         }
-        Err(e) => {
-            let msg = e.to_string();
-            state.controller.record_error(msg.clone());
-            let log = e.log_path().map(|p| p.to_path_buf());
-            show_error(&app, &msg, log.as_deref());
+        if let Some(w) = app.get_webview_window(STARTUP_LABEL) {
+            let _ = w.show();
         }
     }
 }
@@ -188,8 +255,31 @@ fn install_signal_exit(app: AppHandle) {
     });
 }
 
+/// Uninstaller entry point (`rebuild-studio.exe --remove-stored-credentials`): runs headless, no window,
+/// no controller. Invoked only when the user ticks "Delete the application data" in the uninstaller.
+pub const REMOVE_CREDENTIALS_FLAG: &str = "--remove-stored-credentials";
+
+/// Must equal `identifier` in tauri.conf.json: the NSIS installer stamps this AppUserModelID on the Start-menu and
+/// desktop shortcuts, and the process sets the same ID so windows group under (and pin as) those shortcuts no matter
+/// how the app was started (shortcut, installer "Run", Explorer double-click on the exe).
+pub const APP_USER_MODEL_ID: &str = "io.rebuildstudio.desktop";
+
+#[cfg(windows)]
+fn set_app_user_model_id() {
+    let id: Vec<u16> = APP_USER_MODEL_ID.encode_utf16().chain(std::iter::once(0)).collect();
+    // SAFETY: NUL-terminated UTF-16 string that outlives the call; must run before any window is created.
+    let _ = unsafe { windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(windows::core::PCWSTR(id.as_ptr())) };
+}
+
 pub fn run() {
+    #[cfg(windows)]
+    set_app_user_model_id();
     let data_dir = paths::data_dir();
+    if std::env::args().skip(1).any(|a| a == REMOVE_CREDENTIALS_FLAG) {
+        let n = credentials::delete_all(&data_dir);
+        eprintln!("rebuild-studio: removed {n} stored credential(s)");
+        return;
+    }
 
     let mut builder = tauri::Builder::default();
     #[cfg(desktop)]
@@ -268,6 +358,25 @@ mod tests {
         assert!(allow_navigation(&u("http://localhost:5173/"), true));
         assert!(!allow_navigation(&u("file:///etc/passwd"), true));
         assert!(!allow_navigation(&u("javascript:alert(1)"), true));
+    }
+
+    #[test]
+    fn app_user_model_id_matches_bundle_identifier() {
+        let conf: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(conf["identifier"].as_str(), Some(APP_USER_MODEL_ID));
+        assert_eq!(conf["bundle"]["windows"]["nsis"]["installerHooks"].as_str(), Some("windows/hooks.nsh"));
+        assert!(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("windows/hooks.nsh").is_file());
+    }
+
+    #[test]
+    fn startup_dialog_choices_map_to_actions() {
+        use tauri_plugin_dialog::MessageDialogResult as R;
+        assert_eq!(startup_choice(&R::Yes), StartupChoice::Retry);
+        assert_eq!(startup_choice(&R::Custom(RETRY_LABEL.into())), StartupChoice::Retry);
+        assert_eq!(startup_choice(&R::No), StartupChoice::OpenLog);
+        assert_eq!(startup_choice(&R::Custom(OPEN_LOG_LABEL.into())), StartupChoice::OpenLog);
+        assert_eq!(startup_choice(&R::Cancel), StartupChoice::Quit);
+        assert_eq!(startup_choice(&R::Custom(QUIT_LABEL.into())), StartupChoice::Quit);
     }
 
     #[test]
