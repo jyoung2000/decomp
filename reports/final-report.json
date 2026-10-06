@@ -1,10 +1,13 @@
 {
- "generated_at": "2026-10-06T12:31:34.895555+00:00",
+ "generated_at": "2026-10-06T15:40:07.848128+00:00",
  "host": {
-  "os": "Linux 6.18.44-fc-v70",
+  "os": "Windows-11-10.0.26200-SP0",
   "certifies_windows": false
  },
  "commits": [
+  "d32eb7a Windows shell/installer: AUMID, desktop-shortcut-aware uninstall data removal, orphan reaping, recovery dialog; PS 5.1 build fixes; pin .NET 8.0.31 runtime",
+  "ce602d7 Plan: production-readiness P-series on a real Windows host; drop stray duplicate file",
+  "e33b4aa Final report; cutter test expects documented validation status",
   "93e323a Record UI e2e and desktop test runs",
   "8e3b532 Support matrix rows for UI, Cutter, packaging; DR-4 note",
   "e27e3c6 Plan/checkpoint: workers integrated",
@@ -31,10 +34,7 @@
   "e825044 Pipeline: oracle features in ledger, manifest covers plan exports, untested verdict for empty baselines, goto templating",
   "d2fefc0 Jobs: dynamic dependencies for recovery fan-in; blocked cascade",
   "5dcfe1c Providers/budgets/JeV, MCP server, CLI, client packages, Hermes bridge, managed backends, UI and Tauri shell (worker output, integration in progress)",
-  "5d8e6c1 Rizin native backend with rz-ghidra decompilation, loopback API server, fixture oracle adapter",
-  "778c932 Fixtures (pecli, dotnetapp, godotgame, webapp) with frozen oracles; verifier, comparators, plan/feedback/preview stores, pipeline stages, builders, delivery and reports",
-  "3f13319 Controller core: durable store, event log, job DAG/runner, path policy, case and evidence stores, adapter contract",
-  "b5fc38b Bootstrap Rebuild Studio plan and checkpoint"
+  "5d8e6c1 Rizin native backend with rz-ghidra decompilation, loopback API server, fixture oracle adapter"
  ],
  "branch": "ccr-4dbe9b92-nyzsa8",
  "pins": {
@@ -166,15 +166,16 @@
      "artifact": {
       "name": "dotnet-runtime-8.0.31-win-x64.zip",
       "url": "https://builds.dotnet.microsoft.com/dotnet/Runtime/8.0.31/dotnet-runtime-8.0.31-win-x64.zip",
-      "size_bytes": null,
-      "sha256": null,
-      "verify_required": true,
-      "hash_provenance": "NOT VERIFIED: builds.dotnet.microsoft.com is unreachable from the Linux build host. Run Setup-Dependencies.ps1 -ComputeHash dotnet-runtime on Windows, cross-check against https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json, then record the value."
+      "size_bytes": 33322727,
+      "sha256": "7deabbefdc83e378b343c551fe447b86002680eea91355b1f6f81d0c9ab0dcaa",
+      "verify_required": false,
+      "hash_provenance": "2026-10-06 on Windows 11 (interactive host): downloaded from builds.dotnet.microsoft.com; SHA-512 matched the official value in https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json (release 8.0.31, file dotnet-runtime-win-x64.zip); sha256 computed locally from the same verified bytes.",
+      "sha512_official": "9c55c58694676ee64b0eed2cd6d8cbf58b9aa8288420acc66841e15ca0099c75d4af0182d23a641c2342e5a151a325df4a12fa0bde2e47c0fb7e9a33e7b09896"
      },
      "layout": {
       "archive_root": "",
       "entry": "dotnet.exe",
-      "entry_sha256": null,
+      "entry_sha256": "111da7b604cd196b49167cfeecdaef4034b58cc7de71a91cbf9e162c9e8b0931",
       "version_args": [
        "--list-runtimes"
       ]
@@ -292,34 +293,15 @@
   },
   "host_tools": {
    "rizin": [
-    "rizin 0.9.1 @ linux-x86-64"
+    "<error [WinError 2] The system cannot find the file specified>"
    ],
-   "wine": "wine-9.0 (Ubuntu 9.0~repack-4build3)",
-   "dotnet": "8.0.131",
-   "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)",
-   "node": "v22.22.0",
-   "python": "3.13.16"
+   "wine": "<error [WinError 2] The system cannot find the file specified>",
+   "dotnet": "8.0.424",
+   "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+   "node": "v22.23.2",
+   "python": "3.12.10"
   },
-  "rizin_build_manifest": {
-   "rizin": {
-    "tag": "v0.9.1",
-    "commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7",
-    "source": "https://github.com/rizinorg/rizin",
-    "meson_options": "-Dbuildtype=release -Denable_tests=false -Denable_rz_test=false -Duse_sys_zlib=enabled -Duse_sys_lzma=enabled -Duse_sys_libzstd=enabled -Duse_sys_openssl=enabled -Dinstall_sigdb=false",
-    "subprojects_from_git": {
-     "tree-sitter-0.26.9": "7f534862c3ec939c3a6ee147f7600ef5c1bf900f",
-     "lz4-1.10.0": "ebb370ca83af193212df4dcbadcc5d87bc0de2f0",
-     "libzip-1.11.4": "6f8a0cdd24a0dc6cce9dac4a7679da784ab124ea"
-    }
-   },
-   "rz_ghidra": {
-    "tag": "v0.9.0",
-    "commit": "999df7b8e78919b75a330b4710acaf8f956f65cc",
-    "source": "https://github.com/rizinorg/rz-ghidra",
-    "submodules": "3e5d774389b3c4ff1c089ddf822f071c10f548a8 ghidra/ghidra (heads/rizin)\n fdf02957533645069bbea7cd2ed85a3014b42cf3 third-party/pugixml (fdf0295)"
-   },
-   "built_by": "/opt/rebuild-tools/rz-ghidra-build/build.sh"
-  }
+  "rizin_build_manifest": null
  },
  "backends": {
   "mode": "full",
@@ -920,7 +902,8 @@
    "installed": 0,
    "usable": 0,
    "verified": 4
-  }
+  },
+  "source": "recorded from reports/doctor-linux.json (the live doctor tools are not present on this host)"
  },
  "test_runs": [
   {
@@ -1012,8 +995,10 @@
  "demos": [
   {
    "example": "dotnetapp-rust-from-evidence",
+   "fixture": "dotnetapp",
    "case": "dotnetapp",
    "target": "rust",
+   "case_status_recorded": "delivered",
    "parity": {
     "full_parity": true,
     "features_total": 8,
@@ -1044,12 +1029,159 @@
     "wine": true
    },
    "ai_usage": [],
-   "comparisons": 42
+   "comparisons": 84,
+   "outcome": {
+    "state": "fully_matched",
+    "label": "Fully matched within declared coverage",
+    "can_claim_complete": true,
+    "scaffold_only": false,
+    "verification": {
+     "state": "fully_matched",
+     "verdict": "verified",
+     "declared": 9,
+     "passed": 9,
+     "failed": 0,
+     "untested": 0,
+     "stale": false,
+     "text": "Behavior verified: 9 of 9 scenarios",
+     "scope": "declared_scenarios_only"
+    },
+    "pipeline": {
+     "recovered": true,
+     "scaffolded": false,
+     "built": true,
+     "delivered": true,
+     "steps_done": 13,
+     "steps_total": 14,
+     "text": "Pipeline: 13/14 steps"
+    },
+    "coverage": {
+     "features_total": 8,
+     "features_without_oracle": 0,
+     "features_without_oracle_titles": [],
+     "unsupported_modules": 0,
+     "unsupported_modules_titles": [],
+     "unknown_scope": false
+    },
+    "outstanding": [],
+    "scope_statement": "Scenario results cover only the 9 declared scenarios; behaviour outside them is not measured."
+   },
+   "scenarios_declared": 9,
+   "scenarios_passed": 9,
+   "scenario_ids": [
+    "err_corrupt_json",
+    "err_null_json",
+    "err_usage",
+    "load_and_delete",
+    "navigation_and_unknown",
+    "notes_flow",
+    "quit_creates_state",
+    "settings_flow",
+    "stdin_eof_exits_cleanly"
+   ],
+   "ledger_feature_ids": [
+    "dotnetapp.state_save",
+    "dotnetapp.menu_notes",
+    "dotnetapp.menu_settings",
+    "dotnetapp.menu_navigation",
+    "dotnetapp.state_load",
+    "dotnetapp.menu_eof",
+    "dotnetapp.error_corrupt_state",
+    "dotnetapp.error_usage"
+   ],
+   "ledger_features_with_scenario": [
+    "dotnetapp.error_corrupt_state",
+    "dotnetapp.error_usage",
+    "dotnetapp.menu_eof",
+    "dotnetapp.menu_navigation",
+    "dotnetapp.menu_notes",
+    "dotnetapp.menu_settings",
+    "dotnetapp.state_load",
+    "dotnetapp.state_save"
+   ],
+   "fixture_counts": {
+    "features_declared": 9,
+    "feature_ids": [
+     "dotnetapp.menu_navigation",
+     "dotnetapp.menu_notes",
+     "dotnetapp.menu_settings",
+     "dotnetapp.menu_eof",
+     "dotnetapp.state_save",
+     "dotnetapp.state_load",
+     "dotnetapp.error_corrupt_state",
+     "dotnetapp.error_usage",
+     "dotnetapp.apphost_exe"
+    ],
+    "features_not_observable_here": [
+     "dotnetapp.apphost_exe"
+    ],
+    "oracle_scenarios": 9,
+    "oracle_scenarios_per_feature": {
+     "dotnetapp.state_save": 1,
+     "dotnetapp.menu_notes": 1,
+     "dotnetapp.menu_settings": 1,
+     "dotnetapp.menu_navigation": 1,
+     "dotnetapp.state_load": 1,
+     "dotnetapp.menu_eof": 1,
+     "dotnetapp.error_corrupt_state": 2,
+     "dotnetapp.error_usage": 1
+    },
+    "oracle_scenario_ids_per_feature": {
+     "dotnetapp.state_save": [
+      "quit_creates_state"
+     ],
+     "dotnetapp.menu_notes": [
+      "notes_flow"
+     ],
+     "dotnetapp.menu_settings": [
+      "settings_flow"
+     ],
+     "dotnetapp.menu_navigation": [
+      "navigation_and_unknown"
+     ],
+     "dotnetapp.state_load": [
+      "load_and_delete"
+     ],
+     "dotnetapp.menu_eof": [
+      "stdin_eof_exits_cleanly"
+     ],
+     "dotnetapp.error_corrupt_state": [
+      "err_corrupt_json",
+      "err_null_json"
+     ],
+     "dotnetapp.error_usage": [
+      "err_usage"
+     ]
+    }
+   },
+   "declared_in_fixture_not_in_ledger": [
+    "dotnetapp.apphost_exe"
+   ],
+   "provenance": [
+    {
+     "candidate_id": "cand_01a11120ef53a2efdb575f",
+     "final": false,
+     "authored_by": "controller-authored scaffold (deterministic, no AI)",
+     "basis": "pipeline scaffold r1 that precedes the external proposal (exits 64, fails every scenario)",
+     "stored_author_field": "not recorded in this report",
+     "app_routed_ai_calls": 0
+    },
+    {
+     "candidate_id": "cand_01a11124a9daabb70652b3",
+     "final": true,
+     "authored_by": "external MCP client (propose_candidate over the rebuild-mcp stdio server)",
+     "basis": "client-log.txt records the propose_candidate call that created it",
+     "stored_author_field": "not recorded in this report",
+     "app_routed_ai_calls": 0
+    }
+   ]
   },
   {
    "example": "godotgame-bevy-scaffold",
+   "fixture": "godotgame",
    "case": "godotgame",
    "target": "rust_bevy",
+   "case_status_recorded": "running",
    "parity": {
     "full_parity": false,
     "features_total": 0,
@@ -1073,12 +1205,96 @@
    },
    "host": null,
    "ai_usage": [],
-   "comparisons": 0
+   "comparisons": 0,
+   "outcome": {
+    "state": "scaffolded",
+    "label": "Scaffold only: not a working remake",
+    "can_claim_complete": false,
+    "scaffold_only": true,
+    "verification": {
+     "state": "untested",
+     "verdict": "untested",
+     "declared": 0,
+     "passed": 0,
+     "failed": 0,
+     "untested": 0,
+     "stale": false,
+     "text": "Behavior verified: no scenarios declared",
+     "scope": "declared_scenarios_only"
+    },
+    "pipeline": {
+     "recovered": true,
+     "scaffolded": true,
+     "built": true,
+     "delivered": false,
+     "steps_done": 7,
+     "steps_total": 8,
+     "text": "Pipeline: 7/8 steps"
+    },
+    "coverage": {
+     "features_total": 0,
+     "features_without_oracle": 0,
+     "features_without_oracle_titles": [],
+     "unsupported_modules": 0,
+     "unsupported_modules_titles": [],
+     "unknown_scope": false
+    },
+    "outstanding": [
+     "The implementation is a scaffold that exits as unimplemented; no behaviour has been rebuilt yet.",
+     "No scenarios are declared, so no behaviour can be compared. Declare scenarios or provide a baseline."
+    ],
+    "scope_statement": "No scenarios are declared, so nothing about behaviour is measured."
+   },
+   "scenarios_declared": 0,
+   "scenarios_passed": 0,
+   "scenario_ids": [],
+   "ledger_feature_ids": [],
+   "ledger_features_with_scenario": [],
+   "fixture_counts": {
+    "features_declared": 10,
+    "feature_ids": [
+     "godotgame.pck_recover",
+     "godotgame.engine_version_detect",
+     "godotgame.scripts_recover",
+     "godotgame.scenes_recover",
+     "godotgame.audio_asset",
+     "godotgame.project_settings",
+     "godotgame.player_movement",
+     "godotgame.save_system",
+     "godotgame.audio_player",
+     "godotgame.score_label"
+    ],
+    "features_not_observable_here": []
+   },
+   "declared_in_fixture_not_in_ledger": [
+    "godotgame.pck_recover",
+    "godotgame.engine_version_detect",
+    "godotgame.scripts_recover",
+    "godotgame.scenes_recover",
+    "godotgame.audio_asset",
+    "godotgame.project_settings",
+    "godotgame.player_movement",
+    "godotgame.save_system",
+    "godotgame.audio_player",
+    "godotgame.score_label"
+   ],
+   "provenance": [
+    {
+     "candidate_id": "cand_01a11128ff9181146b55a2",
+     "final": true,
+     "authored_by": "controller-authored scaffold (deterministic, no AI)",
+     "basis": "candidate origin=scaffold",
+     "stored_author_field": "null (none recorded)",
+     "app_routed_ai_calls": 0
+    }
+   ]
   },
   {
    "example": "pecli-rust-from-evidence",
+   "fixture": "pecli",
    "case": "pecli",
    "target": "rust",
+   "case_status_recorded": "delivered",
    "parity": {
     "full_parity": true,
     "features_total": 8,
@@ -1109,12 +1325,157 @@
     "wine": true
    },
    "ai_usage": [],
-   "comparisons": 77
+   "comparisons": 154,
+   "outcome": {
+    "state": "fully_matched",
+    "label": "Fully matched within declared coverage",
+    "can_claim_complete": true,
+    "scaffold_only": false,
+    "verification": {
+     "state": "fully_matched",
+     "verdict": "verified",
+     "declared": 8,
+     "passed": 8,
+     "failed": 0,
+     "untested": 0,
+     "stale": false,
+     "text": "Behavior verified: 8 of 8 scenarios",
+     "scope": "declared_scenarios_only"
+    },
+    "pipeline": {
+     "recovered": true,
+     "scaffolded": false,
+     "built": true,
+     "delivered": true,
+     "steps_done": 12,
+     "steps_total": 13,
+     "text": "Pipeline: 12/13 steps"
+    },
+    "coverage": {
+     "features_total": 8,
+     "features_without_oracle": 0,
+     "features_without_oracle_titles": [],
+     "unsupported_modules": 0,
+     "unsupported_modules_titles": [],
+     "unknown_scope": false
+    },
+    "outstanding": [],
+    "scope_statement": "Scenario results cover only the 8 declared scenarios; behaviour outside them is not measured."
+   },
+   "scenarios_declared": 8,
+   "scenarios_passed": 8,
+   "scenario_ids": [
+    "add_get_list",
+    "checksum_sample",
+    "err_bad_magic",
+    "err_corrupt_crc",
+    "err_key_not_found_and_usage",
+    "err_missing_file",
+    "init_roundtrip",
+    "update_and_remove"
+   ],
+   "ledger_feature_ids": [
+    "pecli.file_roundtrip",
+    "pecli.add_get_list",
+    "pecli.update_remove",
+    "pecli.checksum",
+    "pecli.error_bad_magic",
+    "pecli.error_missing_file",
+    "pecli.error_corrupt",
+    "pecli.error_usage"
+   ],
+   "ledger_features_with_scenario": [
+    "pecli.add_get_list",
+    "pecli.checksum",
+    "pecli.error_bad_magic",
+    "pecli.error_corrupt",
+    "pecli.error_missing_file",
+    "pecli.error_usage",
+    "pecli.file_roundtrip",
+    "pecli.update_remove"
+   ],
+   "fixture_counts": {
+    "features_declared": 9,
+    "feature_ids": [
+     "pecli.file_roundtrip",
+     "pecli.add_get_list",
+     "pecli.update_remove",
+     "pecli.checksum",
+     "pecli.error_bad_magic",
+     "pecli.error_missing_file",
+     "pecli.error_corrupt",
+     "pecli.error_usage",
+     "pecli.windows_native_exec"
+    ],
+    "features_not_observable_here": [
+     "pecli.windows_native_exec"
+    ],
+    "oracle_scenarios": 8,
+    "oracle_scenarios_per_feature": {
+     "pecli.file_roundtrip": 1,
+     "pecli.add_get_list": 1,
+     "pecli.update_remove": 1,
+     "pecli.checksum": 1,
+     "pecli.error_bad_magic": 1,
+     "pecli.error_missing_file": 1,
+     "pecli.error_corrupt": 1,
+     "pecli.error_usage": 1
+    },
+    "oracle_scenario_ids_per_feature": {
+     "pecli.file_roundtrip": [
+      "init_roundtrip"
+     ],
+     "pecli.add_get_list": [
+      "add_get_list"
+     ],
+     "pecli.update_remove": [
+      "update_and_remove"
+     ],
+     "pecli.checksum": [
+      "checksum_sample"
+     ],
+     "pecli.error_bad_magic": [
+      "err_bad_magic"
+     ],
+     "pecli.error_missing_file": [
+      "err_missing_file"
+     ],
+     "pecli.error_corrupt": [
+      "err_corrupt_crc"
+     ],
+     "pecli.error_usage": [
+      "err_key_not_found_and_usage"
+     ]
+    }
+   },
+   "declared_in_fixture_not_in_ledger": [
+    "pecli.windows_native_exec"
+   ],
+   "provenance": [
+    {
+     "candidate_id": "cand_01a1110f8ffa16e1f52b05",
+     "final": false,
+     "authored_by": "controller-authored scaffold (deterministic, no AI)",
+     "basis": "pipeline scaffold r1 that precedes the external proposal (exits 64, fails every scenario)",
+     "stored_author_field": "not recorded in this report",
+     "app_routed_ai_calls": 0
+    },
+    {
+     "candidate_id": "cand_01a11113fa217f3ccb63d3",
+     "final": true,
+     "authored_by": "external MCP client (propose_candidate over the rebuild-mcp stdio server)",
+     "basis": "README.md and mcp_client_demo.py describe the proposal; no call log is kept for this example",
+     "stored_author_field": "not recorded in this report",
+     "app_routed_ai_calls": 0
+    }
+   ]
   },
   {
    "example": "webapp-pwa-port",
+   "fixture": "webapp",
    "case": "webapp",
    "target": "web",
+   "case_status_recorded": "running",
    "parity": {
     "full_parity": false,
     "features_total": 5,
@@ -1145,7 +1506,109 @@
     "wine": true
    },
    "ai_usage": [],
-   "comparisons": 20
+   "comparisons": 20,
+   "outcome": {
+    "state": "fully_matched",
+    "label": "Fully matched within declared coverage",
+    "can_claim_complete": true,
+    "scaffold_only": false,
+    "verification": {
+     "state": "fully_matched",
+     "verdict": "verified",
+     "declared": 4,
+     "passed": 4,
+     "failed": 0,
+     "untested": 0,
+     "stale": false,
+     "text": "Behavior verified: 4 of 4 scenarios",
+     "scope": "declared_scenarios_only"
+    },
+    "pipeline": {
+     "recovered": true,
+     "scaffolded": false,
+     "built": true,
+     "delivered": false,
+     "steps_done": 9,
+     "steps_total": 10,
+     "text": "Pipeline: 9/10 steps"
+    },
+    "coverage": {
+     "features_total": 5,
+     "features_without_oracle": 1,
+     "features_without_oracle_titles": [
+      "Offline/PWA behaviour"
+     ],
+     "unsupported_modules": 0,
+     "unsupported_modules_titles": [],
+     "unknown_scope": false
+    },
+    "outstanding": [
+     "1 discovered feature with no scenario to check it against."
+    ],
+    "scope_statement": "Scenario results cover only the 4 declared scenarios; behaviour outside them is not measured."
+   },
+   "scenarios_declared": 4,
+   "scenarios_passed": 4,
+   "scenario_ids": [
+    "about",
+    "add",
+    "load",
+    "offline"
+   ],
+   "ledger_feature_ids": [
+    "webapp.render_notes",
+    "webapp.add_note",
+    "webapp.route_about",
+    "webapp.offline",
+    "static.pwa"
+   ],
+   "ledger_features_with_scenario": [
+    "webapp.add_note",
+    "webapp.offline",
+    "webapp.render_notes",
+    "webapp.route_about"
+   ],
+   "fixture_counts": {
+    "features_declared": 11,
+    "feature_ids": [
+     "webapp.render_notes",
+     "webapp.add_note",
+     "webapp.delete_note",
+     "webapp.localstorage_state",
+     "webapp.hash_routes",
+     "webapp.quota_error_state",
+     "webapp.offline_reload",
+     "webapp.sw_cache_upgrade",
+     "webapp.screenshot_1280x800",
+     "webapp.electron_asar_payload",
+     "webapp.electron_runtime"
+    ],
+    "features_not_observable_here": [
+     "webapp.electron_runtime"
+    ],
+    "oracle_scenarios": 14
+   },
+   "declared_in_fixture_not_in_ledger": [
+    "webapp.delete_note",
+    "webapp.localstorage_state",
+    "webapp.hash_routes",
+    "webapp.quota_error_state",
+    "webapp.offline_reload",
+    "webapp.sw_cache_upgrade",
+    "webapp.screenshot_1280x800",
+    "webapp.electron_asar_payload",
+    "webapp.electron_runtime"
+   ],
+   "provenance": [
+    {
+     "candidate_id": "cand_01a1110e68a802f4e4194c",
+     "final": true,
+     "authored_by": "controller-authored deterministic port of the recovered site (no AI)",
+     "basis": "README.md: deterministic port; no AI usage recorded",
+     "stored_author_field": "not recorded in this report",
+     "app_routed_ai_calls": 0
+    }
+   ]
   }
  ],
  "windows_gates": [
@@ -1157,6 +1620,7 @@
   "PE originals were executed under wine; the reports label that runner non-certifying.",
   "No provider API key was supplied: provider adapters are covered by mocked protocol tests only; zero paid calls were made.",
   "Unity IL2CPP, GameMaker, Android/JVM, Unreal profiles are detected but marked experimental/unverified (no backend run).",
+  "Scenario results are limited to the scenarios declared for each case. Passing them is not global parity: features with no scenario, Windows-only behaviour and undiscovered scope are not measured.",
   "Godot \u2192 Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because the original cannot run here and no scenarios were declared."
  ]
 }

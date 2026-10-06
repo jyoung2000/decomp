@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Empty, Loading } from '../../components/Empty';
 import { ErrorCallout } from '../../components/ErrorCallout';
+import { OutcomePanel, useOutcome } from '../../components/Outcome';
 import { StatusChip } from '../../components/StatusChip';
 import { values } from '../../lib/derive';
 import { dateTime, describeTolerance, humanize, shortHash } from '../../lib/format';
@@ -10,6 +11,7 @@ import type { Artifact, Comparison } from '../../lib/types';
 export function ComparisonsTab({ caseId }: { caseId: string }) {
   const api = useApi();
   const cs = useCaseState(caseId);
+  const outcome = useOutcome(caseId);
   const candidates = useMemo(() => (cs ? values(cs.candidates).sort((a, b) => b.revision - a.revision) : []), [cs]);
   const features = useMemo(() => (cs ? values(cs.features) : []), [cs]);
   const [candidate, setCandidate] = useState<string>('');
@@ -33,8 +35,9 @@ export function ComparisonsTab({ caseId }: { caseId: string }) {
     <div className="stack-lg" data-testid="comparisons">
       <div>
         <h2>Comparisons</h2>
-        <p className="small muted">Each row is a verifier check of the rebuilt candidate against the original. Only the verifier writes verdicts. Tolerances are shown exactly as declared.</p>
+        <p className="small muted">Each row is a verifier check of the rebuilt candidate against the original. Only the verifier writes verdicts. Tolerances are shown exactly as declared. Passing rows prove only the declared scenarios, not the whole program.</p>
       </div>
+      {outcome && <OutcomePanel outcome={outcome} />}
       <div className="filters" role="search" aria-label="Filter comparisons">
         <div className="field">
           <label htmlFor="cmp-cand">Candidate</label>

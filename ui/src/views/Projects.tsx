@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Empty, Loading } from '../components/Empty';
 import { ErrorCallout } from '../components/ErrorCallout';
-import { StatusChip } from '../components/StatusChip';
+import { CaseStatusChip } from '../components/Outcome';
 import { dateTime } from '../lib/format';
 import { setSelectedCase, useSelectedCase } from '../lib/selection';
 import { useApi, useResource, useStoreSelector } from '../lib/store';
@@ -56,7 +56,7 @@ export function ProjectsView() {
                     <div className="xs muted mono">{c.case_id}</div>
                   </td>
                   <td>
-                    <StatusChip status={c.status} />
+                    <CaseStatusChip status={c.status} outcome={c.outcome ?? null} />
                   </td>
                   <td>
                     {TARGET[c.target_language] ?? c.target_language} · {c.output_type}

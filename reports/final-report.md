@@ -1,9 +1,12 @@
 # Rebuild Studio — final report
 
-Generated 2026-10-06T12:31:34.895555+00:00 on Linux 6.18.44-fc-v70 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
+Generated 2026-10-06T15:40:07.848128+00:00 on Windows-11-10.0.26200-SP0 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
 
 ## Implementation commits
 
+- `d32eb7a Windows shell/installer: AUMID, desktop-shortcut-aware uninstall data removal, orphan reaping, recovery dialog; PS 5.1 build fixes; pin .NET 8.0.31 runtime`
+- `ce602d7 Plan: production-readiness P-series on a real Windows host; drop stray duplicate file`
+- `e33b4aa Final report; cutter test expects documented validation status`
 - `93e323a Record UI e2e and desktop test runs`
 - `8e3b532 Support matrix rows for UI, Cutter, packaging; DR-4 note`
 - `e27e3c6 Plan/checkpoint: workers integrated`
@@ -31,19 +34,16 @@ Generated 2026-10-06T12:31:34.895555+00:00 on Linux 6.18.44-fc-v70 (certifies Wi
 - `d2fefc0 Jobs: dynamic dependencies for recovery fan-in; blocked cascade`
 - `5dcfe1c Providers/budgets/JeV, MCP server, CLI, client packages, Hermes bridge, managed backends, UI and Tauri shell (worker output, integration in progress)`
 - `5d8e6c1 Rizin native backend with rz-ghidra decompilation, loopback API server, fixture oracle adapter`
-- `778c932 Fixtures (pecli, dotnetapp, godotgame, webapp) with frozen oracles; verifier, comparators, plan/feedback/preview stores, pipeline stages, builders, delivery and reports`
-- `3f13319 Controller core: durable store, event log, job DAG/runner, path policy, case and evidence stores, adapter contract`
-- `b5fc38b Bootstrap Rebuild Studio plan and checkpoint`
 
 ## Dependency pins
 
 - Controller: pydantic>=2.13,<3, fastapi>=0.142,<1, uvicorn[standard]>=0.54,<1, websockets>=15, httpx>=0.28,<1, rzpipe==0.6.2, lief>=1.0,<2, pefile>=2024.8, mcp>=2.3,<3, pillow>=12, pyyaml>=6
 - UI: {"@tauri-apps/api": "2.12.1", "react": "18.3.1", "react-dom": "18.3.1", "react-router-dom": "6.30.6", "@playwright/test": "1.56.1", "typescript": "5.9.3", "vite": "5.4.21", "vitest": "2.1.9"}
 - Tauri crates: {"tauri-build": "=2.7.1", "tauri": "=2.12.1"}
-- Host tools: {"rizin": ["rizin 0.9.1 @ linux-x86-64"], "wine": "wine-9.0 (Ubuntu 9.0~repack-4build3)", "dotnet": "8.0.131", "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)", "node": "v22.22.0", "python": "3.13.16"}
-- rizin build manifest: {"rizin": {"tag": "v0.9.1", "commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7", "source": "https://github.com/rizinorg/rizin", "meson_options": "-Dbuildtype=release -Denable_tests=false -Denable_rz_test=false -Duse_sys_zlib=enabled -Duse_sys_lzma=enabled -Duse_sys_libzstd=enabled -Duse_sys_openssl=enabled -Dinstall_sigdb=false", "subprojects_from_git": {"tree-sitter-0.26.9": "7f534862c3ec939c3a6ee147f7600ef5c1bf900f", "lz4-1.10.0": "ebb370ca83af193212df4dcbadcc5d87bc0de2f0", "libzip-1.11.4": "6f8a0cdd24a0dc6cce9dac4a7679da784ab124ea"}}, "rz_ghidra": {"tag": "v0.9.0", "commit": "999df7b8e7891
+- Host tools: {"rizin": ["<error [WinError 2] The system cannot find the file specified>"], "wine": "<error [WinError 2] The system cannot find the file specified>", "dotnet": "8.0.424", "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)", "node": "v22.23.2", "python": "3.12.10"}
+- rizin build manifest: n/a
 
-## Backend adapters on this host (live doctor)
+## Backend adapters on this host (doctor source: recorded from reports/doctor-linux.json (the live doctor tools are not present on this host))
 
 | Backend | Availability | Tools |
 |---|---|---|
@@ -74,10 +74,52 @@ Generated 2026-10-06T12:31:34.895555+00:00 on Linux 6.18.44-fc-v70 (certifies Wi
 
 ## Demonstrations (verifier-decided)
 
-- **dotnetapp-rust-from-evidence** (dotnetapp → rust): full parity YES; 8/8 features verified, 0 failed, 0 untested; 42 comparisons; candidate author: controller; AI calls via app routes: none; host certifies Windows: False
-- **godotgame-bevy-scaffold** (godotgame → rust_bevy): full parity NO; 0/0 features verified, 0 failed, 0 untested; 0 comparisons; candidate author: controller; AI calls via app routes: none; host certifies Windows: n/a
-- **pecli-rust-from-evidence** (pecli → rust): full parity YES; 8/8 features verified, 0 failed, 0 untested; 77 comparisons; candidate author: controller; AI calls via app routes: none; host certifies Windows: False
-- **webapp-pwa-port** (webapp → web): full parity NO; 4/5 features verified, 0 failed, 1 untested; 20 comparisons; candidate author: controller; AI calls via app routes: none; host certifies Windows: False
+Each line separates **pipeline** facts (what was built and published) from **measured behaviour** (declared scenarios compared against the original). Scenario results cover only the scenarios declared for that case. They are not a claim of global parity: behaviour outside the declared scenarios, features with no scenario and Windows-only behaviour are not measured.
+
+- **dotnetapp-rust-from-evidence** (dotnetapp -> rust): **Fully matched within declared coverage**. Behavior verified: 9 of 9 declared scenarios passed, 0 failed, 0 not run. Ledger features with no scenario: 0 of 8. Fixture-declared features not in the ledger: 1 (dotnetapp.apphost_exe). Recorded comparison rows: 84 across all candidates (rows are per channel per step, not scenario counts). Final candidate author: external MCP client (propose_candidate over the rebuild-mcp stdio server). App-routed AI calls: 0. Host certifies Windows: False. Recorded case status: delivered.
+- **godotgame-bevy-scaffold** (godotgame -> rust_bevy): **Scaffold only: not a working remake**. Behavior verified: 0 of 0 declared scenarios passed, 0 failed, 0 not run. Ledger features with no scenario: 0 of 0. Fixture-declared features not in the ledger: 10 (godotgame.pck_recover, godotgame.engine_version_detect, godotgame.scripts_recover, godotgame.scenes_recover, godotgame.audio_asset, godotgame.project_settings, godotgame.player_movement, godotgame.save_system, godotgame.audio_player, godotgame.score_label). Recorded comparison rows: 0 across all candidates (rows are per channel per step, not scenario counts). Final candidate author: controller-authored scaffold (deterministic, no AI). App-routed AI calls: 0. Host certifies Windows: n/a. Recorded case status: running.
+- **pecli-rust-from-evidence** (pecli -> rust): **Fully matched within declared coverage**. Behavior verified: 8 of 8 declared scenarios passed, 0 failed, 0 not run. Ledger features with no scenario: 0 of 8. Fixture-declared features not in the ledger: 1 (pecli.windows_native_exec). Recorded comparison rows: 154 across all candidates (rows are per channel per step, not scenario counts). Final candidate author: external MCP client (propose_candidate over the rebuild-mcp stdio server). App-routed AI calls: 0. Host certifies Windows: False. Recorded case status: delivered.
+- **webapp-pwa-port** (webapp -> web): **Fully matched within declared coverage**. Behavior verified: 4 of 4 declared scenarios passed, 0 failed, 0 not run. Ledger features with no scenario: 1 of 5 (Offline/PWA behaviour). Fixture-declared features not in the ledger: 9 (webapp.delete_note, webapp.localstorage_state, webapp.hash_routes, webapp.quota_error_state, webapp.offline_reload, webapp.sw_cache_upgrade, webapp.screenshot_1280x800, webapp.electron_asar_payload, webapp.electron_runtime). Recorded comparison rows: 20 across all candidates (rows are per channel per step, not scenario counts). Final candidate author: controller-authored deterministic port of the recovered site (no AI). App-routed AI calls: 0. Host certifies Windows: False. Recorded case status: running.
+
+### What the numbers count (nine scenarios, eight feature IDs)
+
+These are different units and must not be mixed up:
+
+- **Scenarios** are runnable checks recorded in the fixture oracle (`fixtures/<name>/expected/scenarios.json`). One feature can be checked by more than one scenario.
+- **Feature IDs in the ledger** are the semantic features the verifier marks verified or not (`parity-report.json` > `features`). The ledger is filled from the scenarios' `feature` field, so a feature that has no scenario is not in it.
+- **Feature IDs declared by the fixture** (`fixtures/<name>/features.json`) also include features that cannot be observed on this Linux host (`windows_only`); they have no scenario.
+
+| Example | Scenarios declared / passed | Distinct feature IDs those scenarios cover | Features in the ledger | Features declared by the fixture | Declared by fixture but not in ledger | Scenarios in the full fixture oracle |
+|---|---|---|---|---|---|---|
+| dotnetapp-rust-from-evidence | 9 / 9 | 8 | 8 | 9 | dotnetapp.apphost_exe | 9 |
+| godotgame-bevy-scaffold | 0 / 0 | 0 | 0 | 10 | godotgame.pck_recover, godotgame.engine_version_detect, godotgame.scripts_recover, godotgame.scenes_recover, godotgame.audio_asset, godotgame.project_settings, godotgame.player_movement, godotgame.save_system, godotgame.audio_player, godotgame.score_label | n/a |
+| pecli-rust-from-evidence | 8 / 8 | 8 | 8 | 9 | pecli.windows_native_exec | 8 |
+| webapp-pwa-port | 4 / 4 | 4 | 5 | 11 | webapp.delete_note, webapp.localstorage_state, webapp.hash_routes, webapp.quota_error_state, webapp.offline_reload, webapp.sw_cache_upgrade, webapp.screenshot_1280x800, webapp.electron_asar_payload, webapp.electron_runtime | 14 |
+
+**.NET example, exactly:** 9 scenarios cover 8 distinct feature IDs because `dotnetapp.error_corrupt_state` is checked by 2 scenarios (`err_corrupt_json` and `err_null_json`). The fixture declares 9 feature IDs; the remaining one, `dotnetapp.apphost_exe`, is Windows-only and has no scenario, so it is neither in the ledger nor counted as verified. "Nine scenarios" and "eight features" are both correct and count different things; neither is global parity of the .NET application.
+
+### Provenance of each candidate
+
+The stored candidate `author` field is `model` for a proposal from an external MCP client and also for the app's own AI route, so it cannot separate them. The labels below come from the recorded MCP call log, the demo client, or the candidate origin (basis stated). The app's own AI usage is none in all demos; for the dotnetapp and pecli demos an external client (itself an AI model, outside the app's routes and budget) wrote the Rust source.
+
+| Example | Candidate | Final | Authored by | Basis | Stored author field | App-routed AI calls |
+|---|---|---|---|---|---|---|
+| dotnetapp-rust-from-evidence | `cand_01a11120ef53a2efdb575f` | no | controller-authored scaffold (deterministic, no AI) | pipeline scaffold r1 that precedes the external proposal (exits 64, fails every scenario) | not recorded in this report | 0 |
+| dotnetapp-rust-from-evidence | `cand_01a11124a9daabb70652b3` | yes | external MCP client (propose_candidate over the rebuild-mcp stdio server) | client-log.txt records the propose_candidate call that created it | not recorded in this report | 0 |
+| godotgame-bevy-scaffold | `cand_01a11128ff9181146b55a2` | yes | controller-authored scaffold (deterministic, no AI) | candidate origin=scaffold | null (none recorded) | 0 |
+| pecli-rust-from-evidence | `cand_01a1110f8ffa16e1f52b05` | no | controller-authored scaffold (deterministic, no AI) | pipeline scaffold r1 that precedes the external proposal (exits 64, fails every scenario) | not recorded in this report | 0 |
+| pecli-rust-from-evidence | `cand_01a11113fa217f3ccb63d3` | yes | external MCP client (propose_candidate over the rebuild-mcp stdio server) | README.md and mcp_client_demo.py describe the proposal; no call log is kept for this example | not recorded in this report | 0 |
+| webapp-pwa-port | `cand_01a1110e68a802f4e4194c` | yes | controller-authored deterministic port of the recovered site (no AI) | README.md: deterministic port; no AI usage recorded | not recorded in this report | 0 |
+
+Recommended follow-up (not done here): record a `source` (`mcp` or `controller`) in candidate metadata so provenance does not depend on logs.
+
+## Windows (interactive desktop)
+
+PENDING. No interactive Windows desktop results are included in this report. Installer, WebView2, UI capture, Hermes desktop and DPAPI results will be added by the Windows run.
+
+## Windows CI
+
+PENDING. No Windows CI results are included in this report.
 
 ## Windows release gates (not certified here)
 
@@ -92,4 +134,5 @@ Generated 2026-10-06T12:31:34.895555+00:00 on Linux 6.18.44-fc-v70 (certifies Wi
 - PE originals were executed under wine; the reports label that runner non-certifying.
 - No provider API key was supplied: provider adapters are covered by mocked protocol tests only; zero paid calls were made.
 - Unity IL2CPP, GameMaker, Android/JVM, Unreal profiles are detected but marked experimental/unverified (no backend run).
+- Scenario results are limited to the scenarios declared for each case. Passing them is not global parity: features with no scenario, Windows-only behaviour and undiscovered scope are not measured.
 - Godot → Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because the original cannot run here and no scenarios were declared.

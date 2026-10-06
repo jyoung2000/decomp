@@ -94,6 +94,48 @@ export interface LaunchProfile {
   launch?: { type?: string; command?: string[]; root?: string; entry?: string };
 }
 
+/**
+ * Derived by the controller (controller/rebuild_controller/outcome.py). Pipeline progress (steps done) and verified behaviour
+ * (declared scenarios passed) are separate on purpose: a delivered file is not a behavioural match.
+ */
+export type OutcomeState = 'fully_matched' | 'partially_matched' | 'tested' | 'scaffolded' | 'delivered' | 'built' | 'recovered' | 'untested';
+export type VerificationState = 'untested' | 'tested' | 'partially_matched' | 'fully_matched';
+
+export interface Outcome {
+  state: OutcomeState;
+  label: string;
+  /** true only for fully_matched; the only state in which "complete" or a full bar may be shown */
+  can_claim_complete: boolean;
+  scaffold_only: boolean;
+  verification: {
+    state: VerificationState;
+    verdict?: string;
+    declared: number;
+    passed: number;
+    failed: number;
+    untested: number;
+    stale: boolean;
+    text?: string;
+    scope?: string;
+    /** UI extension: 'features' when scenario counts were not reported and the UI estimated from feature results */
+    unit?: 'scenarios' | 'features';
+  };
+  pipeline: { recovered: boolean; scaffolded: boolean; built: boolean; delivered: boolean; steps_done: number; steps_total: number; text?: string };
+  coverage: {
+    features_total: number;
+    /** null = unknown (estimated outcome) */
+    features_without_oracle: number | null;
+    features_without_oracle_titles?: string[];
+    unsupported_modules: number;
+    unsupported_modules_titles?: string[];
+    unknown_scope: boolean;
+  };
+  outstanding: string[];
+  scope_statement?: string;
+  /** UI extension: 'estimated' when derived by the app instead of reported by the controller */
+  source?: 'controller' | 'estimated';
+}
+
 export interface CaseCounts {
   jobs?: Partial<Record<JobState, number>>;
   features?: Record<string, number>;
@@ -124,6 +166,8 @@ export interface Case {
   app_version?: string;
   settings?: Record<string, unknown>;
   counts?: CaseCounts;
+  /** derived by the controller; absent from older controllers and the mock server */
+  outcome?: Outcome | null;
   /** UI extension: time the current run started. */
   started_at?: string | null;
   /** UI extension: resource usage snapshot. */
@@ -191,6 +235,7 @@ export interface Plan {
   unknown_scope: UnknownScopeEntry[];
   progress: Partial<Record<Phase | 'discovery', PhaseProgress>>;
   eta: Eta | null;
+  outcome?: Outcome | null;
 }
 
 export interface PlanRevision {

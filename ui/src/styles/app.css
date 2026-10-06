@@ -323,3 +323,16 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 @media (prefers-reduced-motion: no-preference) {
   .bar > span { transition: width 0.3s ease; }
 }
+
+/* ---------- outcome: pipeline steps and verified behaviour are shown differently on purpose ---------- */
+.outcome-headline { margin: 0 0 var(--s-3); }
+.outcome-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--s-4); margin-bottom: var(--s-3); }
+.outcome-block { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; padding: var(--s-3); border: 1px solid var(--border); border-radius: var(--r-2); background: var(--bg-sunken); }
+.outcome-line { font-weight: 600; font-variant-numeric: tabular-nums; }
+.steps { display: flex; gap: 3px; }
+.steps > span { flex: 1; height: 10px; max-width: 28px; border: 1px solid var(--border-strong); border-radius: 2px; background: transparent; }
+.steps > span.on { background: var(--queue); border-color: var(--queue); }
+.flags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); color: var(--muted); }
+.flags li.yes { color: var(--fg-2); }
+.bar.verify > span { background: var(--warn); }
+.bar.verify.full > span { background: var(--ok); }

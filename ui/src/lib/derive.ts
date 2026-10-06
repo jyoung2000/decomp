@@ -3,7 +3,7 @@
 // newer state. Nothing here reads a clock: progress only moves when the controller reports it.
 import type {
   Budget, Candidate, Case, ControllerEvent, Eta, Feature, Feedback, Job, JobState, Phase, Plan, PlanItem, PhaseProgress,
-  Preview, UnknownScopeEntry,
+  Outcome, Preview, UnknownScopeEntry,
 } from './types';
 
 export interface Tracked<T> {
@@ -34,6 +34,8 @@ export interface CaseState {
   progressSeq: number;
   eta: Eta | null;
   unknownScope: UnknownScopeEntry[];
+  /** controller-derived outcome (pipeline vs verified behaviour); null until a case/plan snapshot carries it */
+  outcome: Outcome | null;
   scopeNotes: ScopeNote[];
   features: Record<string, Tracked<Feature>>;
   candidates: Record<string, Tracked<Candidate>>;
@@ -75,6 +77,7 @@ export function emptyCase(caseId: string): CaseState {
     progressSeq: -1,
     eta: null,
     unknownScope: [],
+    outcome: null,
     scopeNotes: [],
     features: {},
     candidates: {},
@@ -295,6 +298,7 @@ export function applyEvent(state: StudioState, ev: ControllerEvent): ApplyResult
     if (cs.case) {
       if (cs.case.seq <= ev.seq) cs = { ...cs, case: { value: { ...cs.case.value, status: String(p.status) }, seq: ev.seq } };
     } else refresh.push({ caseId, key: 'case' });
+    refresh.push({ caseId, key: 'plan' }); // the derived outcome (delivered vs verified) changes with the status
   } else if (k.startsWith('job.')) {
     const r = reduceJob(cs, ev);
     cs = r.cs;
@@ -359,7 +363,7 @@ export function applyEvent(state: StudioState, ev: ControllerEvent): ApplyResult
   } else if (k === 'verification.completed' || k === 'verification.invalidated') {
     // not in docs/API.md; emitted by the controller's verifier — verdicts live on candidates, features and previews
     cs = { ...cs, versions: bump(cs.versions, 'comparisons') };
-    refresh.push({ caseId, key: 'candidates' }, { caseId, key: 'features' }, { caseId, key: 'previews' });
+    refresh.push({ caseId, key: 'candidates' }, { caseId, key: 'features' }, { caseId, key: 'previews' }, { caseId, key: 'plan' });
   } else if (k === 'feature.stale') {
     refresh.push({ caseId, key: 'features' });
   }
@@ -397,6 +401,7 @@ export function applySnapshot(state: StudioState, caseId: string, snap: Snapshot
   let cs = state.cases[caseId] ?? emptyCase(caseId);
   switch (snap.kind) {
     case 'case':
+      if (snap.data.outcome) cs = { ...cs, outcome: snap.data.outcome };
       if (!cs.case || cs.case.seq <= asOfSeq) cs = { ...cs, case: { value: snap.data, seq: asOfSeq } };
       else cs = { ...cs, case: { value: { ...snap.data, status: cs.case.value.status }, seq: cs.case.seq } };
       break;
@@ -411,6 +416,7 @@ export function applySnapshot(state: StudioState, caseId: string, snap: Snapshot
         planItems: mergeList(cs.planItems, d.items ?? [], (i) => i.item_id, asOfSeq),
         planRevision: cs.planRevision != null && cs.planRevision > d.revision ? cs.planRevision : d.revision,
         unknownScope: d.unknown_scope ?? [],
+        outcome: d.outcome ?? cs.outcome,
       };
       cs = applyProgress(cs, d.progress ?? {}, d.eta ?? null, Math.max(asOfSeq, cs.progressSeq), at);
       break;
@@ -480,7 +486,8 @@ export function phaseViews(progress: Plan['progress']): PhaseView[] {
 export function toPhaseView(phase: Phase | 'discovery', raw: PhaseProgress | undefined): PhaseView {
   const done = raw && typeof raw.done === 'number' ? raw.done : null;
   const total = raw && typeof raw.total === 'number' ? raw.total : null;
-  const percent = done != null && total != null && total > 0 ? Math.max(0, Math.min(100, (done / total) * 100)) : done != null && total === 0 ? 100 : null;
+  // an empty denominator (0 of 0) is not "100% done": nothing was measured, so there is no percentage
+  const percent = done != null && total != null && total > 0 ? Math.max(0, Math.min(100, (done / total) * 100)) : null;
   return { phase, label: phaseLabel(phase), done, total, unit: raw?.unit, percent, scopeKnown: total != null, reported: !!raw };
 }
 

@@ -95,4 +95,4 @@ class FeatureLedger:
         total = len(feats)
         return {"total": total, "impl": impl, "verify": ver, "critical_incomplete": critical_incomplete,
                 "full_parity": total > 0 and ver["verified"] == total and not critical_incomplete,
-                "note": "counts are semantic features, not files/bytes/functions"}
+                "note": "counts are semantic features, not files/bytes/functions; full_parity means every ledger feature passed its declared scenarios, not that undeclared behaviour matches (see outcome.py)"}

@@ -40,9 +40,9 @@ describe('controller progress shapes', () => {
 
 describe('undocumented controller event kinds', () => {
   const ev = (kind: string, payload: Record<string, unknown>) => ({ seq: 10, ts: '2026-10-06T12:00:00Z', case_id: 'case_x', job_id: null, kind, payload });
-  it('verification.completed refreshes candidates, features and previews and reads well', () => {
+  it('verification.completed refreshes candidates, features, previews and the plan outcome and reads well', () => {
     const r = applyEvent(emptyStudio(), ev('verification.completed', { candidate_id: 'c1', summary: { scenarios: 1, passed: 0, failed: 1, errors: 0 } }));
-    expect(r.refresh.map((x) => x.key).sort()).toEqual(['candidates', 'features', 'previews']);
+    expect(r.refresh.map((x) => x.key).sort()).toEqual(['candidates', 'features', 'plan', 'previews']);
     expect(describeEvent(ev('verification.completed', { summary: { scenarios: 1, passed: 0, failed: 1, errors: 0 } }))).toBe('Verification finished: 0 passed, 1 failed, 0 errors of 1 scenarios');
   });
   it('preview.opened / feature.stale have readable descriptions', () => {

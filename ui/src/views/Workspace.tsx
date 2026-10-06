@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { ConfirmDialog } from '../components/Dialog';
 import { Empty } from '../components/Empty';
 import { ErrorCallout } from '../components/ErrorCallout';
-import { StatusChip } from '../components/StatusChip';
+import { CaseStatusChip, useOutcome } from '../components/Outcome';
 import { RouteTabs } from '../components/Tabs';
 import { useToast } from '../components/Toasts';
 import { ApiError } from '../lib/api';
@@ -25,6 +25,7 @@ export function WorkspaceView() {
   const store = useStore();
   const toast = useToast();
   const cs = useCaseState(caseId);
+  const outcome = useOutcome(caseId);
   const fetched = useResource(() => api.getCase(caseId), [api, caseId]);
   const [confirmStop, setConfirmStop] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -85,7 +86,7 @@ export function WorkspaceView() {
           <div className="stack" style={{ gap: 4 }}>
             <div className="row">
               <h1 data-testid="project-title">{c.name}</h1>
-              <StatusChip status={status} />
+              <CaseStatusChip status={status} outcome={outcome} />
             </div>
             <div className="small muted row">
               <span className="mono">{c.case_id}</span>

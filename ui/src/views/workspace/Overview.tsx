@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useStaleness } from '../../components/ConnectionBanner';
 import { Empty } from '../../components/Empty';
 import { CountsProgress, PhaseProgressRow } from '../../components/Progress';
+import { OutcomePanel, useOutcome } from '../../components/Outcome';
 import { StatusChip } from '../../components/StatusChip';
 import { useToast } from '../../components/Toasts';
 import { describeEvent, describeScopeNote, jobCounts, phaseViews, values } from '../../lib/derive';
@@ -14,6 +15,7 @@ export function OverviewTab({ caseId }: { caseId: string }) {
   const api = useApi();
   const toast = useToast();
   const cs = useCaseState(caseId);
+  const outcome = useOutcome(caseId);
   const { stale, reason, now, heartbeatSeconds, snap } = useStaleness();
   const lastHeartbeat = useStoreSelector((s) => s.state.lastHeartbeat);
   const workersActive = useStoreSelector((s) => s.state.workersActive);
@@ -90,6 +92,8 @@ export function OverviewTab({ caseId }: { caseId: string }) {
         </div>
       </section>
 
+      {outcome && <OutcomePanel outcome={outcome} />}
+
       {(blocked.length > 0 || failed.length > 0 || planBlocked.length > 0) && (
         <section className="card" aria-label="Blockers" data-testid="blockers">
           <h3>Blockers</h3>
@@ -115,7 +119,7 @@ export function OverviewTab({ caseId }: { caseId: string }) {
 
       <section className="card" aria-labelledby="ov-progress">
         <div className="card-head">
-          <h3 id="ov-progress">Progress</h3>
+          <h3 id="ov-progress">Pipeline progress (work done, not a match score)</h3>
           <span className="small muted">
             Plan revision {cs.planRevision ?? '—'} · percentages appear only when the scope is known
           </span>

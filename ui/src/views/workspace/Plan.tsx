@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Dialog } from '../../components/Dialog';
 import { Empty } from '../../components/Empty';
 import { ErrorCallout } from '../../components/ErrorCallout';
+import { OutcomePanel, useOutcome } from '../../components/Outcome';
 import { StatusChip } from '../../components/StatusChip';
 import { useToast } from '../../components/Toasts';
 import { values } from '../../lib/derive';
@@ -22,6 +23,7 @@ export function PlanTab({ caseId }: { caseId: string }) {
   const store = useStore();
   const toast = useToast();
   const cs = useCaseState(caseId);
+  const outcome = useOutcome(caseId);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [changeFor, setChangeFor] = useState<PlanItem | null>(null);
   const [exported, setExported] = useState<Record<string, unknown> | null>(null);
@@ -116,6 +118,7 @@ export function PlanTab({ caseId }: { caseId: string }) {
           </button>
         </div>
       </div>
+      {outcome && <OutcomePanel outcome={outcome} compact />}
       {exportError ? <ErrorCallout error={exportError} title="Export failed" /> : null}
       {exported && <ExportResult result={exported} />}
 
