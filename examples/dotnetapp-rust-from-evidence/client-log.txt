@@ -1,0 +1,29 @@
+# step 1: no-AI pipeline (demo_setup.py)
+{"queued": 0, "running": 0, "blocked": 0, "failed": 0, "cancelled": 0, "completed": 11, "needs_retest": 0}
+case case_01a11120cc63d940d082ca [('mod_7690fbcbdf8e2d60e0a5', 'dotnetapp.dll'), ('mod_1acedf756b73ce971bf6', 'dotnetapp.exe')]
+packet ['ev_01a11120ef58545bd00bc4']
+M-IMPL ["No AI route configured: translating recovered dotnet code into rust needs interpretation. Next: connect a model (Connections) and set AI policy to 'AI-assisted', or open the task packet ev_01a11120ef58545bd00bc4 in an external client (Claude Code / Codex / Gemini via the Rebuild Studio MCP) and call propose_candidate."]
+
+# step 3: evidence reads over MCP stdio (raw list_features / search_evidence / get_evidence)
+list_features case_01a11120cc63d940d082ca -> 8 features (all verify_status=failed against scaffold r1)
+search_evidence Menus/null/EOF/ReadLine; get_evidence ev_01a11120ef58545bd00bc4 (ai_task_packet), ev_01a11120cf897590de9fc8 (dotnet.metadata), ev_01a11120d3c6d2971e9bda (module_report)
+read recovered C#: cases/<case>/recovered/mod_7690fbcbdf8e2d60e0a5/NotesApp/{Program,Menus,AppState,StateCorruptException}.cs (ILSpy 9.1 output, ev_01a11120d3c5f658e43a09)
+
+# step 4: attempt 1 (propose -> build -> drive)
+2026-10-06 12:16:17,868 rebuild_controller.mcp op=op_01a11124a9646b21e3ab21 tool=list_cases ok=True bytes=648 ms=103
+2026-10-06 12:16:17,886 rebuild_controller.mcp op=op_01a11124a9dacba874bd93 tool=propose_candidate ok=True bytes=461 ms=3
+PROPOSED {"operation_id": "op_01a11124a9dacba874bd93", "tool": "propose_candidate", "ok": true, "evidence_revision": 137, "truncated": false, "data": {"candidate": {"candidate_id": "cand_01a11124a9daabb70652b3", "case_id": "case_01a11120cc63d940d082ca", "revision": 2, "target_language": "rust", "output_type": "exe", "created_at": "2026-10-06T12:16:17.883Z"}, "files_written": 2, "next": {"untrusted": true, "text": "build_candidate, then compare_candidate; verdicts come from the verifier only."}}}
+CANDIDATE cand_01a11124a9daabb70652b3
+2026-10-06 12:16:17,892 rebuild_controller.mcp op=op_01a11124a9e1890bc0ff7e tool=build_candidate ok=True bytes=566 ms=2
+BUILD {"operation_id": "op_01a11124a9e1890bc0ff7e", "tool": "build_candidate", "ok": true, "evidence_revision": 137, "truncated": false, "data": {"job": {"job_id": "job_01a11124a9e2fe815fee3f", "case_id": "case_01a11120cc63d940d082ca", "stage": "build_candidate", "title": {"untrusted": true, "text": "Buil
+2026-10-06 12:16:30,837 rebuild_controller.mcp op=op_01a11124dc178378d4ee5d tool=list_cases ok=True bytes=648 ms=93
+2026-10-06 12:16:30,851 rebuild_controller.mcp op=op_01a11124dc81886c105fe9 tool=compare_candidate ok=True bytes=679 ms=2
+COMPARE {"operation_id": "op_01a11124dc81886c105fe9", "tool": "compare_candidate", "ok": true, "evidence_revision": 139, "truncated": false, "data": {"job": {"job_id": "job_01a11124dc8140a9c036b4", "case_id":
+2026-10-06 12:16:33,859 rebuild_controller.mcp op=op_01a11124e84132e3a62a86 tool=job_status ok=True bytes=1355 ms=2
+JOB completed {"candidate_id": "cand_01a11124a9daabb70652b3", "evidence_id": "ev_01a11124dcd24c80db899c", "feature_verdicts": {"dotnetapp.error_corrupt_state": {"untrusted": true, "text": "verified"}, "dotnetapp.error_usage": {"untrusted": true, "text": "verified"}, "dotnetapp.menu_eof": {"untrusted": true, "text": "verified"}, "dotnetapp.menu_navigation": {"untrusted": true, "text": "verified"}, "dotnetapp.menu_notes": {"untrusted": true, "text": "verified"}, "dotnetapp.menu_settings": {"untrusted": true, "text": "verified"}, "dotnetapp.state_load": {"untrusted": true, "text": "verified"}, "dotnetapp.state_save": {"untrusted": true, "text": "verified"}}, "summary": {"errors": 0, "failed": 0, "passed": 9, "scenarios": 9}}
+
+# step 5: deliver
+{"job_id":"job_01a111252110470ad12248","case_id":"case_01a11120cc63d940d082ca","stage":"deliver","title":"Publish source/dist/evidence/reports","inputs":{"candidate_id":"cand_01a11124a9daabb70652b3"},"input_hash":"b9fc4005e257c77cc628602e6c09e88542e940e18d4edb0fb32c69dfbe692048","state":"queued","priority":100,"attempt":0,"max_attempts":1,"progress":{},"result":null,"error":null,"blocker":null,"cancel_requested":false,"milestone_id":"M-DELIVER","lease_owner":null,"lease_expires":null,"heartbeat_at":null,"started_at":null,"finished_at":null,"created_at":"2026-10-06T12:16:48.400Z","updated_at":"2026-10-06T12:16:48.400Z"}
+
+# independent check
+fixtures/tools/scenario_runner.py check --fixture fixtures/dotnetapp --launcher out/dist/dotnetapp -> summary: 9 passed, 0 failed, 9 total

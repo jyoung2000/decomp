@@ -180,4 +180,5 @@ class Verifier:
 
 def _environment() -> dict[str, Any]:
     return {"os": platform.system(), "os_release": platform.release(), "machine": platform.machine(), "python": platform.python_version(),
-            "locale": os.environ.get("LANG", ""), "tz": os.environ.get("TZ", "UTC"), "wine": shutil.which("wine") is not None, "host_certifies_windows": os.name == "nt"}
+            "locale": os.environ.get("LANG", ""), "tz": os.environ.get("TZ", "UTC"), "wine_available": shutil.which("wine") is not None, "host_certifies_windows": os.name == "nt",
+            "note": "the runner actually used per comparison is recorded in each comparison's details.runner"}

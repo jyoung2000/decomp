@@ -21,7 +21,7 @@ def build_report(st, case_id: str, candidate_id: str | None) -> dict[str, Any]:
     ai = st.db.query("SELECT provider, model, task, COUNT(*) AS calls, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(cost_usd) AS cost_usd, SUM(1-cost_known) AS unknown_cost FROM ai_calls WHERE case_id=? GROUP BY provider, model, task", (case_id,))
     return {
         "generated_at": now_iso(), "case": {k: case[k] for k in ("case_id", "name", "source_root", "output_root", "target_language", "output_type", "status", "ai_policy")},
-        "candidate": {k: cand[k] for k in ("candidate_id", "revision", "build_hash", "build_status", "verification", "last_known_good")} if cand else None,
+        "candidate": ({k: cand[k] for k in ("candidate_id", "revision", "build_hash", "build_status", "verification", "last_known_good")} | {"author": cand["meta"].get("author"), "origin": cand["meta"].get("origin")}) if cand else None,
         "parity": {"full_parity": summary["full_parity"], "features_total": summary["total"], "verified": summary["verify"]["verified"], "partial": summary["verify"]["partial"],
                    "failed": summary["verify"]["failed"], "untested": summary["verify"]["untested"], "stale": summary["verify"]["stale"],
                    "critical_incomplete": summary["critical_incomplete"], "scope_note": "feature counts are semantic features, not files/functions; undiscovered scope is not counted"},
@@ -59,6 +59,8 @@ def render_markdown(rep: dict[str, Any]) -> str:
     if rep["candidate"]:
         c = rep["candidate"]
         lines += ["", f"## Candidate r{c['revision']} `{c['candidate_id']}`", f"build hash `{c['build_hash']}`, build {c['build_status']}, verification **{c['verification']}**, last known good: {c['last_known_good']}"]
+        if c.get("author"):
+            lines.append(f"Source authored by: **{c['author']}**" + (" (an external model client proposed these files through the MCP interface; the verifier decided)" if c["author"] == "model" else ""))
     lines += ["", "## Features", "", "| Feature | Origin | Critical | Implementation | Verification |", "|---|---|---|---|---|"]
     lines += [f"| {f['title']} | {f['origin']} | {'yes' if f['critical'] else ''} | {f['impl_status']} | {f['verify_status']} |" for f in rep["features"]]
     if rep["comparisons"]:
@@ -66,7 +68,8 @@ def render_markdown(rep: dict[str, Any]) -> str:
         lines += [f"| {c['feature_id'] or ''} | {c['channel']} | {c['rule']} | {c['verdict']} |" for c in rep["comparisons"]]
         if rep["host"]:
             h = rep["host"]
-            lines += ["", f"Environment: {h.get('os')} {h.get('os_release')} {h.get('machine')}, wine={h.get('wine')}, host_certifies_windows={h.get('host_certifies_windows')}"]
+            runners = sorted({str(c.get("details", {}).get("runner")) for c in rep["comparisons"] if isinstance(c.get("details"), dict) and c["details"].get("runner")})
+            lines += ["", f"Environment: {h.get('os')} {h.get('os_release')} {h.get('machine')}; runners used: {', '.join(runners) or 'n/a'}; host_certifies_windows={h.get('host_certifies_windows')}"]
     if rep["unresolved"]:
         lines += ["", "## Unresolved"] + [f"- {u['feature']}: impl {u['impl']}, verify {u['verify']}{' (critical)' if u['critical'] else ''}" for u in rep["unresolved"]]
     if rep["blockers"]:
@@ -75,7 +78,7 @@ def render_markdown(rep: dict[str, Any]) -> str:
     if rep["ai_usage"]:
         lines += [f"- {a['provider']}/{a['model']} ({a['task']}): {a['calls']} calls, {a['input_tokens']} in / {a['output_tokens']} out / {a['cached_tokens']} cached tokens, cost ${a['cost_usd'] or 0:.4f}" + (" (some costs unknown)" if a['unknown_cost'] else "") for a in rep["ai_usage"]]
     else:
-        lines.append("- no AI calls were made for this case")
+        lines.append("- no AI calls were made through the app's model routes for this case" + (" (the candidate was authored by an external client over MCP)" if rep["candidate"] and rep["candidate"].get("author") == "model" else ""))
     lines += ["", "## Reproduction", "", "```", rep["reproduction"]["cli"], "```"]
     return "\n".join(lines) + "\n"
 

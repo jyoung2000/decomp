@@ -1,0 +1,686 @@
+{
+ "evidence_id": "ev_01a11124dcd24c80db899c",
+ "case_id": "case_01a11120cc63d940d082ca",
+ "revision": 140,
+ "kind": "verification_report",
+ "module_id": null,
+ "title": {
+  "untrusted": true,
+  "text": "Verification of cand_01a11124a9daabb70652b3"
+ },
+ "meta": {},
+ "input_hash": "9a8a21dd37ebf74ffb37a1ee19e5c8cb49cd98e687dd25ce5b43057aa1e9a5c8",
+ "producer": "verifier",
+ "created_at": "2026-10-06T12:16:30.930Z",
+ "stale": 0,
+ "body": {
+  "baseline_evidence": {
+   "untrusted": true,
+   "text": "ev_01a11120ef51abeb68b457"
+  },
+  "build_hash": "2d9bade3618999b5",
+  "candidate_id": "cand_01a11124a9daabb70652b3",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": {
+    "untrusted": true,
+    "text": ""
+   },
+   "machine": {
+    "untrusted": true,
+    "text": "x86_64"
+   },
+   "os": {
+    "untrusted": true,
+    "text": "Linux"
+   },
+   "os_release": {
+    "untrusted": true,
+    "text": "6.18.44-fc-v70"
+   },
+   "python": "3.13.16",
+   "tz": {
+    "untrusted": true,
+    "text": "UTC"
+   },
+   "wine": true
+  },
+  "feature_verdicts": {
+   "dotnetapp.error_corrupt_state": {
+    "untrusted": true,
+    "text": "verified"
+   },
+   "dotnetapp.error_usage": {
+    "untrusted": true,
+    "text": "verified"
+   },
+   "dotnetapp.menu_eof": {
+    "untrusted": true,
+    "text": "verified"
+   },
+   "dotnetapp.menu_navigation": {
+    "untrusted": true,
+    "text": "verified"
+   },
+   "dotnetapp.menu_notes": {
+    "untrusted": true,
+    "text": "verified"
+   },
+   "dotnetapp.menu_settings": {
+    "untrusted": true,
+    "text": "verified"
+   },
+   "dotnetapp.state_load": {
+    "untrusted": true,
+    "text": "verified"
+   },
+   "dotnetapp.state_save": {
+    "untrusted": true,
+    "text": "verified"
+   }
+  },
+  "scenarios": [
+   {
+    "comparisons": [
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcad15acdd0e36",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcae7cf32054bb",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcae564c81f8a0",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "files"
+      },
+      "comparison_id": "cmp_01a11124dcae83d97d2fae",
+      "rule": {
+       "untrusted": true,
+       "text": "sha256:exact"
+      },
+      "verdict": "pass"
+     }
+    ],
+    "feature_id": "dotnetapp.state_save",
+    "scenario": {
+     "untrusted": true,
+     "text": "quit_creates_state"
+    },
+    "verdict": "pass"
+   },
+   {
+    "comparisons": [
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcb22113a6f62d",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcb3d5443be925",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcb3d6dba0637c",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "files"
+      },
+      "comparison_id": "cmp_01a11124dcb366e49bd6b7",
+      "rule": {
+       "untrusted": true,
+       "text": "sha256:exact"
+      },
+      "verdict": "pass"
+     }
+    ],
+    "feature_id": "dotnetapp.menu_notes",
+    "scenario": {
+     "untrusted": true,
+     "text": "notes_flow"
+    },
+    "verdict": "pass"
+   },
+   {
+    "comparisons": [
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcb7c3d713ba59",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcb74a0c6a7b96",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcb7199a072034",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "files"
+      },
+      "comparison_id": "cmp_01a11124dcb7883ac79f57",
+      "rule": {
+       "untrusted": true,
+       "text": "sha256:exact"
+      },
+      "verdict": "pass"
+     }
+    ],
+    "feature_id": "dotnetapp.menu_settings",
+    "scenario": {
+     "untrusted": true,
+     "text": "settings_flow"
+    },
+    "verdict": "pass"
+   },
+   {
+    "comparisons": [
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcb95a86f0c14b",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcba4f73a28ad0",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcba81724f7407",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "files"
+      },
+      "comparison_id": "cmp_01a11124dcbaa20c4474d3",
+      "rule": {
+       "untrusted": true,
+       "text": "sha256:exact"
+      },
+      "verdict": "pass"
+     }
+    ],
+    "feature_id": "dotnetapp.menu_navigation",
+    "scenario": {
+     "untrusted": true,
+     "text": "navigation_and_unknown"
+    },
+    "verdict": "pass"
+   },
+   {
+    "comparisons": [
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcc0f37ca9e7db",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcc086b74e3558",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcc00308d2a6f6",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcc0a28fb839c5",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcc00893506a48",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcc0c9483b5ce5",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "files"
+      },
+      "comparison_id": "cmp_01a11124dcc03c489f3669",
+      "rule": {
+       "untrusted": true,
+       "text": "sha256:exact"
+      },
+      "verdict": "pass"
+     }
+    ],
+    "feature_id": "dotnetapp.state_load",
+    "scenario": {
+     "untrusted": true,
+     "text": "load_and_delete"
+    },
+    "verdict": "pass"
+   },
+   {
+    "comparisons": [
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcc395866a076f",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcc4862ecc23cc",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcc4975a5216a3",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "files"
+      },
+      "comparison_id": "cmp_01a11124dcc46d091f9adc",
+      "rule": {
+       "untrusted": true,
+       "text": "sha256:exact"
+      },
+      "verdict": "pass"
+     }
+    ],
+    "feature_id": "dotnetapp.menu_eof",
+    "scenario": {
+     "untrusted": true,
+     "text": "stdin_eof_exits_cleanly"
+    },
+    "verdict": "pass"
+   },
+   {
+    "comparisons": [
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcc8f646613efa",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcc8afb84abd50",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcc8fda323ad64",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "files"
+      },
+      "comparison_id": "cmp_01a11124dcc8419cf5430b",
+      "rule": {
+       "untrusted": true,
+       "text": "sha256:exact"
+      },
+      "verdict": "pass"
+     }
+    ],
+    "feature_id": "dotnetapp.error_corrupt_state",
+    "scenario": {
+     "untrusted": true,
+     "text": "err_corrupt_json"
+    },
+    "verdict": "pass"
+   },
+   {
+    "comparisons": [
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dccb55708e89b5",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dccce533645b1b",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcccb72399e85c",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "files"
+      },
+      "comparison_id": "cmp_01a11124dcccf6ffa0fa2a",
+      "rule": {
+       "untrusted": true,
+       "text": "sha256:exact"
+      },
+      "verdict": "pass"
+     }
+    ],
+    "feature_id": "dotnetapp.error_corrupt_state",
+    "scenario": {
+     "untrusted": true,
+     "text": "err_null_json"
+    },
+    "verdict": "pass"
+   },
+   {
+    "comparisons": [
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcd1043c66b9fe",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcd13a4f2b221d",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcd18bfe4b99e9",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "exit_code"
+      },
+      "comparison_id": "cmp_01a11124dcd1e60fac774e",
+      "rule": {
+       "untrusted": true,
+       "text": "exact"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stdout"
+      },
+      "comparison_id": "cmp_01a11124dcd106cbe73d12",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "stderr"
+      },
+      "comparison_id": "cmp_01a11124dcd15084b8cd00",
+      "rule": {
+       "untrusted": true,
+       "text": "normalize:crlf"
+      },
+      "verdict": "pass"
+     },
+     {
+      "channel": {
+       "untrusted": true,
+       "text": "files"
+      },
+      "comparison_id": "cmp_01a11124dcd1900d28382f",
+      "rule": {
+       "untrusted": true,
+       "text": "sha256:exact"
+      },
+      "verdict": "pass"
+     }
+    ],
+    "feature_id": "dotnetapp.error_usage",
+    "scenario": {
+     "untrusted": true,
+     "text": "err_usage"
+    },
+    "verdict": "pass"
+   }
+  ],
+  "summary": {
+   "errors": 0,
+   "failed": 0,
+   "passed": 9,
+   "scenarios": 9
+  },
+  "verified_at": "2026-10-06T12:16:30.929Z"
+ }
+}
