@@ -26,7 +26,7 @@ class StudioServices:
         self.jobs = JobStore(self.db, self.events, max_queue=self.settings.limits.max_queue_length,
                              lease_timeout=self.settings.limits.lease_timeout_seconds)
         self.cases = CaseStore(self.db, self.events, self.settings)
-        self.registry = BackendRegistry()
+        self.registry = BackendRegistry(self.settings.data_dir)
         self.stages = StageRegistry()
         self.services: dict[str, Any] = {"studio": self}
         self.runner = JobRunner(self.jobs, self.events, self.stages, self.settings.limits, self.services)
@@ -113,8 +113,8 @@ class StudioServices:
         from .pipeline import schedule_rebuild
         return schedule_rebuild(self, case_id)
 
-    def doctor(self, smoke: bool = False) -> dict[str, Any]:
-        return self.registry.doctor(smoke=smoke)
+    def doctor(self, smoke: bool = False, verify: bool = False) -> dict[str, Any]:
+        return self.registry.doctor(smoke=smoke, verify=verify)
 
     def job_status(self, job_id: str) -> dict[str, Any]:
         return self.jobs.get(job_id).to_dict()

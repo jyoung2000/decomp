@@ -7,9 +7,10 @@ from .contract import Availability, BackendAdapter, BackendInfo, ToolProbe
 
 
 class BackendRegistry:
-    def __init__(self):
+    def __init__(self, data_dir=None):
         self._adapters: dict[str, BackendAdapter] = {}
         self._cache: dict[str, BackendInfo] = {}
+        self.data_dir = data_dir
 
     def register(self, adapter: BackendAdapter) -> None:
         self._adapters[adapter.backend_id] = adapter
@@ -34,19 +35,32 @@ class BackendRegistry:
                 out.append(self._adapters[bid])
         return out
 
-    def doctor(self, *, smoke: bool = False) -> dict[str, Any]:
+    def doctor(self, *, smoke: bool = False, verify: bool = False) -> dict[str, Any]:
+        """Availability ladder: missing → detected → installed → usable (smoke op passed now) → verified (fixture regression passed
+        on this host with these exact tool versions; recorded in <data_dir>/backend-verification.json)."""
+        from . import verification
         report: dict[str, Any] = {"backends": [], "summary": {}}
         counts = {a.value: 0 for a in Availability}
         for bid in self.ids():
             info = self.info(bid, refresh=True)
+            versions = {t.name: t.version for t in info.tools if not t.optional}
+            if verify and self.data_dir is not None and info.availability in (Availability.INSTALLED, Availability.USABLE, Availability.VERIFIED):
+                verification.run_regression(bid, self.data_dir, versions)
+            rec = verification.is_verified(bid, self.data_dir, versions) if self.data_dir is not None else None
+            if rec and info.availability in (Availability.INSTALLED, Availability.USABLE):
+                for t in info.tools:
+                    if not t.optional and t.availability in (Availability.INSTALLED, Availability.USABLE):
+                        t.availability = Availability.VERIFIED
             entry = info.to_dict()
+            if rec:
+                entry["verification"] = {k: rec[k] for k in ("when", "command", "host", "versions")}
             if smoke and info.availability in (Availability.INSTALLED, Availability.DETECTED):
                 try:
                     probe: ToolProbe = self._adapters[bid].smoke()
                     entry["smoke"] = probe.to_dict()
                     if probe.availability == Availability.USABLE:
                         for t in info.tools:
-                            if t.name == probe.name:
+                            if t.name == probe.name and t.availability != Availability.VERIFIED:
                                 t.availability = Availability.USABLE
                         entry = info.to_dict(); entry["smoke"] = probe.to_dict()
                 except Exception as e:  # smoke must never crash doctor

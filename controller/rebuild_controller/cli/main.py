@@ -101,7 +101,7 @@ def _table(rows: list[Sequence[Any]], header: Sequence[str]) -> str:
 def cmd_doctor(args: argparse.Namespace) -> int:
     try:
         studio = _open_studio(args)
-        report = studio.doctor(smoke=args.smoke)
+        report = studio.doctor(smoke=args.smoke, verify=args.verify)
         mode = "full"
     except CliError:
         # Backend registry alone needs no database or sub-stores: still useful when the rest of the install is broken.
@@ -109,9 +109,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             from ..adapters.registry import BackendRegistry
             from ..backends import register_backends
             settings = _make_settings(getattr(args, "data_dir", None))
-            reg = BackendRegistry()
+            reg = BackendRegistry(settings.data_dir)
             register_backends(reg, settings)
-            report = reg.doctor(smoke=args.smoke)
+            report = reg.doctor(smoke=args.smoke, verify=args.verify)
             mode = "registry-only"
         except Exception as exc:
             raise CliError(f"doctor failed: {type(exc).__name__}: {exc}", 3) from exc
@@ -353,7 +353,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True, metavar="command")
 
     d = sub.add_parser("doctor", parents=[common], help="report backend tool availability")
-    d.add_argument("--smoke", action="store_true", help="run one real operation per tool")
+    d.add_argument("--smoke", action="store_true", help="run one real operation per tool (→ usable)")
+    d.add_argument("--verify", action="store_true", help="run each backend's fixture regression and record it (→ verified, bound to tool versions)")
     d.set_defaults(fn=cmd_doctor)
 
     r = sub.add_parser("rebuild", parents=[common], help="create a case and start a rebuild")
