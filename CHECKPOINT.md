@@ -1,13 +1,27 @@
 # CHECKPOINT
 
-## 2026-10-06 07:15 — session start
-- Host audited (see PLAN.md host constraints). Repo was empty on branch `ccr-4dbe9b92-nyzsa8`.
-- Tools installed under /opt/rebuild-tools (not shipped): rizin v0.9.1 static (sha256 9102249a…f647e8cf, commit c3a90e92), GDRE tools v2.7.0 linux (sha256 abb4c197…55dfacc).
-- apt install in progress: dotnet-sdk-8.0, mingw-w64, wine64, webkit2gtk/gtk dev (Tauri Linux), nsis, alsa/udev (Bevy).
-- Delegation policy (JeV-style, by task): core controller/verifier/UI → high-capability model; fixtures, scripts, docs, client packages → smaller models. One integration owner (this session); workers get file ownership lists.
+## 2026-10-06 ~12:00 UTC — vertical slice working on pecli; other fixtures running
+Branch `ccr-4dbe9b92-nyzsa8`. Commits so far: bootstrap → core → fixtures/verifier → rizin/API → worker output → jobs fan-in → pipeline fixes.
 
-## Completed
-- (none yet)
+### Verified on this host (Linux, non-certifying for Windows)
+- `controller/tests`: core (31), inventory (6+1 skip), verifier gate (3), fixture oracle (2: original 8/8 & 9/9 pass, wrong remake 0/8 rejected), API (3), rizin (32, real rizin + rz-ghidra), managed backends (109: ILSpy 9.1.0.7988, GDRE 2.7.0, asar/js), providers/budget/router/secrets/jev (208 + 3 live skipped), MCP/CLI/installer (162), Hermes (36), e2e pipeline (2: pecli full run ≈7 s, crash/resume).
+- `ui`: `npm run build` ok, vitest 53 passed; e2e against mock in progress (worker).
+- `desktop/src-tauri`: `cargo check` passes on Linux (tauri 2.12.1 pinned).
+- Fixtures: pecli (mingw PE, oracle via wine), dotnetapp (.NET 8), godotgame (PCK v2, GDRE recovers byte-identical), webapp (PWA + app.asar); `fixtures/build_all.sh` reproducible hashes.
 
-## Remaining
-- All milestones M0–M17.
+### Tools (not shipped, under /opt/rebuild-tools)
+rizin v0.9.1 static (sha256 9102249a…) and source build + rz-ghidra v0.9.0 (commit 999df7b8); GDRE 2.7.0 (sha256 abb4c197…); ilspycmd 9.1.0.7988 (~/.dotnet/tools); dotnet 8.0.131; mingw 13; wine 9.0; Python venv /opt/rebuild-tools/venv (rzpipe 0.6.2, lief 1.0.0, mcp 2.3.0, fastapi 0.142.2, playwright 1.58.2 in controller/harness with Chromium 1194 via explicit executablePath).
+
+### Decisions made while integrating
+- Recovery fan-in uses dynamic job dependencies (`JobStore.add_dependency`); a BLOCKED job (missing tool) cascades a visible blocker to dependents instead of spinning.
+- Verifier returns `untested` for an empty baseline; `verified` requires ≥1 scenario passing all channels.
+- Fixture oracles are converted (never edited) by `fixture_oracle.py`; setup files are inlined so candidate runs never read the original root.
+- No-AI mode on native/managed inputs produces a buildable scaffold + bounded `ai_task_packet` evidence and marks M-IMPL blocked with the exact next action (connect a model, or use an external client via MCP `propose_candidate`). This is reported, never faked.
+
+### Remaining
+- M7: Rust/Bevy reconstruction beyond scaffold needs a model route or external client; demonstrate via MCP propose_candidate on pecli (planned next).
+- M9/M15: UI e2e + real-controller run (worker), Windows packaging scripts/CI (worker).
+- M13: knowledge tests + reuse demo with RaisingProvider.
+- M16: web/dotnet/godot pipeline runs (in progress), then `pytest -m e2e` for all.
+- M17: final report generation (`reports/final-report.{md,json}`), SUPPORT_MATRIX update, PLAN statuses.
+- Windows gates: see docs/WINDOWS_RELEASE_GATES.md (worker) + docs/HERMES.md §7.

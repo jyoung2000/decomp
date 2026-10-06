@@ -13,27 +13,27 @@ Acceptance checks are executable commands or named tests. "done" requires the ac
 
 | ID | Outcome (plain language) | Depends on | Status | Acceptance check |
 |----|--------------------------|------------|--------|------------------|
-| M0 | Repo skeleton, decision record, support matrix, dependency pins | – | in-progress | `docs/DECISIONS.md`, `docs/SUPPORT_MATRIX.md` exist and name exact versions |
-| M1 | Controller core: SQLite store, sequenced event log, job DAG with leases/attempts/cancel/resume, case + evidence store, path safety | M0 | todo | `pytest controller/tests/test_store.py test_jobs.py test_paths.py` |
-| M2 | Unified adapter contract + backend registry (missing/detected/installed/usable/verified) + `doctor` | M1 | todo | `rebuildctl doctor` lists rizin/ilspy/gdre/node with states; `pytest test_registry.py` |
-| M3 | Detection + inventory (LIEF/pefile, Detect-It-Easy-style signatures, archive bounds, truncation disclosure) | M2 | todo | `pytest test_inventory.py` incl. junction/escape/truncation regressions |
-| M4 | Fixtures with known source kept outside adapter inputs: native PE CLI (mingw), .NET console app, Godot PCK game, JS/Electron-style web app | M0 | todo | `fixtures/build_all.sh` produces originals + manifests + frozen expected results |
-| M5 | Native path: persistent Rizin worker (rzpipe), typed extraction, function briefings, rz-ghidra/Ghidra decompile when available | M2,M3 | todo | `pytest test_rizin.py` against PE fixture (real rizin) |
-| M6 | Managed/engine paths: ILSpy (.NET), gdsdecomp (Godot), JS/Electron extraction | M2,M3 | todo | `pytest test_ilspy.py test_gdre.py test_js.py` on real fixtures |
-| M7 | Reconstruction + builders: Rust, Rust+Bevy, HTML/JS targets; staged build, atomic publish into `source/ dist/ evidence/ reports/` | M5,M6 | todo | fixture remakes build with `cargo build` / node; wrong-remake fixture rejected |
-| M8 | Verifier + comparators (exit/stdout/files/state/web DOM+screenshot with declared tolerance); feature ledger; only verifier writes verdicts | M7 | todo | `pytest test_verifier.py`: failed comparison cannot be promoted by AI response |
-| M9 | UI: Tauri 2 + React/TS; Overview/Plan/Preview&Test/Feedback/Comparisons/Connections/Knowledge/Settings; live events ≤1s; stale detection | M1 | todo | `npm test` + Playwright UI run against real controller events |
-| M10 | Plan/progress/preview/feedback persistence; project-plan.json/html export; restart recovery | M1,M9 | todo | `pytest test_plan_feedback.py`; Playwright restart scenario |
-| M11 | AI connections: OpenAI Responses, Anthropic, Gemini, OpenRouter, local OpenAI-compatible; budgets/reservations; JeV advisory router; secrets | M1 | todo | mocked protocol tests; opt-in live checks only with provided key |
-| M12 | MCP server (stdio), CLI, Cutter plugin, client skill packages (Claude Code/Codex/Gemini/Hermes), install/remove scripts (dry-run, idempotent) | M2 | todo | `pytest test_mcp.py`; scripts dry-run output |
-| M13 | Knowledge store: proposals → isolated validation → promotion/quarantine/rollback; reuse demo with raising AI adapter | M8 | todo | `pytest test_knowledge.py` incl. reuse-with-no-AI demo |
-| M14 | Hermes bridge (profile pairing, MCP registration, cua-driver vs agent session distinction, diagnostics) | M12 | todo | unit tests with recorded protocol; Windows-live gate in M15 |
-| M15 | Windows packaging + CI handoff: Tauri bundle (NSIS), PowerShell scripts, SBOM/notices, Windows CI workflow, release gates list | M9 | todo | `cargo check` of src-tauri on Linux; workflow lint; gate list in CHECKPOINT |
-| M16 | End-to-end vertical slice on each fixture via `rebuildctl rebuild` with crash/resume | M3..M8 | todo | `pytest -m e2e` |
+| M0 | Repo skeleton, decision record, support matrix, dependency pins | – | done | `docs/DECISIONS.md`, `docs/SUPPORT_MATRIX.md` exist and name exact versions |
+| M1 | Controller core: SQLite store, sequenced event log, job DAG with leases/attempts/cancel/resume, case + evidence store, path safety | M0 | done | `pytest controller/tests/test_store.py test_jobs.py test_paths.py` |
+| M2 | Unified adapter contract + backend registry (missing/detected/installed/usable/verified) + `doctor` | M1 | done | `rebuildctl doctor` lists rizin/ilspy/gdre/node with states; `pytest test_registry.py` |
+| M3 | Detection + inventory (LIEF/pefile, Detect-It-Easy-style signatures, archive bounds, truncation disclosure) | M2 | done | `pytest test_inventory.py` incl. junction/escape/truncation regressions |
+| M4 | Fixtures with known source kept outside adapter inputs: native PE CLI (mingw), .NET console app, Godot PCK game, JS/Electron-style web app | M0 | done | `fixtures/build_all.sh` produces originals + manifests + frozen expected results |
+| M5 | Native path: persistent Rizin worker (rzpipe), typed extraction, function briefings, rz-ghidra/Ghidra decompile when available | M2,M3 | done | `pytest test_rizin.py` against PE fixture (real rizin) |
+| M6 | Managed/engine paths: ILSpy (.NET), gdsdecomp (Godot), JS/Electron extraction | M2,M3 | done | `pytest test_ilspy.py test_gdre.py test_js.py` on real fixtures |
+| M7 | Reconstruction + builders: Rust, Rust+Bevy, HTML/JS targets; staged build, atomic publish into `source/ dist/ evidence/ reports/` | M5,M6 | partial | fixture remakes build with `cargo build` / node; wrong-remake fixture rejected |
+| M8 | Verifier + comparators (exit/stdout/files/state/web DOM+screenshot with declared tolerance); feature ledger; only verifier writes verdicts | M7 | done | `pytest test_verifier.py`: failed comparison cannot be promoted by AI response |
+| M9 | UI: Tauri 2 + React/TS; Overview/Plan/Preview&Test/Feedback/Comparisons/Connections/Knowledge/Settings; live events ≤1s; stale detection | M1 | in-progress | `npm test` + Playwright UI run against real controller events |
+| M10 | Plan/progress/preview/feedback persistence; project-plan.json/html export; restart recovery | M1,M9 | done | `pytest test_plan_feedback.py`; Playwright restart scenario |
+| M11 | AI connections: OpenAI Responses, Anthropic, Gemini, OpenRouter, local OpenAI-compatible; budgets/reservations; JeV advisory router; secrets | M1 | done | mocked protocol tests; opt-in live checks only with provided key |
+| M12 | MCP server (stdio), CLI, Cutter plugin, client skill packages (Claude Code/Codex/Gemini/Hermes), install/remove scripts (dry-run, idempotent) | M2 | done | `pytest test_mcp.py`; scripts dry-run output |
+| M13 | Knowledge store: proposals → isolated validation → promotion/quarantine/rollback; reuse demo with raising AI adapter | M8 | partial | `pytest test_knowledge.py` incl. reuse-with-no-AI demo |
+| M14 | Hermes bridge (profile pairing, MCP registration, cua-driver vs agent session distinction, diagnostics) | M12 | done | unit tests with recorded protocol; Windows-live gate in M15 |
+| M15 | Windows packaging + CI handoff: Tauri bundle (NSIS), PowerShell scripts, SBOM/notices, Windows CI workflow, release gates list | M9 | in-progress | `cargo check` of src-tauri on Linux; workflow lint; gate list in CHECKPOINT |
+| M16 | End-to-end vertical slice on each fixture via `rebuildctl rebuild` with crash/resume | M3..M8 | in-progress | `pytest -m e2e` |
 | M17 | Final report (readable + machine) with per-feature status, calls/tokens/cost, failures/skips, remaining Windows actions | all | todo | `reports/final-report.{md,json}` generated by tooling |
 
 ## Discovery items (explicitly unknown scope)
-- D1: rz-ghidra plugin build on this host (needs rizin dev headers; static tarball ships binaries only).
+- D1 (resolved): rizin v0.9.1 built from source + rz-ghidra v0.9.0 plugin at /opt/rebuild-tools/rizin-src-install; real Ghidra decompilation (`pdgj`). Build script: /opt/rebuild-tools/rz-ghidra-build/build.sh.
 - D2: Bevy compile feasibility on 4 cores within session time.
-- D3: Wine availability for running the PE fixture oracle on Linux (labelled non-certifying).
-- D4: Hermes protocol contract (docs host unreachable; derive from pinned source).
+- D3 (resolved): wine 9.0 runs the PE fixture oracle on Linux; labelled non-certifying in every report.
+- D4 (resolved): contracts derived from pinned source daefc2b7 with path:line citations in docs/HERMES.md; Windows gates G1–G9 open.
