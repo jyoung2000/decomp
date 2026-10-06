@@ -1,5 +1,10 @@
 # CHECKPOINT
 
+## 2026-10-06 ~12:25 UTC — demos complete, doctor verified
+- `rebuildctl doctor --verify --smoke`: rizin, ilspy, gdre, jsweb **verified** (fixture regressions recorded in <data>/backend-verification.json, bound to tool versions); ghidra missing (optional).
+- Demos: pecli→Rust 8/8 (MCP external client), dotnetapp→Rust 9/9 (MCP external client, worker), webapp→PWA 4/4 (deterministic), godotgame→Bevy scaffold (recovery only, honest no-parity). Records under `examples/`.
+- Demo controller on port 8766 stopped. Workers still in flight: Windows packaging/CI, UI e2e + real controller, Cutter plugin.
+
 ## 2026-10-06 ~12:30 UTC — all four fixture pipelines run; native + web demos verified
 - Full controller suite: 598 passed / 1 skipped. e2e set running. UI vitest 53. cargo check ok.
 - Demos: `examples/pecli-rust-from-evidence` (Rust from rz-ghidra evidence via MCP: verifier 8/8, independent harness 8/8, delivered);
