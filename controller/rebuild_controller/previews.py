@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import http.server
-import os
 import secrets
 import socket
-import subprocess
 import threading
 from functools import partial
 from pathlib import Path
@@ -90,25 +88,26 @@ class PreviewManager:
             self.events.emit("preview.opened", {"preview_id": preview_id, "instance_id": iid, "url": url}, case_id=p["case_id"])
             return {"kind": "browser", "url": url, "instance_id": iid, "opened": True, "isolation": "separate origin per port; no shared state with original"}
         if launch.get("type") == "native":
-            cmd = launch["command"]
+            from . import sandbox
+            cmd = list(launch["command"])
             cwd = launch.get("cwd")
-            env = dict(os.environ)
             state_dir = Path(launch.get("state_dir") or (Path(cwd or ".") / ".preview-state"))
-            state_dir.mkdir(parents=True, exist_ok=True)
-            env.update({"REBUILD_PREVIEW_STATE": str(state_dir), **launch.get("env", {})})
-            kwargs: dict[str, Any] = {"cwd": cwd, "env": env}
-            if os.name == "nt":
-                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-            else:
-                kwargs["start_new_session"] = True
             try:
-                proc = subprocess.Popen(cmd, **kwargs)
-            except OSError as e:
+                policy = sandbox.IsolationPolicy.from_spec(launch.get("isolation"), wall_time_s=None, ui_restrictions="interactive",
+                                                           process_memory_bytes=2 * sandbox.GiB, job_memory_bytes=4 * sandbox.GiB, max_processes=64)
+                sandbox.prepare_work_dir(state_dir, policy)
+                prog_dirs = [str(Path(cmd[0]).parent)] if Path(cmd[0]).is_absolute() else []
+                env = sandbox.build_env(state_dir, program_dirs=prog_dirs, policy=policy,
+                                        declared={"REBUILD_PREVIEW_STATE": str(state_dir), **launch.get("env", {})})
+                proc = sandbox.spawn(cmd, work=state_dir, cwd=Path(cwd) if cwd else state_dir, policy=policy, env=env)
+            except (OSError, ValueError, sandbox.SandboxError) as e:
                 return {"opened": False, "message": f"could not launch: {e}", "next_action": "check launch requirements"}
             with self._lock:
                 self._instances[iid] = {"instance_id": iid, "preview_id": preview_id, "kind": "native", "proc": proc}
-            self.events.emit("preview.opened", {"preview_id": preview_id, "instance_id": iid, "pid": proc.pid}, case_id=p["case_id"])
-            return {"kind": "native", "instance_id": iid, "pid": proc.pid, "opened": True, "command": cmd, "isolated_state": str(state_dir)}
+            iso = getattr(proc, "isolation", None)
+            self.events.emit("preview.opened", {"preview_id": preview_id, "instance_id": iid, "pid": proc.pid, "isolation": iso}, case_id=p["case_id"])
+            return {"kind": "native", "instance_id": iid, "pid": proc.pid, "opened": True, "command": cmd, "isolated_state": str(state_dir),
+                    "isolation": iso}
         return {"opened": False, "message": f"unsupported launch type {launch.get('type')}", "next_action": "build a runnable candidate first"}
 
     def stop(self, instance_id: str) -> bool:
@@ -118,6 +117,8 @@ class PreviewManager:
             return False
         if inst["kind"] == "browser":
             inst["server"].shutdown(); inst["server"].server_close()
+        elif hasattr(inst["proc"], "kill_tree"):
+            inst["proc"].kill_tree()     # sandboxed: whole job / process group
         else:
             kill_tree(inst["proc"])
         p = self.get(inst["preview_id"])

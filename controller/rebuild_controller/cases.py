@@ -87,7 +87,7 @@ class CaseStore:
             "case_id": case_id, "created_at": ts, "updated_at": ts, "name": name,
             "source_root": str(resolve_final(source_root)), "output_root": str(resolve_final(output_root)),
             "target_language": target_language, "output_type": output_type,
-            "ai_policy": ai_policy or {"mode": "no_ai"}, "launch_profile": launch_profile or {"execute_original": False},
+            "ai_policy": ai_policy or {"mode": "no_ai"}, "launch_profile": _initial_consent(launch_profile or {"execute_original": False}, ts),
             "status": "created", "app_version": __version__, "settings": settings or {},
         }
         self.db.insert("cases", row)
@@ -101,6 +101,27 @@ class CaseStore:
         for k in ("ai_policy", "launch_profile", "settings"):
             r[k] = loads(r[k], {})
         return r
+
+    # -- consent to execute the user's original program ----------------------------------------------------------------
+    def original_execution_consent(self, case_id: str) -> dict[str, Any]:
+        """The recorded per-case permission to run the ORIGINAL program (default: not allowed)."""
+        return consent_of(self.get_case(case_id))
+
+    def set_original_execution_consent(self, case_id: str, allow: bool, *, via: str = "api", note: str = "") -> dict[str, Any]:
+        """Grant or revoke permission to execute the original program for this case. Every change is timestamped and logged."""
+        case = self.get_case(case_id)
+        lp = dict(case.get("launch_profile") or {})
+        ts = now_iso()
+        history = list(lp.get("original_execution_consent_history") or [])
+        history.append({"allowed": bool(allow), "at": ts, "via": via, "note": note[:500]})
+        lp.update({"allow_original_execution": bool(allow), "original_execution_consent_at": ts, "original_execution_consent_via": via,
+                   "original_execution_consent_history": history[-50:]})
+        if allow:
+            lp["execute_original"] = True   # consent also enables runtime observation in the pipeline
+        self.db.update("cases", "case_id", case_id, {"launch_profile": lp, "updated_at": ts})
+        c = consent_of(self.get_case(case_id))
+        self.events.emit("case.consent", {"case_id": case_id, "original_execution": c}, case_id=case_id)
+        return c
 
     def list_cases(self) -> list[dict[str, Any]]:
         return [self.get_case(r["case_id"]) for r in self.db.query("SELECT case_id FROM cases ORDER BY created_at DESC")]
@@ -244,3 +265,31 @@ class CaseStore:
 def _install_root() -> Path | None:
     env = os.environ.get("REBUILD_STUDIO_INSTALL")
     return Path(env) if env else None
+
+
+def consent_of(case: dict[str, Any]) -> dict[str, Any]:
+    lp = case.get("launch_profile") or {}
+    return {"allowed": bool(lp.get("allow_original_execution")), "at": lp.get("original_execution_consent_at"),
+            "via": lp.get("original_execution_consent_via"), "history": lp.get("original_execution_consent_history") or []}
+
+
+def require_original_execution_consent(case: dict[str, Any]) -> dict[str, Any]:
+    """Return the consent record or raise OriginalExecutionNotPermitted ('Original execution needs your permission: ...')."""
+    c = consent_of(case)
+    if not c["allowed"]:
+        from .comparators.cli import original_consent_error
+        lp = case.get("launch_profile") or {}
+        raise original_consent_error(lp.get("launch"), Path(case["source_root"]) if case.get("source_root") else None)
+    return c
+
+
+def _initial_consent(lp: dict[str, Any], ts: str) -> dict[str, Any]:
+    """A case created with execute_original=true (the user ticked "run the original" in the new-project form) records that
+    choice as a timestamped consent; anything else starts without consent. Explicit allow_original_execution=false wins."""
+    lp = dict(lp)
+    allowed = bool(lp.get("execute_original")) and lp.get("allow_original_execution", True) is not False
+    lp["allow_original_execution"] = allowed
+    lp["original_execution_consent_at"] = ts if allowed else None
+    lp["original_execution_consent_via"] = "create_case" if allowed else None
+    lp["original_execution_consent_history"] = [{"allowed": True, "at": ts, "via": "create_case", "note": "execute_original enabled at creation"}] if allowed else []
+    return lp

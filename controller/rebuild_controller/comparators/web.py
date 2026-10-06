@@ -5,7 +5,6 @@ import glob
 import json
 import os
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -56,12 +55,26 @@ def run_web_scenario(url: str, scenario: dict[str, Any], out_dir: Path, *, timeo
             "dpr": scenario.get("dpr", 1), "colorScheme": scenario.get("color_scheme", "light"), "wait_for": scenario.get("wait_for")}
     spec_path = out_dir / "spec.json"; spec_path.write_text(json.dumps(spec))
     rec_path = out_dir / "record.json"
-    env = dict(os.environ); env["REBUILD_HARNESS_DIR"] = str(harness_dir())
-    p = subprocess.run(["node", str(HARNESS), str(spec_path), str(rec_path)], cwd=str(harness_dir()), capture_output=True, timeout=timeout, env=env)
+    # The page under test (original or candidate web app) runs inside Chromium's own renderer sandbox. The node/Chromium
+    # tree itself runs in a Job Object (tree kill, memory/process caps) with an allow-listed environment, but at MEDIUM
+    # integrity: Chromium's sandbox needs a normal-integrity browser process. Recorded as a downgrade in rec["isolation"].
+    from .. import sandbox
+    node = shutil.which("node") or "node"
+    policy = sandbox.IsolationPolicy.from_spec(scenario.get("isolation") or {"integrity": "medium", "reason": "Chromium's renderer sandbox needs a medium-integrity browser process"},
+                                               wall_time_s=timeout, process_memory_bytes=4 * sandbox.GiB, job_memory_bytes=8 * sandbox.GiB,
+                                               max_processes=128, ui_restrictions="interactive",
+                                               env_passthrough=("PLAYWRIGHT_BROWSERS_PATH", "REBUILD_CHROMIUM"))
+    iso_root = out_dir.parent / f".{out_dir.name}.isohome"
+    for d in (out_dir, iso_root):
+        sandbox.prepare_work_dir(d, policy)
+    env = sandbox.build_env(iso_root, program_dirs=[str(Path(node).parent)], policy=policy, declared={"REBUILD_HARNESS_DIR": str(harness_dir())})
+    p = sandbox.run([node, str(HARNESS), str(spec_path), str(rec_path)], work=iso_root, cwd=harness_dir(), policy=policy, env=env)
     if p.returncode != 0 or not rec_path.exists():
-        raise RuntimeError(f"web harness failed: {p.stderr.decode('utf-8', 'replace')[-2000:]}")
+        why = "timed out" if p.timed_out else p.stderr.decode('utf-8', 'replace')[-2000:]
+        raise RuntimeError(f"web harness failed: {why}")
     rec = json.loads(rec_path.read_text())
     rec["command"] = f"node {HARNESS.name} spec.json record.json"
+    rec["isolation"] = {**p.isolation, "limits_triggered": p.triggered}
     return rec
 
 

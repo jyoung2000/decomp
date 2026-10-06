@@ -277,6 +277,12 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
         return {"evidence_id": ev["evidence_id"], "source": "fixture_oracle", "scenarios": len(bl.get("scenarios", []))}
     if not lp.get("execute_original"):
         raise StageError("original execution not authorized", blocker="enable 'execute original' in launch configuration to capture a baseline")
+    from .cases import require_original_execution_consent
+    from .sandbox import OriginalExecutionNotPermitted
+    try:
+        consent = require_original_execution_consent(case)
+    except OriginalExecutionNotPermitted as e:
+        raise StageError(str(e), blocker="Original execution needs your permission: allow it for this project or supply a baseline file") from e
     launch = lp.get("launch")
     if not launch:
         raise StageError("launch profile has no launch spec", blocker="configure how the original is started")
@@ -308,7 +314,8 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
         from .comparators.cli import run_steps, snapshot_work
         for i, sc in enumerate(scenarios):
             w = work_root / sc["id"]
-            runs = run_steps(launch, root, sc["steps"], w, timeout=float(sc.get("timeout", 60)), setup_files=sc.get("setup_files"))
+            runs = run_steps(launch, root, sc["steps"], w, timeout=float(sc.get("timeout", 60)), setup_files=sc.get("setup_files"),
+                             role="original", consent=consent, isolation=sc.get("isolation"), poll=ctx.heartbeat)
             bl["scenarios"].append({**sc, "expected": {"steps": runs, "files": snapshot_work(w)}})
             ctx.progress(scenarios_done=i + 1, scenarios_total=len(scenarios))
     ev = st.verifier.freeze_baseline(case["case_id"], bl, producer="capture_original", title="Captured original baseline")
