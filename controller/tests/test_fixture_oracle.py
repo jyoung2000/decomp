@@ -71,4 +71,9 @@ def test_dotnetapp_oracle_self_check(studio, tmp_path):
     c = studio.candidates.mark_built(c["candidate_id"], orig)
     studio.db.update("candidates", "candidate_id", c["candidate_id"], {"meta": {"launch": {"type": "dotnet", "path": "dotnetapp.dll"}}})
     rep = studio.verifier.verify_candidate(cid, c["candidate_id"])
-    assert rep["summary"]["passed"] == len(bl["scenarios"]) == 9, rep["summary"]
+    if rep["summary"]["passed"] != 9:   # diagnostics: what did the isolated run actually do on this host?
+        from rebuild_controller.comparators.cli import run_steps
+        sc = bl["scenarios"][0]
+        r = run_steps({"type": "dotnet", "path": "dotnetapp.dll"}, orig, sc["steps"], tmp_path / "diag", setup_files=sc.get("setup_files"))
+        diag = [{k: (v[:600] if isinstance(v, str) else v) for k, v in step.items() if k in ("exit_code", "stdout", "stderr", "timed_out", "triggered", "isolation")} for step in r]
+        pytest.fail(f"{rep['summary']} expected stdout={sc['expected']['steps'][0].get('stdout', '')[:300]!r} run={diag}")

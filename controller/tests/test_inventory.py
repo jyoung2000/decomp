@@ -67,13 +67,9 @@ def test_inventory_inaccessible_disclosed(tmp_path):
 
 def test_detect_pe_and_dependency_graph(tmp_path):
     exe = tmp_path / "app" / "a.exe"; exe.parent.mkdir()
-    if os.name == "nt":
-        # Native Windows host: no mingw cross-compiler needed; use a real x64 console PE that ships with Windows.
-        import shutil
-        shutil.copy2(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "whoami.exe", exe)
-    else:
-        src = tmp_path / "a.c"; src.write_text('#include <stdio.h>\nint main(){puts("x");return 0;}')
-        subprocess.run(["x86_64-w64-mingw32-gcc", "-O1", "-o", str(exe), str(src)], check=True)
+    # The committed pecli fixture is a real mingw-built x64 console PE: no cross-compiler needed on any host.
+    import shutil
+    shutil.copy2(Path(__file__).resolve().parents[2] / "fixtures" / "pecli" / "original" / "pecli.exe", exe)
     d = sniff(exe)
     assert d.format == "pe" and d.profile == "native_pe" and d.arch == "x86_64" and d.bits == 64
     assert d.flags["subsystem"] == "console" and "kernel32.dll" in d.flags["imports"]

@@ -342,7 +342,15 @@ def test_spawn_kill_tree_for_previews(tmp_path):
     deadline = time.monotonic() + 5
     while _pid_alive(gpid) and time.monotonic() < deadline:
         time.sleep(0.1)
-    assert not _pid_alive(gpid) and p.poll() is not None
+    diag = ""
+    if not WIN and _pid_alive(gpid):
+        try:
+            st = Path(f"/proc/{gpid}/stat").read_text().split()
+            diag = f"grandchild state={st[2]} ppid={st[3]} pgid={st[4]} main_pid={getattr(getattr(p, 'proc', None), 'pid', '?')}"
+        except OSError as e:
+            diag = repr(e)
+    assert not _pid_alive(gpid), diag
+    assert p.poll() is not None
 
 
 @pytest.mark.skipif(not WIN or not __import__("shutil").which("cargo"), reason="Windows + cargo needed")
