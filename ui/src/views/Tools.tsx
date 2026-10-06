@@ -23,6 +23,7 @@ const PHASE: Record<string, string> = {
   verifying: 'Verifying checksum',
   extracting: 'Unpacking',
   checking: 'Checking that the tool starts',
+  installing: 'Installing (this can take several minutes)',
   activating: 'Finishing',
   done: 'Done',
   failed: 'Failed',
@@ -126,6 +127,7 @@ function ToolCard({ tool, snapshot, onChanged }: { tool: ToolSetupEntry; snapsho
       <p className="small muted">
         Version {tool.installed_version && tool.installed_version !== tool.version ? `${tool.installed_version} (installed), ${tool.version} (available)` : tool.version}
         {' · '}Download {bytes(tool.size_bytes)}
+        {tool.footprint ? ` + about ${bytes(tool.footprint.installer_download_bytes)} fetched by its installer · ${bytes(tool.footprint.disk_bytes)} on disk` : ''}
         {tool.license ? ` · License ${tool.license}` : ''}
         {tool.optional ? ' · Optional' : ''}
       </p>

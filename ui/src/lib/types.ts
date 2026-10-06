@@ -545,7 +545,7 @@ export interface ToolSetupError {
 }
 
 export interface ToolSetupJob {
-  phase: 'queued' | 'downloading' | 'verifying' | 'extracting' | 'checking' | 'activating' | 'done' | 'failed' | 'cancelled';
+  phase: 'queued' | 'downloading' | 'verifying' | 'extracting' | 'checking' | 'installing' | 'activating' | 'done' | 'failed' | 'cancelled';
   bytes_done: number;
   bytes_total: number;
   percent: number | null;
@@ -569,6 +569,8 @@ export interface ToolSetupEntry {
   file_name?: string | null;
   url?: string | null;
   sha256?: string | null;
+  /** Large tools whose installer fetches more than the pinned download (e.g. the Rust toolchain). */
+  footprint?: { installer_download_bytes: number; disk_bytes: number; note?: string } | null;
   requires: string[];
   status: ToolSetupStatus;
   disk_status: ToolSetupStatus;

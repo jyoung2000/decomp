@@ -227,6 +227,71 @@
       },
       "install_dir": "jadx"
     },
+    "rust": {
+      "version": "1.97.0",
+      "role": "Rust compiler for building rebuilt programs as Windows .exe files (cargo + rustc, stable 1.97.0, host/target x86_64-pc-windows-gnu). Installed privately under tools\\rust by the official rustup-init 1.29.1 (sha256-pinned below) run as a lock-declared post_install step with RUSTUP_HOME/CARGO_HOME inside the tools folder: no administrator rights, no PATH changes, no Visual Studio Build Tools (the GNU toolchain ships its own self-contained mingw linker). Without it the app falls back to a cargo already on PATH.",
+      "license": "MIT OR Apache-2.0 (rustup, Rust toolchain); the bundled mingw-w64 linker files carry their own permissive/GPL-with-exception licenses",
+      "optional": false,
+      "source": {
+        "repo": "https://github.com/rust-lang/rustup",
+        "docs": "https://rust-lang.github.io/rustup/installation/other.html",
+        "rustup_init_version": "1.29.1",
+        "channel_manifest": "https://static.rust-lang.org/dist/channel-rust-1.97.0.toml",
+        "toolchain": "1.97.0",
+        "host_triple": "x86_64-pc-windows-gnu"
+      },
+      "artifact": {
+        "name": "rustup-init.exe",
+        "url": "https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe",
+        "size_bytes": 12721664,
+        "sha256": "6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e",
+        "verify_required": false,
+        "format": "file",
+        "hash_provenance": "2026-10-06 on Windows 11: downloaded rustup-init.exe 1.29.1 (x86_64-pc-windows-msvc host binary, which only needs the Windows system DLLs) from static.rust-lang.org; sha256 computed locally and matched the official value in rustup-init.exe.sha256 published next to it (https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe.sha256). 1.29.1 is the version named in https://static.rust-lang.org/rustup/release-stable.toml that day.",
+        "sha256_official": "6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e",
+        "sha256_official_url": "https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe.sha256"
+      },
+      "footprint": {
+        "installer_download_bytes": 147000000,
+        "disk_bytes": 840000000,
+        "note": "rustup-init (12.7 MB, pinned above) downloads the toolchain components itself (about 147 MB) and unpacks to about 840 MB. rustup verifies every component's hash against Rust's signed release manifests (channel-rust-1.97.0.toml); that check is rustup's, the lock pins only the installer and the toolchain version."
+      },
+      "layout": {
+        "archive_root": "",
+        "entry": "rustup-init.exe",
+        "entry_sha256": "6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e",
+        "version_args": [
+          "--version"
+        ],
+        "post_install": {
+          "argv": [
+            "{staged}/rustup-init.exe",
+            "--default-host",
+            "x86_64-pc-windows-gnu",
+            "--default-toolchain",
+            "1.97.0",
+            "--profile",
+            "minimal",
+            "--no-modify-path",
+            "-y"
+          ],
+          "env": {
+            "RUSTUP_HOME": "{staged}/rustup",
+            "CARGO_HOME": "{staged}/cargo",
+            "RUSTUP_INIT_SKIP_PATH_CHECK": "yes",
+            "RUSTUP_TERM_COLOR": "never"
+          },
+          "timeout_seconds": 2400,
+          "progress_message": "Installing the Rust toolchain",
+          "log_name": "rust-install.log",
+          "produces": [
+            "rustup/toolchains/1.97.0-x86_64-pc-windows-gnu/bin/cargo.exe",
+            "rustup/toolchains/1.97.0-x86_64-pc-windows-gnu/bin/rustc.exe"
+          ]
+        }
+      },
+      "install_dir": "rust"
+    },
     "node": {
       "version": "22.22.0",
       "role": "Optional: JS/Electron extraction (@electron/asar) at runtime. Not required for native/.NET/Godot paths.",
@@ -311,7 +376,8 @@
       "toolchain": "1.97.0",
       "msrv": "1.90",
       "target": "x86_64-pc-windows-msvc",
-      "note": "CI uses the stable channel; the pin records the version the shell was validated with (cargo check on Linux). Windows MSVC builds are unverified until docs/WINDOWS_RELEASE_GATES.md gate W1 passes."
+      "note": "CI uses the stable channel; the pin records the version the shell was validated with (cargo check on Linux). Windows MSVC builds are unverified until docs/WINDOWS_RELEASE_GATES.md gate W1 passes.",
+      "private_install": "Guided setup (tool 'rust') installs 1.97.0 for x86_64-pc-windows-gnu privately; the Rust builder prefers it over PATH. Release builds of the shell itself still use the msvc target above."
     },
     "node": {
       "major": 22,

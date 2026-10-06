@@ -10,14 +10,52 @@ from .. import sandbox
 from ..jobs.runner import StageContext, StageError
 
 
+TOOL_NAME = "rust"                                   # key in dependency-lock.json / the Tools page
+TOOL_TITLE = "Rust compiler (private)"               # tool_setup.FRIENDLY["rust"][0]
+BLOCKER = (f"open Tools and install '{TOOL_TITLE}' (needed to build rebuilt programs as Windows .exe files), then resume; "
+           "or put cargo on PATH")
+
+
 def cargo() -> str | None:
     return shutil.which("cargo") or (str(Path.home() / ".cargo" / "bin" / "cargo") if (Path.home() / ".cargo" / "bin" / "cargo").exists() else None)
 
 
+def private_rust(tools_dir: Path | str | None = None) -> dict[str, str] | None:
+    """The toolchain installed by Tools setup: <tools>/rust/rustup/toolchains/<ver>-<host>/bin/cargo.exe (the proxy in
+    cargo/bin is deliberately not used). None when it is not (completely) there."""
+    if tools_dir is None:
+        from ..config import get_settings
+        tools_dir = get_settings().tools_dir
+    root = Path(tools_dir) / TOOL_NAME
+    exe = ".exe" if os.name == "nt" else ""
+    tcs = root / "rustup" / "toolchains"
+    try:
+        cands = sorted((d for d in tcs.iterdir() if (d / "bin" / f"cargo{exe}").is_file() and (d / "bin" / f"rustc{exe}").is_file()), reverse=True)
+    except OSError:
+        return None
+    if not cands:
+        return None
+    tc = cands[0]
+    return {"cargo": str(tc / "bin" / f"cargo{exe}"), "rustc": str(tc / "bin" / f"rustc{exe}"), "bin": str(tc / "bin"),
+            "toolchain": tc.name, "rustup_home": str(root / "rustup"), "cargo_home": str(root / "cargo")}
+
+
+def _tools_dir(ctx: StageContext) -> Path | None:
+    st = (getattr(ctx, "services", None) or {}).get("studio")
+    s = getattr(st, "settings", None)
+    return Path(s.tools_dir) if s is not None and getattr(s, "tools_dir", None) else None
+
+
+def toolchain_available(tools_dir: Path | str | None = None) -> bool:
+    """Used by the forecast / capabilities text: can a Rust candidate be built here at all?"""
+    return private_rust(tools_dir) is not None or cargo() is not None
+
+
 def build_rust(ctx: StageContext, source_dir: Path, dist_dir: Path, *, bevy: bool = False, target_triple: str | None = None) -> dict[str, Any]:
-    cg = cargo()
+    private = private_rust(_tools_dir(ctx))
+    cg = private["cargo"] if private else cargo()
     if not cg:
-        raise StageError("cargo not installed", blocker="install Rust toolchain (rustup) to build Rust candidates")
+        raise StageError("cargo not installed", blocker=BLOCKER)
     manifest = source_dir / "Cargo.toml"
     if not manifest.exists():
         raise StageError("candidate has no Cargo.toml")
@@ -32,7 +70,7 @@ def build_rust(ctx: StageContext, source_dir: Path, dist_dir: Path, *, bevy: boo
     if target_triple:
         args += ["--target", target_triple]
     ctx.log(f"cargo build in {source_dir} (isolated: build scripts and proc-macros are untrusted code)")
-    res = _isolated_cargo(ctx, args, source_dir, dist_dir)
+    res = _isolated_cargo(ctx, args, source_dir, dist_dir, private=private)
     log = (res.stdout + b"\n" + res.stderr).decode("utf-8", "replace")
     if res.timed_out:
         raise StageError(f"timeout after {ctx.limits.max_stage_seconds}s running cargo build", retry=False)
@@ -54,7 +92,7 @@ def build_rust(ctx: StageContext, source_dir: Path, dist_dir: Path, *, bevy: boo
     for extra in ("assets", "data"):
         if (source_dir / extra).is_dir():
             shutil.copytree(source_dir / extra, dist_dir / extra, dirs_exist_ok=True)
-    return {"launch": {"type": "exe", "path": out.name}, "binary": str(out), "build_log": log[-20000:], "toolchain": _rustc_version(ctx), "bevy": bevy,
+    return {"launch": {"type": "exe", "path": out.name}, "binary": str(out), "build_log": log[-20000:], "toolchain": _rustc_version(ctx, private), "private_toolchain": private["toolchain"] if private else None, "bevy": bevy,
             "locked": (source_dir / "Cargo.lock").exists(), "build_isolation": {**res.isolation, "limits_triggered": res.triggered}}
 
 
@@ -69,7 +107,7 @@ def _cargo_cache_dir(ctx: StageContext, dist_dir: Path) -> Path:
     return dist_dir.parent / ".build-cache" / "cargo-home"
 
 
-def _isolated_cargo(ctx: StageContext, args: list[str], source_dir: Path, dist_dir: Path) -> sandbox.RunResult:
+def _isolated_cargo(ctx: StageContext, args: list[str], source_dir: Path, dist_dir: Path, *, private: dict[str, str] | None = None) -> sandbox.RunResult:
     """cargo runs build.rs / proc-macros from the (AI-generated) candidate: run it in the sandbox. Low integrity on Windows:
     it can write the candidate source/target dir and its own CARGO_HOME cache, not the user profile. Network stays open
     (crates.io downloads); see docs/ISOLATION.md."""
@@ -83,15 +121,22 @@ def _isolated_cargo(ctx: StageContext, args: list[str], source_dir: Path, dist_d
     for d in (source_dir, iso_root):
         sandbox.prepare_work_dir(d, policy)
     cargo_home.mkdir(parents=True, exist_ok=True)
-    rustup_home = os.environ.get("RUSTUP_HOME") or str(Path.home() / ".rustup")
-    env = sandbox.build_env(iso_root, program_dirs=[str(Path(args[0]).parent)], policy=policy,
-                            declared={"CARGO_HOME": str(cargo_home), "RUSTUP_HOME": rustup_home, "CARGO_TERM_COLOR": "never", "CARGO_INCREMENTAL": "0"})
+    # CARGO_HOME stays the case-local cache either way. With the private toolchain cargo/rustc are called directly from the
+    # toolchain dir (no rustup proxy), RUSTUP_HOME points at the private rustup home, and the default host/target is the GNU one.
+    rustup_home = private["rustup_home"] if private else (os.environ.get("RUSTUP_HOME") or str(Path.home() / ".rustup"))
+    declared = {"CARGO_HOME": str(cargo_home), "RUSTUP_HOME": rustup_home, "CARGO_TERM_COLOR": "never", "CARGO_INCREMENTAL": "0"}
+    if private:
+        declared["RUSTC"] = private["rustc"]
+    env = sandbox.build_env(iso_root, program_dirs=[str(Path(args[0]).parent)], policy=policy, declared=declared)
+    if private:
+        for k in ("RUSTUP_TOOLCHAIN", "CARGO_BUILD_TARGET"):    # a developer's rustup/target override must not redirect the private toolchain
+            env.pop(k, None)
     return sandbox.run(args, work=iso_root, cwd=source_dir, policy=policy, env=env, poll=ctx.heartbeat, label="build")
 
 
-def _rustc_version(ctx: StageContext) -> str:
+def _rustc_version(ctx: StageContext, private: dict[str, str] | None = None) -> str:
     try:
-        r = ctx.run([shutil.which("rustc") or "rustc", "--version"], timeout=30)
+        r = ctx.run([(private or {}).get("rustc") or shutil.which("rustc") or "rustc", "--version"], timeout=30)
         return r.text.strip()
     except Exception:
         return "unknown"

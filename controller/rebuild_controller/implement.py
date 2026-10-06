@@ -133,7 +133,32 @@ def route_status(st: Any, pol: LoopPolicy, task: str = "interpretation") -> dict
 
 
 # ====================================================================================== forecast (plain language, before start)
-def forecast(st: Any, *, target_language: str, output_type: str, ai_policy: dict[str, Any] | None, launch_profile: dict[str, Any] | None,
+RUST_TOOL_TITLE = "Rust compiler (private)"      # = tool_setup.FRIENDLY["rust"][0] = builders.rust.TOOL_TITLE
+
+
+def _rust_toolchain_note(st: Any) -> dict[str, Any]:
+    """Is a Rust compiler available (private one from Tools, else cargo on PATH)? Plain-language when it is not."""
+    from .builders.rust import toolchain_available
+    tools = getattr(getattr(st, "settings", None), "tools_dir", None)
+    ok = toolchain_available(tools)
+    out: dict[str, Any] = {"available": ok, "tool": "rust", "title": RUST_TOOL_TITLE}
+    if not ok:
+        out["message"] = (f"The '{RUST_TOOL_TITLE}' is not installed, so nothing can be built as a Windows .exe yet. "
+                          f"Open Tools and install it (about 150 MB to download, 850 MB on disk, no administrator rights needed).")
+    return out
+
+
+def forecast(st: Any, **kw: Any) -> dict[str, Any]:
+    res = _forecast(st, **kw)
+    rt = _rust_toolchain_note(st)
+    res["rust_toolchain"] = rt
+    if not rt["available"] and res.get("state") not in ("unsupported", "deterministic_port"):
+        res.setdefault("details", []).append(rt["message"])
+        res.setdefault("next_actions", []).append(f"Install '{RUST_TOOL_TITLE}' in Tools.")
+    return res
+
+
+def _forecast(st: Any, *, target_language: str, output_type: str, ai_policy: dict[str, Any] | None, launch_profile: dict[str, Any] | None,
              profile: str | None = None) -> dict[str, Any]:
     """State in plain language whether an implementation can be produced for the selected profile/target/AI mode."""
     from .reconstruct import _unsupported_combo
@@ -201,6 +226,15 @@ def forecast_for_case(st: Any, case: dict[str, Any]) -> dict[str, Any]:
 
 def global_forecast(st: Any) -> dict[str, Any]:
     """Case-independent statement for /capabilities: what the app can do with the AI connection it currently has."""
+    out = _global_forecast(st)
+    rt = _rust_toolchain_note(st)
+    out["rust_toolchain"] = rt
+    if not rt["available"]:
+        out["summary"] = f"{out['summary']} {rt['message']}"
+    return out
+
+
+def _global_forecast(st: Any) -> dict[str, Any]:
     pol = LoopPolicy.from_case({"ai_policy": {"mode": "assisted", "budget_usd": 1.0, "max_output_tokens": 1}})
     rs = route_status(st, pol)
     if getattr(st, "ai", None) is None:
@@ -553,7 +587,7 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
     except Exception as e:  # noqa: BLE001 - compiler errors, bad manifests, missing toolchain: all become feedback
         text = redact(str(e))
         if isinstance(e, StageError) and e.blocker and "cargo" in text.lower() and "not installed" in text.lower():
-            raise ImplementStop("toolchain_missing", f"Cannot build Rust candidates: {text}. Install the Rust toolchain, then resume.") from e
+            raise ImplementStop("toolchain_missing", f"Cannot build Rust candidates: {text}. Open Tools and install '{RUST_TOOL_TITLE}', then resume.") from e
         ev = st.cases.add_evidence(case_id, "build_log", f"Build log {cid} (failed)", body_bytes=text.encode("utf-8"), inputs={"candidate": cid, "failed": True}, producer="builder")
         rec["build"] = {"status": "failed", "log_evidence": ev["evidence_id"], "log_tail": text[-2000:]}
         rec["feedback_for_next"] = {"kind": "build_failed", "build_log": text[-FEEDBACK_BUILD_LOG_CHARS:],

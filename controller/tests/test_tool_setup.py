@@ -6,6 +6,7 @@ import http.server
 import io
 import json
 import os
+import sys
 import threading
 import time
 import zipfile
@@ -372,6 +373,154 @@ def test_default_tools_dir_is_platform_aware(monkeypatch, tmp_path):
     assert default_tools_dir() == tmp_path / "x"
 
 
+# ------------------------------------------------------------------------------------------------ post_install step
+FAKE_INSTALLER = r"""
+import os, sys, time
+mode, out = sys.argv[1], sys.argv[2]
+print("step 1: starting", flush=True)
+if mode == "hang":
+    for i in range(600):
+        print(f"step {i + 2}: working", flush=True)
+        time.sleep(0.2)
+if mode == "fail":
+    print("boom: network unreachable", file=sys.stderr, flush=True)
+    sys.exit(3)
+if mode == "ok":
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w") as f:
+        f.write(os.environ.get("FAKE_ENV", "") + "|" + os.environ.get("FAKE_HOME", ""))
+    print("installed", flush=True)
+"""
+needs_cmd = pytest.mark.skipif(os.name != "nt", reason="the fake installer is a .cmd wrapper (post_install is only used on Windows)")
+
+
+def post_zip() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(zipfile.ZipInfo("run.cmd", date_time=(2020, 1, 1, 0, 0, 0)), f'@"{sys.executable}" "%~dp0fake_installer.py" %*\r\n')
+        z.writestr(zipfile.ZipInfo("fake_installer.py", date_time=(2020, 1, 1, 0, 0, 0)), FAKE_INSTALLER)
+    return buf.getvalue()
+
+
+@pytest.fixture
+def make_post(tmp_path, server):
+    def _make(mode: str = "ok", *, timeout: float = 30, produces=("out/made.txt",), argv0: str | None = None):
+        blob = post_zip()
+        server.routes["/p.zip"] = (200, blob, 0)
+        lock = {"schema_version": 1, "tools": {"posttool": {
+            "version": "1.0", "role": "fake", "license": "MIT",
+            "footprint": {"installer_download_bytes": 5, "disk_bytes": 10},
+            "artifact": {"name": "p.zip", "url": server.url("/p.zip"), "size_bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest()},
+            "layout": {"archive_root": "", "entry": "run.cmd", "post_install": {
+                "argv": [argv0 or "{staged}/run.cmd", mode, "{staged}/out/made.txt"],
+                "env": {"FAKE_ENV": "{tools}/x", "FAKE_HOME": "{staged}/home"},
+                "timeout_seconds": timeout, "progress_message": "Installing the fake toolchain", "log_name": "fake.log",
+                "produces": list(produces)}},
+            "install_dir": "posttool"}}}
+        lp = tmp_path / "plock.json"
+        lp.write_text(json.dumps(lock))
+        tools = tmp_path / "ptools"
+        st = Settings(data_dir=tmp_path / "pdata", tools_dir=tools, limits=Limits())
+        return ToolSetup(st, None, lp, allow_insecure_loopback=True), tools
+    return _make
+
+
+def staging_empty(tools: Path) -> bool:
+    return not any((tools / ".staging").glob("posttool-*"))
+
+
+@needs_cmd
+def test_post_install_success_activates_with_expanded_env_and_log(make_post):
+    ts, tools = make_post("ok")
+    s = run(ts, "posttool")
+    assert s["status"] == "installed", s
+    env_tools, env_staged = (tools / "posttool" / "out" / "made.txt").read_text().split("|")
+    assert env_tools.replace("\\", "/") == str(tools).replace("\\", "/") + "/x"               # {tools} expanded
+    assert ".staging" in env_staged and env_staged.replace("\\", "/").endswith("/home")       # {staged} expanded
+    assert "installed" in (tools / ".logs" / "fake.log").read_text()
+    assert (tools / "posttool" / MARKER).is_file() and staging_empty(tools)
+    assert s["footprint"] == {"installer_download_bytes": 5, "disk_bytes": 10}
+    (tools / "posttool" / "out" / "made.txt").unlink()           # a produced file that vanished => damaged, repairable
+    assert ts.status("posttool")["status"] == "corrupt"
+
+
+@needs_cmd
+def test_post_install_nonzero_exit_activates_nothing_and_is_retryable(make_post):
+    ts, tools = make_post("fail")
+    s = run(ts, "posttool")
+    assert s["status"] == "not_installed" and not (tools / "posttool").exists()
+    err = s["job"]["error"]
+    assert err["code"] == "post_install_failed" and err["retryable"] is True and "exit 3" in err["message"] and "nothing was installed" in err["message"]
+    assert "boom" in (tools / ".logs" / "fake.log").read_text() and staging_empty(tools)
+    assert "fake.log" in err["next_action"]
+
+
+@needs_cmd
+def test_post_install_missing_declared_output_activates_nothing(make_post):
+    ts, tools = make_post("ok", produces=("out/made.txt", "out/never.txt"))
+    s = run(ts, "posttool")
+    assert s["status"] == "not_installed" and s["job"]["error"]["code"] == "post_install_failed" and "out/never.txt" in s["job"]["error"]["message"]
+    assert not (tools / "posttool").exists() and staging_empty(tools)
+
+
+@needs_cmd
+def test_post_install_timeout_kills_the_installer_and_activates_nothing(make_post):
+    ts, tools = make_post("hang", timeout=1.5)
+    t0 = time.time()
+    s = run(ts, "posttool")
+    assert time.time() - t0 < 20
+    assert s["status"] == "not_installed" and s["job"]["error"]["code"] == "post_install_timeout" and s["job"]["error"]["retryable"] is True
+    assert not (tools / "posttool").exists() and staging_empty(tools)
+    n = (tools / ".logs" / "fake.log").read_text().count("working")
+    time.sleep(1.0)
+    assert (tools / ".logs" / "fake.log").read_text().count("working") == n      # the process tree is really gone
+
+
+@needs_cmd
+def test_post_install_cancel_stops_the_installer_and_shows_progress(make_post):
+    ts, tools = make_post("hang", timeout=60)
+    ts.install("posttool")
+    deadline = time.time() + 30
+    job = None
+    while time.time() < deadline:
+        job = ts.status("posttool")["job"]
+        if job and job["phase"] == "installing" and "step" in job["message"]:
+            break
+        time.sleep(0.1)
+    assert job and job["phase"] == "installing" and job["message"].startswith("Installing the fake toolchain"), job
+    ts.cancel("posttool")
+    assert ts.join(30)
+    s = ts.status("posttool")
+    assert s["status"] == "not_installed" and s["job"]["cancelled"] is True and s["job"]["error"] is None
+    assert not (tools / "posttool").exists() and staging_empty(tools)
+    n = (tools / ".logs" / "fake.log").read_text().count("working")
+    time.sleep(1.0)
+    assert (tools / ".logs" / "fake.log").read_text().count("working") == n
+
+
+@needs_cmd
+def test_post_install_program_must_live_in_the_staged_download(make_post):
+    ts, tools = make_post("ok", argv0=sys.executable)
+    s = run(ts, "posttool")
+    assert s["status"] == "not_installed" and s["job"]["error"]["code"] == "bad_lock" and not (tools / "posttool").exists()
+
+
+def test_real_lock_has_private_rust_entry():
+    from rebuild_controller.tool_setup import FRIENDLY, find_lock_path
+    ts = ToolSetup(Settings(tools_dir=Path("nonexistent-tools-dir")), None, find_lock_path())
+    t = {x["name"]: x for x in ts.snapshot()["tools"]}["rust"]
+    assert t["title"] == FRIENDLY["rust"][0] == "Rust compiler (private)" and "Windows .exe" in t["purpose"] and not t["optional"]
+    assert t["status"] == "not_installed" and t["blocked_reason"] is None and len(t["sha256"]) == 64
+    assert t["url"] == "https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe"
+    assert t["footprint"]["disk_bytes"] > 100_000_000 and t["footprint"]["installer_download_bytes"] > 50_000_000
+    lock = json.loads(Path(ts.lock_path).read_text(encoding="utf-8"))["tools"]["rust"]
+    assert lock["artifact"]["sha256"] == lock["artifact"]["sha256_official"] == lock["layout"]["entry_sha256"]
+    pi = lock["layout"]["post_install"]
+    assert pi["argv"][1:] == ["--default-host", "x86_64-pc-windows-gnu", "--default-toolchain", lock["version"], "--profile", "minimal", "--no-modify-path", "-y"]
+    assert pi["env"]["RUSTUP_HOME"] == "{staged}/rustup" and pi["env"]["CARGO_HOME"] == "{staged}/cargo"
+    assert all(p.startswith(f"rustup/toolchains/{lock['version']}-x86_64-pc-windows-gnu/bin/") for p in pi["produces"])
+
+
 # ------------------------------------------------------------------------------------------------ live (opt-in)
 FIX = Path(__file__).resolve().parents[2] / "fixtures" / "dotnetapp" / "original" / "dotnetapp.dll"
 
@@ -430,3 +579,55 @@ def test_live_installed_app_browser_comparison_uses_tools_page_node_playwright_a
     (site / "index.html").write_text("<!doctype html><title>t</title><h1 id=h>Hello installed app</h1>", encoding="utf-8")
     rec = web.run_web_scenario(site.joinpath("index.html").as_uri(), {"text_selectors": ["#h"], "screenshot": False, "sw": False}, tmp_path / "out")
     assert "Hello installed app" in json.dumps(rec)
+
+
+EXAMPLE_PECLI = Path(__file__).resolve().parents[2] / "examples" / "pecli-rust-from-evidence"
+
+
+@pytest.mark.live
+@pytest.mark.skipif(os.name != "nt" or not os.environ.get("REBUILD_LIVE_TOOLS"),
+                    reason="opt-in (REBUILD_LIVE_TOOLS=1): installs the real private Rust toolchain (~147 MB download, ~850 MB on disk)")
+@pytest.mark.skipif(not (EXAMPLE_PECLI / "src" / "main.rs").exists(), reason="examples/pecli-rust-from-evidence missing")
+def test_live_install_private_rust_then_build_pecli_with_clean_path(tmp_path, monkeypatch):
+    """A clean machine: nothing but System32 on PATH, no Visual Studio, no admin. Guided setup installs the GNU toolchain
+    privately, and the Rust builder (through the sandbox) compiles the pecli remake with it."""
+    import shutil
+    import subprocess
+    from types import SimpleNamespace
+    from rebuild_controller.builders import rust
+    from rebuild_controller.tool_setup import find_lock_path
+    monkeypatch.setenv("PATH", os.environ.get("SystemRoot", r"C:\Windows") + r"\System32")
+    for k in ("RUSTUP_HOME", "CARGO_HOME", "RUSTUP_TOOLCHAIN", "CARGO_BUILD_TARGET", "RUSTFLAGS", "RUSTC"):
+        monkeypatch.delenv(k, raising=False)
+    assert shutil.which("cargo") is None and shutil.which("gcc") is None and shutil.which("link") is None
+    tools = tmp_path / "tools"
+    st = Settings(data_dir=tmp_path / "data", tools_dir=tools)
+    ts = ToolSetup(st, None, find_lock_path())
+    t0 = time.time()
+    ts.install("rust")
+    assert ts.join(2400)
+    took = time.time() - t0
+    s = ts.status("rust")
+    assert s["status"] == "installed", (s["job"], (tools / ".logs" / "rust-install.log").read_text(errors="replace")[-2000:])
+    size = sum(f.stat().st_size for f in (tools / "rust").rglob("*") if f.is_file())
+    print(f"live rust install: {took:.0f}s, {size / 1e6:.0f} MB on disk, toolchain {rust.private_rust(tools)['toolchain']}")
+    p = rust.private_rust(tools)
+    assert p and p["toolchain"] == "1.97.0-x86_64-pc-windows-gnu"
+    assert "rustc 1.97.0" in subprocess.run([p["rustc"], "--version"], capture_output=True, text=True).stdout
+    # the real builder, in the sandbox, case-local CARGO_HOME, PATH restricted
+    src = tmp_path / "cand" / "source"
+    shutil.copytree(EXAMPLE_PECLI, src, ignore=shutil.ignore_patterns("evidence", "target", "*.py", "README.md"))
+    logs: list[str] = []
+    ctx = SimpleNamespace(job=SimpleNamespace(case_id=None, inputs={}), services={"studio": SimpleNamespace(settings=st)}, limits=st.limits,
+                          heartbeat=lambda *a, **k: None, log=lambda m, **k: logs.append(m),
+                          run=lambda cmd, timeout=30: SimpleNamespace(text=subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).stdout))
+    t1 = time.time()
+    info = rust.build_rust(ctx, src, tmp_path / "cand" / "dist")
+    print(f"live pecli build: {time.time() - t1:.1f}s; {info['toolchain']}; private={info['private_toolchain']}")
+    exe = Path(info["binary"])
+    assert exe.is_file() and exe.suffix == ".exe" and info["private_toolchain"] == p["toolchain"]
+    assert "rustc 1.97.0" in info["toolchain"] and info["build_isolation"]["mode"] == "low"
+    r = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30)
+    assert r.returncode in (0, 1, 2) and (r.stdout or r.stderr).strip(), (r.returncode, r.stdout, r.stderr)
+    ts.remove("rust")
+    assert not (tools / "rust").exists()

@@ -10,8 +10,14 @@ The pinned lock (docs/dependency-lock.json) is the single source of truth. Rules
 - extraction goes to a staging directory with zip-slip / symlink / expansion guards, ``layout.archive_root`` is honoured,
   ``layout.entry_sha256`` and ``layout.extra_files`` hashes are checked, then the staging directory is renamed into
   ``<tools_dir>/<install_dir>`` and a ``.rebuild-tool.json`` marker is written;
-- downloaded content is never executed, except the post-install version check (entry + version_args, timeout, no shell),
-  which runs on the staged copy before it is activated.
+- downloaded content is executed in exactly two places, both on the STAGED copy before anything is activated, both with
+  ``shell=False``, a timeout and no stdin: (1) the version check (entry + version_args); (2) an optional, lock-declared
+  ``layout.post_install`` step (argv template with ``{staged}``/``{tools}`` placeholders, env, timeout, ``produces``). The
+  post-install program must be a file inside the staged directory (the hash-verified entry), it is cancellable, its output
+  goes to ``<tools>/.logs/<name>-install.log``, and any failure/cancel/timeout discards the staging directory so nothing is
+  activated. The only user of post_install is the Rust toolchain: the pinned, sha256-verified official ``rustup-init.exe``
+  downloads the pinned toolchain itself over HTTPS; rustup verifies every component against the hashes in Rust's signed
+  release manifests (that second verification is rustup's, not ours). Nothing else is ever run from a download.
 """
 from __future__ import annotations
 
@@ -54,6 +60,7 @@ FRIENDLY = {
     "node": ("Node.js (optional)", "Optional. Unpacks Electron and JavaScript apps and runs browser behaviour tests."),
     "playwright-core": ("Browser test library (optional)", "Optional. Lets Rebuild Studio compare web apps in a browser (uses Microsoft Edge, already on Windows 11). Needs Node.js."),
     "temurin-jre": ("Private Java runtime (optional)", "Optional. Runs the Java and Android recovery tools. Installed privately inside Rebuild Studio, not on your PC."),
+    "rust": ("Rust compiler (private)", "Needed to build rebuilt programs as Windows .exe files. Installed privately inside Rebuild Studio (no administrator rights, no Visual Studio). Large: about 150 MB to download and 850 MB of disk."),
     "cfr": ("CFR (optional)", "Optional. Needed to recover Java programs (.jar files)."),
     "jadx": ("jadx (optional)", "Optional. Needed to recover Android apps (.apk files)."),
 }
@@ -105,6 +112,32 @@ def sha256_file(path: Path) -> str:
 
 def _is_hex64(s: Any) -> bool:
     return isinstance(s, str) and len(s) == 64 and set(s) <= _HEX64
+
+
+def _rmtree(path: Path) -> None:
+    """Best-effort delete that also removes read-only files (rustup/cargo leave some)."""
+    def _chmod_retry(func, p, _exc):
+        try:
+            os.chmod(p, stat.S_IWRITE)
+            func(p)
+        except OSError:
+            pass
+    shutil.rmtree(path, onerror=_chmod_retry)
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, timeout=20, shell=False)
+        else:
+            import signal
+            os.killpg(proc.pid, signal.SIGKILL)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
 
 
 def _fmt_mb(n: int | None) -> str:
@@ -205,6 +238,9 @@ class ToolSetup:
         for extra in (layout.get("extra_files") or {}):
             if not (root / extra).is_file():
                 return False
+        for made in ((layout.get("post_install") or {}).get("produces") or []):
+            if not (root / made).is_file():
+                return False
         want = layout.get("entry_sha256")
         if not want:
             return True
@@ -247,7 +283,7 @@ class ToolSetup:
             "name": name, "title": title, "purpose": purpose, "role": t.get("role"), "version": t.get("version"),
             "license": t.get("license"), "optional": bool(t.get("optional")), "size_bytes": art.get("size_bytes"),
             "file_name": art.get("name"), "url": art.get("url"), "sha256": art.get("sha256"),
-            "requires": self._requires(name), "status": status, "disk_status": disk,
+            "footprint": t.get("footprint"), "requires": self._requires(name), "status": status, "disk_status": disk,
             "blocked_reason": blocked if disk in ("blocked_unverified",) or (blocked and disk != "installed") else None,
             "install_path": str(self._install_dir(name)), "installed_version": (self._marker(name) or {}).get("version"),
             "job": job_view,
@@ -373,7 +409,7 @@ class ToolSetup:
             except OSError as e:
                 raise ToolSetupError("remove_failed", f"Could not remove {root}: {e}", affected=str(root), status=409,
                                      next_action="Close any analysis that is using the tool and try again.") from e
-            shutil.rmtree(trash, ignore_errors=True)
+            _rmtree(trash)
         with self._lock:
             self._jobs.pop(name, None)
         self._emit("tools.setup.removed", {"tool": name})
@@ -481,7 +517,7 @@ class ToolSetup:
         old_backup: Path | None = None
         try:
             for stale in stage_root.glob(f"{final.name}-*"):     # leftovers of a crashed run
-                shutil.rmtree(stale, ignore_errors=True)
+                _rmtree(stale)
             if part.exists():
                 part.unlink()
             self._progress(name, phase="downloading", done=0, total=int(art.get("size_bytes") or 0),
@@ -504,6 +540,8 @@ class ToolSetup:
             self._verify_layout(name, staged, layout)
             self._progress(name, phase="checking", message="Checking that the tool starts", force_emit=True)
             self._version_check(name, staged, layout)
+            if layout.get("post_install"):
+                self._post_install(name, staged, layout["post_install"], cancel)
             marker = {"name": name, "version": t.get("version"), "sha256": str(art["sha256"]).lower(),
                       "entry_sha256": layout.get("entry_sha256"), "installed_at": now_iso(),
                       "source": "file" if local else "download"}
@@ -535,9 +573,9 @@ class ToolSetup:
                 except OSError:
                     pass
             if staged.exists():
-                shutil.rmtree(staged, ignore_errors=True)
+                _rmtree(staged)
             if old_backup and old_backup.exists():
-                shutil.rmtree(old_backup, ignore_errors=True)
+                _rmtree(old_backup)
 
     # -- acquiring bytes --------------------------------------------------------------------------------------------
     def _offline_error(self, url: str, art: dict[str, Any], why: str) -> ToolSetupError:
@@ -758,7 +796,7 @@ class ToolSetup:
             if sha256_file(f).lower() != str(h).lower():
                 raise ToolSetupError("checksum_mismatch", f"{rel} inside the archive does not match its pinned checksum; nothing was installed.", affected=rel)
 
-    # -- the only place downloaded content is executed --------------------------------------------------------------
+    # -- where downloaded content is executed (see the module docstring) -------------------------------------------
     def dotnet_exe(self) -> Path:
         return self.tools_dir / "dotnet" / ("dotnet.exe" if os.name == "nt" else "dotnet")
 
@@ -802,3 +840,87 @@ class ToolSetup:
             tail = (r.stderr or r.stdout or b"").decode("utf-8", "replace").strip()[:300]
             raise ToolSetupError("version_check_failed", f"The tool's version check failed (exit {r.returncode}): {tail}; nothing was installed.",
                                  next_action="Retry; if it repeats, report the message above.")
+
+    # -- the second (and last) place downloaded content is executed -------------------------------------------------
+    def _post_install(self, name: str, staged: Path, spec: dict[str, Any], cancel: threading.Event) -> None:
+        """Run the lock-declared installer step on the staged copy. Failure/cancel/timeout raise, so nothing is activated."""
+        def expand(v: str) -> str:
+            return str(v).replace("{staged}", str(staged)).replace("{tools}", str(self.tools_dir))
+
+        argv = [expand(a) for a in (spec.get("argv") or [])]
+        if not argv:
+            raise ToolSetupError("bad_lock", f"The lock entry for {name} declares an empty post_install.", status=500)
+        prog = Path(argv[0])
+        try:
+            prog.resolve().relative_to(staged.resolve())
+        except ValueError:
+            raise ToolSetupError("bad_lock", f"post_install for {name} must run a file inside the staged download, not {prog}.", status=500) from None
+        if not prog.is_file():
+            raise ToolSetupError("layout_mismatch", f"The installer program ({prog.name}) is missing; nothing was installed.", affected=prog.name)
+        env = dict(os.environ)
+        env.update({str(k): expand(v) for k, v in (spec.get("env") or {}).items()})
+        timeout = float(spec.get("timeout_seconds") or 1800)
+        message = str(spec.get("progress_message") or "Installing")
+        log_name = Path(str(spec.get("log_name") or f"{name}-install.log")).name
+        log_dir = self.tools_dir / ".logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / log_name
+        self._progress(name, phase="installing", message=message, force_emit=True)
+
+        def tail(n: int = 600) -> str:
+            try:
+                with open(log_path, "rb") as f:
+                    f.seek(0, os.SEEK_END)
+                    f.seek(max(0, f.tell() - n))
+                    raw = f.read().decode("utf-8", "replace")
+            except OSError:
+                return ""
+            parts = [p.strip() for p in raw.replace("\r", "\n").split("\n") if p.strip()]
+            return parts[-1][:160] if parts else ""
+
+        kw: dict[str, Any] = {}
+        if os.name == "nt":
+            kw["creationflags"] = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            kw["start_new_session"] = True
+        try:
+            with open(log_path, "wb") as logf:
+                logf.write(f"$ {' '.join(argv)}\n".encode("utf-8", "replace"))
+                logf.flush()
+                try:
+                    proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=logf, stderr=subprocess.STDOUT, env=env,
+                                            cwd=str(staged), shell=False, **kw)
+                except OSError as e:
+                    raise ToolSetupError("post_install_failed", f"The installer could not be started ({e}); nothing was installed.",
+                                         next_action="Check that your antivirus is not blocking Rebuild Studio's tools folder, then retry.") from e
+                started = time.monotonic()
+                try:
+                    while True:
+                        try:
+                            rc = proc.wait(timeout=0.25)
+                            break
+                        except subprocess.TimeoutExpired:
+                            pass
+                        if cancel.is_set():
+                            _kill_tree(proc)
+                            proc.wait(timeout=30)
+                            raise _Cancelled()
+                        if time.monotonic() - started > timeout:
+                            _kill_tree(proc)
+                            proc.wait(timeout=30)
+                            raise ToolSetupError("post_install_timeout", f"The installer did not finish in time ({timeout:g} s); nothing was installed.",
+                                                 retryable=True, next_action=f"Retry (the log is at {log_path}). A slow or filtered network can cause this.")
+                        self._progress(name, message=f"{message} {tail()}".strip())
+                finally:
+                    if proc.poll() is None:
+                        _kill_tree(proc)
+        except OSError as e:
+            raise ToolSetupError("post_install_failed", f"Could not write the install log {log_path}: {e}", retryable=True) from e
+        if rc != 0:
+            last = tail(2000)
+            raise ToolSetupError("post_install_failed", f"The installer failed (exit {rc}){': ' + last if last else ''}; nothing was installed.",
+                                 retryable=True, next_action=f"Check your internet connection and retry. Details: {log_path}")
+        for rel in spec.get("produces") or []:
+            if not (staged / rel).is_file():
+                raise ToolSetupError("post_install_failed", f"The installer finished but {rel} was not created; nothing was installed.",
+                                     retryable=True, affected=rel, next_action=f"Retry. Details: {log_path}")
