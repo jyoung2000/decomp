@@ -151,6 +151,84 @@
       },
       "src_dir": "godotgame/src (evaluation harness only)"
     },
+    "javacli": {
+      "dir": "javacli",
+      "expected": {
+        "expected/scenarios.json": {
+          "path": "javacli/expected/scenarios.json",
+          "sha256": "3c1374c9f62afe36f1521f20e32f5a3e539bdaa24a9be3dd1e0e8ef76d94ee27"
+        }
+      },
+      "features": [
+        {
+          "description": "list and total on an empty/missing ledger",
+          "id": "javacli.list_total",
+          "observable_on": "host_via_java17"
+        },
+        {
+          "description": "add entries, list sorted by name, totals; ledger text byte-exact",
+          "id": "javacli.add_list",
+          "observable_on": "host_via_java17"
+        },
+        {
+          "description": "replace an existing entry keeping position, remove an entry",
+          "id": "javacli.update_remove",
+          "observable_on": "host_via_java17"
+        },
+        {
+          "description": "min/max/floor-mean statistics and the empty case",
+          "id": "javacli.stats",
+          "observable_on": "host_via_java17"
+        },
+        {
+          "description": "cent-exact amount parsing; rejects bad spellings and overflow with exit 4",
+          "id": "javacli.amount_parsing",
+          "observable_on": "host_via_java17"
+        },
+        {
+          "description": "existing ledger loaded in file order and extended",
+          "id": "javacli.load_existing",
+          "observable_on": "host_via_java17"
+        },
+        {
+          "description": "corrupt ledger -> message on stderr, exit 2, file untouched",
+          "id": "javacli.error_corrupt",
+          "observable_on": "host_via_java17"
+        },
+        {
+          "description": "remove of a missing entry -> exit 3",
+          "id": "javacli.error_missing",
+          "observable_on": "host_via_java17"
+        },
+        {
+          "description": "usage/unknown command/empty name -> exit 1",
+          "id": "javacli.error_usage",
+          "observable_on": "host_via_java17"
+        },
+        {
+          "description": "javacli.cmd launcher resolving java on PATH under cmd.exe",
+          "id": "javacli.launcher_cmd",
+          "observable_on": "windows_only"
+        }
+      ],
+      "kind": "java17_console_jar",
+      "oracle": "java 17 (Temurin/Microsoft OpenJDK) on the Windows host (non-certifying for other hosts)",
+      "originals": {
+        "original": {
+          "file_count": 3,
+          "files": {
+            "README.txt": "e379b19d737559cc942b3a045a9be45c6548c4074a5743105ac9ea591a204abc",
+            "javacli.cmd": "1147d4db1f1ba916f501f42a0f4338277028ca4d210d81534c2fc7f46d3518a1",
+            "javacli.jar": "2d28ea4f2983939cad409ebc1f877a197034820b2b852430ca690c6bb60b7344"
+          },
+          "manifest": "javacli/original.manifest.json",
+          "manifest_sha256": "a8809b7a3a4618fa0bc7a7b9f876ec8c8533b61d1f4c33d648c6687b07311969",
+          "path": "javacli/original",
+          "total_bytes": 17854
+        }
+      },
+      "src_dir": "javacli/src (evaluation harness only)"
+    },
     "pecli": {
       "dir": "pecli",
       "expected": {

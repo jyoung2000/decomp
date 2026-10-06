@@ -14,6 +14,8 @@ FIXTURES = {
               "extra": {"wrong_remake": "wrong_remake"}, "oracle": "wine (non-certifying)"},
     "dotnetapp": {"kind": "dotnet8_console", "originals": ["original"], "expected": ["expected/scenarios.json"],
                   "extra": {}, "oracle": "dotnet 8 runtime on Linux (non-certifying)"},
+    "javacli": {"kind": "java17_console_jar", "originals": ["original"], "expected": ["expected/scenarios.json"],
+                "extra": {}, "oracle": "java 17 (Temurin/Microsoft OpenJDK) on the Windows host (non-certifying for other hosts)"},
     "godotgame": {"kind": "godot4_pck", "originals": ["original"], "expected": ["expected/resources.json"],
                   "extra": {}, "oracle": "GDRE tools 2.7.0 recovery (game itself not executable here)"},
     "webapp": {"kind": "pwa_and_electron_asar", "originals": ["original", "original-electron"],
@@ -52,7 +54,7 @@ def build():
         for u in sorted(used - ids):
             problems.append(f"{fx}: feature {u} used in expected files but missing from features.json")
         for f in feats:
-            if f["observable_on"].startswith("linux") and f["id"] not in used and fx != "webapp":
+            if f["observable_on"].startswith(("linux", "host_")) and f["id"] not in used and fx != "webapp":
                 problems.append(f"{fx}: feature {f['id']} claims to be observable here but has no expected evidence")
         entry = {"kind": meta["kind"], "oracle": meta["oracle"], "dir": fx, "originals": {}, "expected": {}, "features": feats,
                  "src_dir": f"{fx}/src (evaluation harness only)"}
@@ -89,8 +91,8 @@ def main():
             print("\n".join("DRIFT " + b for b in bad)); sys.exit(1)
         print("fixtures/manifest.json: originals reproduce exactly")
         return
-    json.dump(doc, open(path, "w"), indent=2, sort_keys=True)
-    open(path, "a").write("\n")
+    json.dump(doc, open(path, "w", newline="\n"), indent=2, sort_keys=True)
+    open(path, "a", newline="\n").write("\n")
     print(f"wrote {path}: " + ", ".join(f"{k}({len(v['features'])} features)" for k, v in doc["fixtures"].items()))
 
 

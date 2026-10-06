@@ -229,6 +229,7 @@ foreach ($name in @($lock.tools.PSObject.Properties.Name)) {
                 try {
                     $va = @(Get-RsProp $t.layout 'version_args' @('--version'))
                     $file = $r.path; $args2 = $va
+                    if ($file.EndsWith('.jar')) { Add-Check "tool-$name" 'ok' "$detail; smoke skipped (jar runs through the private JRE; covered by tests/test_jvm.py)"; continue }
                     if ($name -eq 'ilspycmd') { $file = Join-Path (Split-Path -Parent $r.path) 'ilspycmd.cmd'; $args2 = @('--version') }
                     if ($script:RsIsWindows) {
                         if ($file.EndsWith('.cmd')) { $p = Invoke-Probe "$env:SystemRoot\System32\cmd.exe" (@('/c', $file) + $args2) } else { $p = Invoke-Probe $file $args2 }

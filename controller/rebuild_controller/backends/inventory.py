@@ -14,7 +14,8 @@ from ..ids import sha256_file
 from ..paths import classify_entry, is_within, resolve_final
 from .detect import Detection, embedded_pck_offset, sniff, summarize_profile
 
-MODULE_FORMATS = {"pe", "elf", "macho", "dotnet", "godot_pck", "asar", "wasm", "js_bundle"}
+MODULE_FORMATS = {"pe", "elf", "macho", "dotnet", "godot_pck", "asar", "wasm", "js_bundle",
+                  "jar", "apk", "aab", "dex", "gamemaker_data", "unreal_pak", "unreal_iostore", "il2cpp_metadata"}
 SKIP_NAMES = {"$recycle.bin", "system volume information"}
 
 
@@ -111,7 +112,7 @@ def inventory_root(root: Path, limits: Limits, *, progress: Callable[[dict[str, 
         if truncated:
             break
     modules = [f for f in files if f.get("detect", {}).get("format") in MODULE_FORMATS]
-    profile = summarize_profile(detections)
+    profile = summarize_profile(detections, root)
     return {
         "root": str(root), "files": files, "file_count": len(files), "dir_count": dirs, "total_bytes": total_bytes,
         "modules": [m["path"] for m in modules], "module_count": len(modules), "links": links, "skipped": skipped,

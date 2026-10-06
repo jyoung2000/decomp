@@ -59,8 +59,9 @@ class BackendRegistry:
                     probe: ToolProbe = self._adapters[bid].smoke()
                     entry["smoke"] = probe.to_dict()
                     if probe.availability == Availability.USABLE:
+                        proves = {probe.name, *((getattr(probe, "extra", None) or {}).get("proves", []))}   # a smoke may prove its runtime too (cfr proves java)
                         for t in info.tools:
-                            if t.name == probe.name and t.availability != Availability.VERIFIED:
+                            if t.name in proves and t.availability != Availability.VERIFIED:
                                 t.availability = Availability.USABLE
                         entry = info.to_dict(); entry["smoke"] = probe.to_dict()
                 except Exception as e:  # smoke must never crash doctor

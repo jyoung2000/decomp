@@ -216,8 +216,15 @@ function Install-Tool($Plan) {
 
     $staged = Join-Path $StagingRoot ("{0}-{1}-{2}" -f $Plan.InstallDir, $Plan.Version, ([guid]::NewGuid().ToString('N').Substring(0, 8)))
     try {
-        $n = Expand-RsZipSafe -ZipPath $dl -Destination $staged -OnlyUnder $Plan.ArchiveRoot
-        Write-RsLog "$($Plan.Name): extracted $n files" 'INFO'
+        if ($Plan.Format -eq 'file') {
+            # single-file artifact (e.g. cfr-*.jar): copied verbatim as layout.entry, never unzipped
+            New-Item -ItemType Directory -Force -Path $staged | Out-Null
+            Copy-Item -LiteralPath $dl -Destination (Join-Path $staged ($Plan.Entry -replace '/', [System.IO.Path]::DirectorySeparatorChar)) -Force
+            Write-RsLog "$($Plan.Name): copied single-file artifact as $($Plan.Entry)" 'INFO'
+        } else {
+            $n = Expand-RsZipSafe -ZipPath $dl -Destination $staged -OnlyUnder $Plan.ArchiveRoot
+            Write-RsLog "$($Plan.Name): extracted $n files" 'INFO'
+        }
         Complete-Staged $Plan $staged
         Assert-EntryVerified $Plan $staged
     } catch {

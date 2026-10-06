@@ -11,6 +11,8 @@ def register_backends(registry: BackendRegistry, settings: Settings) -> None:
         ("rizin_worker", "RizinBackend"),
         ("ilspy", "ILSpyBackend"),
         ("gdre", "GDREBackend"),
+        ("jvm", "JVMBackend"),
+        ("triage", "TriageBackend"),
         ("jsweb", "JSWebBackend"),
         ("ghidra", "GhidraBackend"),
     ]:

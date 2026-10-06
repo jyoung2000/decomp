@@ -1,0 +1,691 @@
+{
+  "fixture": "javacli",
+  "launcher": [
+    "java",
+    "-jar",
+    "{ORIG}/javacli.jar"
+  ],
+  "newline_policy": "stdout/stderr always LF (explicit \n in the program, never println)",
+  "observable_on": "host_via_java17",
+  "oracle": {
+    "certifying": false,
+    "note": "Original jar executed with `java -jar` (JDK 17.0.20.1 on Windows 11, native). Native Windows execution of the jar is the real target, but the launcher javacli.cmd is not exercised.",
+    "observable_on": "host_via_java17",
+    "runner": "java17"
+  },
+  "scenarios": [
+    {
+      "description": "missing ledger file: list prints (empty) and creates nothing; total is 0.00",
+      "feature": "javacli.list_total",
+      "final_files": {},
+      "id": "empty_list",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "list"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "(empty)\n",
+          "stdout_normalized": "(empty)\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "total"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "total 0.00 (0 entries)\n",
+          "stdout_normalized": "total 0.00 (0 entries)\n"
+        }
+      ]
+    },
+    {
+      "description": "add three entries, list sorted by name, total; ledger bytes exact",
+      "feature": "javacli.add_list",
+      "final_files": {
+        "ledger.txt": {
+          "changed_or_new": true,
+          "sha256": "c80233a729d33ee2e5bff08f6be51f9d6015a840485d025e0d3799028eced1c1",
+          "size": 42,
+          "text": "LEDGER1\nrent\t120000\ncoffee\t350\nbooks\t4205\n"
+        }
+      },
+      "id": "add_list_total",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "rent",
+            "1200.00"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added rent 1200.00\n",
+          "stdout_normalized": "added rent 1200.00\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "coffee",
+            "3.5"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added coffee 3.50\n",
+          "stdout_normalized": "added coffee 3.50\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "books",
+            "42.05"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added books 42.05\n",
+          "stdout_normalized": "added books 42.05\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "list"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "books             42.05\ncoffee             3.50\nrent            1200.00\n",
+          "stdout_normalized": "books             42.05\ncoffee             3.50\nrent            1200.00\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "total"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "total 1245.55 (3 entries)\n",
+          "stdout_normalized": "total 1245.55 (3 entries)\n"
+        }
+      ]
+    },
+    {
+      "description": "replace an existing amount, remove another, list",
+      "feature": "javacli.update_remove",
+      "final_files": {
+        "ledger.txt": {
+          "changed_or_new": true,
+          "sha256": "ded65052becc2989f2b268b09415e0c401721772d65ead6e9cbfc1f6c33310a4",
+          "size": 15,
+          "text": "LEDGER1\na\t1010\n"
+        }
+      },
+      "id": "update_remove",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "a",
+            "1.00"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added a 1.00\n",
+          "stdout_normalized": "added a 1.00\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "b",
+            "2.00"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added b 2.00\n",
+          "stdout_normalized": "added b 2.00\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "a",
+            "10.10"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "updated a 10.10\n",
+          "stdout_normalized": "updated a 10.10\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "remove",
+            "b"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "removed b\n",
+          "stdout_normalized": "removed b\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "list"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "a                 10.10\n",
+          "stdout_normalized": "a                 10.10\n"
+        }
+      ]
+    },
+    {
+      "description": "min / max / floor mean over mixed signs; empty ledger reports no data",
+      "feature": "javacli.stats",
+      "final_files": {
+        "ledger.txt": {
+          "changed_or_new": true,
+          "sha256": "c56a0a63d251caf8c03149d44dfec8db7fbba49f3cd208f3645de6d9c24500be",
+          "size": 25,
+          "text": "LEDGER1\nx\t-300\ny\t7\nz\t999\n"
+        }
+      },
+      "id": "stats",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "stats"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "no data\n",
+          "stdout_normalized": "no data\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "x",
+            "-3"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added x -3.00\n",
+          "stdout_normalized": "added x -3.00\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "y",
+            "0.07"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added y 0.07\n",
+          "stdout_normalized": "added y 0.07\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "z",
+            "9.99"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added z 9.99\n",
+          "stdout_normalized": "added z 9.99\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "stats"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "min x -3.00\nmax z 9.99\nmean 2.35\n",
+          "stdout_normalized": "min x -3.00\nmax z 9.99\nmean 2.35\n"
+        }
+      ]
+    },
+    {
+      "description": "accepted and rejected amount spellings (exit 4 on rejection, ledger untouched by rejected adds)",
+      "feature": "javacli.amount_parsing",
+      "final_files": {
+        "ledger.txt": {
+          "changed_or_new": true,
+          "sha256": "7bd2413e31e1f7cc43c72ee5ee50f8951954696d5903de7ccb4ce2aec275bc05",
+          "size": 18,
+          "text": "LEDGER1\np\t5\nq\t700\n"
+        }
+      },
+      "id": "amount_parsing",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "p",
+            "0.05"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added p 0.05\n",
+          "stdout_normalized": "added p 0.05\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "q",
+            "7"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added q 7.00\n",
+          "stdout_normalized": "added q 7.00\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "r",
+            "1.234"
+          ],
+          "exit_code": 4,
+          "stderr": "bad amount: not an amount: 1.234\n",
+          "stderr_normalized": "bad amount: not an amount: 1.234\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "s",
+            "abc"
+          ],
+          "exit_code": 4,
+          "stderr": "bad amount: not an amount: abc\n",
+          "stderr_normalized": "bad amount: not an amount: abc\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "t",
+            ".5"
+          ],
+          "exit_code": 4,
+          "stderr": "bad amount: not an amount: .5\n",
+          "stderr_normalized": "bad amount: not an amount: .5\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "u",
+            "99999999999999999999"
+          ],
+          "exit_code": 4,
+          "stderr": "bad amount: For input string: \"99999999999999999999\"\n",
+          "stderr_normalized": "bad amount: For input string: \"99999999999999999999\"\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "v",
+            "92233720368547759"
+          ],
+          "exit_code": 4,
+          "stderr": "bad amount: long overflow\n",
+          "stderr_normalized": "bad amount: long overflow\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "list"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "p                  0.05\nq                  7.00\n",
+          "stdout_normalized": "p                  0.05\nq                  7.00\n"
+        }
+      ]
+    },
+    {
+      "description": "pre-existing ledger is loaded; a new entry is appended after existing order",
+      "feature": "javacli.load_existing",
+      "final_files": {
+        "ledger.txt": {
+          "changed_or_new": true,
+          "sha256": "c49f019edca2fba64775d93668d48f6a24c07a34e6508f1c2fce92f51cd7d45f",
+          "size": 38,
+          "text": "LEDGER1\nbeta\t250\nalpha\t-100\ngamma\t330\n"
+        }
+      },
+      "id": "load_existing",
+      "setup_files": {
+        "ledger.txt": {
+          "text": "LEDGER1\nbeta\t250\nalpha\t-100\n"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "gamma",
+            "3.30"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added gamma 3.30\n",
+          "stdout_normalized": "added gamma 3.30\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "list"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "alpha             -1.00\nbeta               2.50\ngamma              3.30\n",
+          "stdout_normalized": "alpha             -1.00\nbeta               2.50\ngamma              3.30\n"
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "total"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "total 4.80 (3 entries)\n",
+          "stdout_normalized": "total 4.80 (3 entries)\n"
+        }
+      ]
+    },
+    {
+      "description": "wrong header: exit 2, file untouched",
+      "feature": "javacli.error_corrupt",
+      "final_files": {
+        "ledger.txt": {
+          "changed_or_new": false,
+          "sha256": "2c4d19ae62239b4a4413e048c445be9caf6e25e86c18c1c7ed5d806009797f2e",
+          "size": 15,
+          "text": "NOTALEDGER\nx\t1\n"
+        }
+      },
+      "id": "err_corrupt_header",
+      "setup_files": {
+        "ledger.txt": {
+          "text": "NOTALEDGER\nx\t1\n"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "list"
+          ],
+          "exit_code": 2,
+          "stderr": "ledger is corrupt (missing header); refusing to touch ledger.txt\n",
+          "stderr_normalized": "ledger is corrupt (missing header); refusing to touch ledger.txt\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    },
+    {
+      "description": "line with 3 fields / non-numeric cents: exit 2, file untouched",
+      "feature": "javacli.error_corrupt",
+      "final_files": {
+        "ledger.txt": {
+          "changed_or_new": false,
+          "sha256": "41d9aef010c7c58483c6a2459028c77033aad0c8a4e18ea729c7f8b98f8dbe67",
+          "size": 18,
+          "text": "LEDGER1\nx\t1\ny\t2\t3\n"
+        }
+      },
+      "id": "err_corrupt_line",
+      "setup_files": {
+        "ledger.txt": {
+          "text": "LEDGER1\nx\t1\ny\t2\t3\n"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "total"
+          ],
+          "exit_code": 2,
+          "stderr": "ledger is corrupt (line 3: expected 2 fields); refusing to touch ledger.txt\n",
+          "stderr_normalized": "ledger is corrupt (line 3: expected 2 fields); refusing to touch ledger.txt\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    },
+    {
+      "description": "non-numeric cents: exit 2",
+      "feature": "javacli.error_corrupt",
+      "final_files": {
+        "ledger.txt": {
+          "changed_or_new": false,
+          "sha256": "43adfd6336b8f8312c708c272b52039f30a76979add85cfe4797a3ce8754d342",
+          "size": 14,
+          "text": "LEDGER1\nx\tabc\n"
+        }
+      },
+      "id": "err_corrupt_number",
+      "setup_files": {
+        "ledger.txt": {
+          "text": "LEDGER1\nx\tabc\n"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "total"
+          ],
+          "exit_code": 2,
+          "stderr": "ledger is corrupt (line 2: For input string: \"abc\"); refusing to touch ledger.txt\n",
+          "stderr_normalized": "ledger is corrupt (line 2: For input string: \"abc\"); refusing to touch ledger.txt\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    },
+    {
+      "description": "remove of unknown name: exit 3, ledger untouched",
+      "feature": "javacli.error_missing",
+      "final_files": {
+        "ledger.txt": {
+          "changed_or_new": false,
+          "sha256": "f7299a75f7689d364fa6282c2f2e15ac4e74b531de7483ad601095732088bbd9",
+          "size": 17,
+          "text": "LEDGER1\nreal\t100\n"
+        }
+      },
+      "id": "err_missing_entry",
+      "setup_files": {
+        "ledger.txt": {
+          "text": "LEDGER1\nreal\t100\n"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "ledger.txt",
+            "remove",
+            "ghost"
+          ],
+          "exit_code": 3,
+          "stderr": "no such entry: ghost\n",
+          "stderr_normalized": "no such entry: ghost\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    },
+    {
+      "description": "too few args, unknown command, wrong arity, empty entry name (exit 1 each)",
+      "feature": "javacli.error_usage",
+      "final_files": {},
+      "id": "err_usage",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [],
+          "exit_code": 1,
+          "stderr": "usage: javacli <ledger.txt> add <name> <amount> | remove <name> | list | total | stats\n",
+          "stderr_normalized": "usage: javacli <ledger.txt> add <name> <amount> | remove <name> | list | total | stats\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt"
+          ],
+          "exit_code": 1,
+          "stderr": "usage: javacli <ledger.txt> add <name> <amount> | remove <name> | list | total | stats\n",
+          "stderr_normalized": "usage: javacli <ledger.txt> add <name> <amount> | remove <name> | list | total | stats\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "frobnicate"
+          ],
+          "exit_code": 1,
+          "stderr": "unknown command: frobnicate\n",
+          "stderr_normalized": "unknown command: frobnicate\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "only-name"
+          ],
+          "exit_code": 1,
+          "stderr": "usage: javacli <ledger.txt> add <name> <amount>\n",
+          "stderr_normalized": "usage: javacli <ledger.txt> add <name> <amount>\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "remove"
+          ],
+          "exit_code": 1,
+          "stderr": "usage: javacli <ledger.txt> remove <name>\n",
+          "stderr_normalized": "usage: javacli <ledger.txt> remove <name>\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "ledger.txt",
+            "add",
+            "",
+            "1.00"
+          ],
+          "exit_code": 1,
+          "stderr": "bad name\n",
+          "stderr_normalized": "bad name\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    }
+  ]
+}

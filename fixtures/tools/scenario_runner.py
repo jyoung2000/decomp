@@ -100,13 +100,17 @@ def main():
         scenarios = [s for s in scenarios if s["id"] in keep]
     orig_dir = a.original_dir or os.path.join(fx, "original")
     env = dict(os.environ)
-    env.update(cfg.get("env", {}))
+    for k, v in cfg.get("env", {}).items():   # a null value removes the variable from the child environment
+        if v is None:
+            env.pop(k, None)
+        else:
+            env[k] = v
     exp_path = os.path.join(fx, "expected", "scenarios.json")
 
     if a.mode == "generate":
         launcher = [x.replace("{ORIG}", orig_dir) for x in cfg["original_launcher"]]
         out = {"fixture": cfg["fixture"], "oracle": cfg["oracle"], "launcher": cfg["original_launcher"],
-               "observable_on": "linux_via_" + cfg["oracle"]["runner"], "newline_policy": cfg.get("newline_policy"),
+               "observable_on": cfg["oracle"].get("observable_on") or "linux_via_" + cfg["oracle"]["runner"], "newline_policy": cfg.get("newline_policy"),
                "scenarios": []}
         for sc in scenarios:
             steps, files = run_scenario(sc, launcher, env, orig_dir)
@@ -117,7 +121,7 @@ def main():
             out["scenarios"].append(rec)
             print(f"[gen] {sc['id']}: exits={[s['exit_code'] for s in steps]} files={list(files)}")
         os.makedirs(os.path.dirname(exp_path), exist_ok=True)
-        with open(exp_path, "w") as f:
+        with open(exp_path, "w", newline="\n") as f:
             json.dump(out, f, indent=2, sort_keys=True, ensure_ascii=False)
             f.write("\n")
         print(f"wrote {exp_path} ({len(out['scenarios'])} scenarios)")

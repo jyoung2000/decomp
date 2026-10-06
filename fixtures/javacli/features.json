@@ -1,0 +1,52 @@
+[
+  {
+    "id": "javacli.list_total",
+    "description": "list and total on an empty/missing ledger",
+    "observable_on": "host_via_java17"
+  },
+  {
+    "id": "javacli.add_list",
+    "description": "add entries, list sorted by name, totals; ledger text byte-exact",
+    "observable_on": "host_via_java17"
+  },
+  {
+    "id": "javacli.update_remove",
+    "description": "replace an existing entry keeping position, remove an entry",
+    "observable_on": "host_via_java17"
+  },
+  {
+    "id": "javacli.stats",
+    "description": "min/max/floor-mean statistics and the empty case",
+    "observable_on": "host_via_java17"
+  },
+  {
+    "id": "javacli.amount_parsing",
+    "description": "cent-exact amount parsing; rejects bad spellings and overflow with exit 4",
+    "observable_on": "host_via_java17"
+  },
+  {
+    "id": "javacli.load_existing",
+    "description": "existing ledger loaded in file order and extended",
+    "observable_on": "host_via_java17"
+  },
+  {
+    "id": "javacli.error_corrupt",
+    "description": "corrupt ledger -> message on stderr, exit 2, file untouched",
+    "observable_on": "host_via_java17"
+  },
+  {
+    "id": "javacli.error_missing",
+    "description": "remove of a missing entry -> exit 3",
+    "observable_on": "host_via_java17"
+  },
+  {
+    "id": "javacli.error_usage",
+    "description": "usage/unknown command/empty name -> exit 1",
+    "observable_on": "host_via_java17"
+  },
+  {
+    "id": "javacli.launcher_cmd",
+    "description": "javacli.cmd launcher resolving java on PATH under cmd.exe",
+    "observable_on": "windows_only"
+  }
+]

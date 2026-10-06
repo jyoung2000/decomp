@@ -1,0 +1,405 @@
+[
+ {
+  "id": "empty_list",
+  "feature": "javacli.list_total",
+  "description": "missing ledger file: list prints (empty) and creates nothing; total is 0.00",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "list"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "total"
+    ],
+    "stdin": null
+   }
+  ]
+ },
+ {
+  "id": "add_list_total",
+  "feature": "javacli.add_list",
+  "description": "add three entries, list sorted by name, total; ledger bytes exact",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "rent",
+     "1200.00"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "coffee",
+     "3.5"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "books",
+     "42.05"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "list"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "total"
+    ],
+    "stdin": null
+   }
+  ]
+ },
+ {
+  "id": "update_remove",
+  "feature": "javacli.update_remove",
+  "description": "replace an existing amount, remove another, list",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "a",
+     "1.00"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "b",
+     "2.00"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "a",
+     "10.10"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "remove",
+     "b"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "list"
+    ],
+    "stdin": null
+   }
+  ]
+ },
+ {
+  "id": "stats",
+  "feature": "javacli.stats",
+  "description": "min / max / floor mean over mixed signs; empty ledger reports no data",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "stats"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "x",
+     "-3"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "y",
+     "0.07"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "z",
+     "9.99"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "stats"
+    ],
+    "stdin": null
+   }
+  ]
+ },
+ {
+  "id": "amount_parsing",
+  "feature": "javacli.amount_parsing",
+  "description": "accepted and rejected amount spellings (exit 4 on rejection, ledger untouched by rejected adds)",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "p",
+     "0.05"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "q",
+     "7"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "r",
+     "1.234"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "s",
+     "abc"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "t",
+     ".5"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "u",
+     "99999999999999999999"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "v",
+     "92233720368547759"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "list"
+    ],
+    "stdin": null
+   }
+  ]
+ },
+ {
+  "id": "load_existing",
+  "feature": "javacli.load_existing",
+  "description": "pre-existing ledger is loaded; a new entry is appended after existing order",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "gamma",
+     "3.30"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "list"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "total"
+    ],
+    "stdin": null
+   }
+  ],
+  "files": {
+   "ledger.txt": {
+    "text": "LEDGER1\nbeta\t250\nalpha\t-100\n"
+   }
+  }
+ },
+ {
+  "id": "err_corrupt_header",
+  "feature": "javacli.error_corrupt",
+  "description": "wrong header: exit 2, file untouched",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "list"
+    ],
+    "stdin": null
+   }
+  ],
+  "files": {
+   "ledger.txt": {
+    "text": "NOTALEDGER\nx\t1\n"
+   }
+  }
+ },
+ {
+  "id": "err_corrupt_line",
+  "feature": "javacli.error_corrupt",
+  "description": "line with 3 fields / non-numeric cents: exit 2, file untouched",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "total"
+    ],
+    "stdin": null
+   }
+  ],
+  "files": {
+   "ledger.txt": {
+    "text": "LEDGER1\nx\t1\ny\t2\t3\n"
+   }
+  }
+ },
+ {
+  "id": "err_corrupt_number",
+  "feature": "javacli.error_corrupt",
+  "description": "non-numeric cents: exit 2",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "total"
+    ],
+    "stdin": null
+   }
+  ],
+  "files": {
+   "ledger.txt": {
+    "text": "LEDGER1\nx\tabc\n"
+   }
+  }
+ },
+ {
+  "id": "err_missing_entry",
+  "feature": "javacli.error_missing",
+  "description": "remove of unknown name: exit 3, ledger untouched",
+  "steps": [
+   {
+    "args": [
+     "ledger.txt",
+     "remove",
+     "ghost"
+    ],
+    "stdin": null
+   }
+  ],
+  "files": {
+   "ledger.txt": {
+    "text": "LEDGER1\nreal\t100\n"
+   }
+  }
+ },
+ {
+  "id": "err_usage",
+  "feature": "javacli.error_usage",
+  "description": "too few args, unknown command, wrong arity, empty entry name (exit 1 each)",
+  "steps": [
+   {
+    "args": [],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "frobnicate"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "only-name"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "remove"
+    ],
+    "stdin": null
+   },
+   {
+    "args": [
+     "ledger.txt",
+     "add",
+     "",
+     "1.00"
+    ],
+    "stdin": null
+   }
+  ]
+ }
+]

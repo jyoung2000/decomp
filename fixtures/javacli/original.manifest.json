@@ -1,0 +1,23 @@
+{
+  "file_count": 3,
+  "files": [
+    {
+      "path": "README.txt",
+      "sha256": "e379b19d737559cc942b3a045a9be45c6548c4074a5743105ac9ea591a204abc",
+      "size": 143
+    },
+    {
+      "path": "javacli.cmd",
+      "sha256": "1147d4db1f1ba916f501f42a0f4338277028ca4d210d81534c2fc7f46d3518a1",
+      "size": 44
+    },
+    {
+      "path": "javacli.jar",
+      "sha256": "2d28ea4f2983939cad409ebc1f877a197034820b2b852430ca690c6bb60b7344",
+      "size": 17667
+    }
+  ],
+  "fixture": "javacli",
+  "root": "original",
+  "total_bytes": 17854
+}

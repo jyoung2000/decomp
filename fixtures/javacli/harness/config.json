@@ -1,0 +1,21 @@
+{
+  "fixture": "javacli",
+  "original_launcher": [
+    "java",
+    "-jar",
+    "{ORIG}/javacli.jar"
+  ],
+  "env": {
+    "JAVA_TOOL_OPTIONS": null,
+    "_JAVA_OPTIONS": null,
+    "JDK_JAVA_OPTIONS": null,
+    "LC_ALL": "C.UTF-8"
+  },
+  "oracle": {
+    "runner": "java17",
+    "certifying": false,
+    "note": "Original jar executed with `java -jar` (JDK 17.0.20.1 on Windows 11, native). Native Windows execution of the jar is the real target, but the launcher javacli.cmd is not exercised.",
+    "observable_on": "host_via_java17"
+  },
+  "newline_policy": "stdout/stderr always LF (explicit \n in the program, never println)"
+}

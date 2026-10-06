@@ -22,7 +22,7 @@ def main():
     files.sort(key=lambda e: e["path"])
     doc = {"fixture": fid, "root": os.path.basename(os.path.normpath(root)),
            "file_count": len(files), "total_bytes": sum(e["size"] for e in files), "files": files}
-    with open(out, "w") as f:
+    with open(out, "w", newline="\n") as f:
         json.dump(doc, f, indent=2, sort_keys=True)
         f.write("\n")
 

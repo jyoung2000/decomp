@@ -18,6 +18,8 @@ REGRESSIONS: dict[str, list[str]] = {
     "rizin": ["tests/test_rizin.py", "tests/test_fixture_oracle.py::test_pecli_oracle_rejects_wrong_remake_and_accepts_original"],
     "ilspy": ["tests/test_ilspy.py"],
     "gdre": ["tests/test_gdre.py"],
+    "jvm": ["tests/test_jvm.py"],
+    "triage": ["tests/test_support_triage.py"],
     "jsweb": ["tests/test_jsweb.py", "tests/test_archive.py"],
 }
 
