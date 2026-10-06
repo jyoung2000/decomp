@@ -315,6 +315,11 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
     except OriginalExecutionNotPermitted as e:
         raise StageError(str(e), blocker="Original execution needs your permission: allow it for this project or supply a baseline file") from e
     launch = lp.get("launch")
+    inferred = False
+    if not launch and (Path(case["source_root"]) / "index.html").is_file() and lp.get("kind", "web" if case.get("target_language") == "web" else "cli") == "web":
+        # A web app's start page needs no configuration: serve the folder and open index.html (recorded as inferred).
+        launch, inferred = {"type": "web", "root": ".", "entry": "index.html"}, True
+        lp = {**lp, "kind": "web", "launch": launch}
     if not launch:
         raise StageError("launch profile has no launch spec", blocker="configure how the original is started")
     root = Path(case["source_root"])
@@ -323,6 +328,10 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
         shutil.rmtree(work_root)
     bl: dict[str, Any] = {"kind": lp.get("kind", "cli"), "launch": launch, "scenarios": [], "tolerance": lp.get("tolerance", {})}
     scenarios = lp.get("scenarios", [])
+    if inferred and not scenarios:
+        # Minimal, explicitly labelled check so the comparison measures something; users add real scenarios in the app.
+        scenarios = [{"id": "start_page", "feature_id": None, "title": "Start page renders the same text (automatic minimal check)",
+                      "text_selectors": ["body"], "auto": True}]
     if bl["kind"] == "web":
         from .comparators.web import run_web_scenario
         from .previews import _free_port, _QuietHandler

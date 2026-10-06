@@ -131,6 +131,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 def _wait_for_case(studio: Any, case_id: str, args: argparse.Namespace) -> int:
     deadline = time.monotonic() + args.timeout if args.timeout else None
     last = ""
+    stuck_polls = 0
     try:
         while True:
             jobs = _job_dicts(studio, case_id)
@@ -141,6 +142,14 @@ def _wait_for_case(studio: Any, case_id: str, args: argparse.Namespace) -> int:
                 last = line
             if jobs and not any(s in ACTIVE_STATES for s in counts):
                 break
+            # Only blocked jobs left (nothing queued or running): nothing will progress until the user acts. Stop waiting
+            # and report the blockers instead of sitting until --timeout.
+            if jobs and not any(s in ("queued", "running") for s in counts):
+                stuck_polls += 1
+                if stuck_polls >= 3:
+                    break
+            else:
+                stuck_polls = 0
             if deadline and time.monotonic() > deadline:
                 raise CliError(f"timed out after {args.timeout}s waiting for case {case_id}", 1)
             time.sleep(1.0)
@@ -152,13 +161,16 @@ def _wait_for_case(studio: Any, case_id: str, args: argparse.Namespace) -> int:
     counts = _counts(jobs)
     ok = set(counts) <= {"completed"}
     final = {"case_id": case_id, "jobs": counts, "ok": ok,
-             "failed": [{"job_id": j["job_id"], "stage": j["stage"], "error": j.get("error")} for j in jobs if j["state"] == "failed"]}
+             "failed": [{"job_id": j["job_id"], "stage": j["stage"], "error": j.get("error")} for j in jobs if j["state"] == "failed"],
+             "blocked": [{"job_id": j["job_id"], "stage": j["stage"], "blocker": j.get("blocker")} for j in jobs if j["state"] == "blocked"]}
     if args.json:
         _jprint(final)
     else:
         print("completed" if ok else f"finished with problems: {counts}")
         for f in final["failed"]:
             print(f"  failed {f['stage']} ({f['job_id']}): {f['error']}")
+        for b in final["blocked"]:
+            print(f"  blocked {b['stage']} ({b['job_id']}): {b['blocker']}")
     return 0 if ok else 1
 
 

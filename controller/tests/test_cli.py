@@ -256,3 +256,13 @@ def test_real_case_lifecycle_through_the_cli(real_env, capsys):
     assert code == 0 and json.loads(out)["action"] == "cancel"
     code, out, _ = run(capsys, "status", "case_" + "0" * 22, *d)
     assert code == 1
+
+
+def test_rebuild_wait_stops_when_only_blocked_jobs_remain(fake_open, capsys):
+    """Nothing queued or running and something blocked: the run cannot progress without the user, so --wait must return
+    the blockers promptly instead of sitting until --timeout (seen with the installed app on a web project)."""
+    fake_open([["completed", "blocked"]])
+    code, out, err = run(capsys, "rebuild", "--source", "/s", "--output", "/o", "--wait", "--json", "--timeout", "30")
+    data = json.loads(out)
+    assert code == 1 and data["ok"] is False and data["jobs"] == {"completed": 1, "blocked": 1}
+    assert [b["stage"] for b in data["blocked"]] == ["inventory"]
