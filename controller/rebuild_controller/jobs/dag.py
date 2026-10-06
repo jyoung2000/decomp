@@ -117,6 +117,16 @@ class JobStore:
                 return False
         return True
 
+    def add_dependency(self, job_id: str, depends_on: str) -> None:
+        """Add an edge after creation (fan-out). A queued job whose new dependency is unfinished becomes blocked."""
+        with self.db.transaction():
+            if not self.db.query_one("SELECT 1 FROM jobs WHERE job_id=?", (depends_on,)):
+                raise ValueError(f"unknown dependency job {depends_on}")
+            self.db.execute("INSERT OR IGNORE INTO job_deps(job_id, depends_on) VALUES (?,?)", (job_id, depends_on))
+            j = self.get(job_id)
+            if j.state == JobState.QUEUED and not self._deps_satisfied(self.dependencies(job_id)):
+                self.db.update("jobs", "job_id", job_id, {"state": JobState.BLOCKED.value, "blocker": "waiting on dependencies", "updated_at": now_iso()})
+
     def dependencies(self, job_id: str) -> list[str]:
         return [r["depends_on"] for r in self.db.query("SELECT depends_on FROM job_deps WHERE job_id=?", (job_id,))]
 
@@ -238,13 +248,13 @@ class JobStore:
                     if d.state == JobState.BLOCKED and self._deps_satisfied(self.dependencies(dep)):
                         self.db.update("jobs", "job_id", dep, {"state": JobState.QUEUED.value, "blocker": None, "updated_at": ts})
                         self.events.emit("job.unblocked", {"job_id": dep}, case_id=d.case_id, job_id=dep)
-            elif state in (JobState.FAILED, JobState.CANCELLED):
+            elif state in (JobState.FAILED, JobState.CANCELLED, JobState.BLOCKED):
+                reason = f"dependency {job_id} {state.value}" + (f": {blocker}" if blocker else "")
                 for dep in self._all_dependents(job_id):
                     d = self.get(dep)
                     if d.state in (JobState.BLOCKED, JobState.QUEUED):
-                        self.db.update("jobs", "job_id", dep, {"state": JobState.BLOCKED.value, "updated_at": ts,
-                                                             "blocker": f"dependency {job_id} {state.value}"})
-                        self.events.emit("job.blocked", {"job_id": dep, "blocker": f"dependency {job_id} {state.value}"}, case_id=d.case_id, job_id=dep)
+                        self.db.update("jobs", "job_id", dep, {"state": JobState.BLOCKED.value, "updated_at": ts, "blocker": reason})
+                        self.events.emit("job.blocked", {"job_id": dep, "blocker": reason}, case_id=d.case_id, job_id=dep)
         payload = {"job_id": job_id, "state": state.value, "stage": job.stage, "title": job.title, "error": (error or "")[:4000], "blocker": blocker}
         if result is not None:
             payload["result_keys"] = sorted(result.keys())

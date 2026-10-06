@@ -13,8 +13,9 @@ def schedule_rebuild(studio, case_id: str) -> dict[str, Any]:
     plan.link_job(mid("M-ANALYSIS"), inv.job_id)
     dep = jobs.create(case_id, "dependency_graph", "Build dependency graph", {}, depends_on=[inv.job_id], milestone_id="M-ASSETS", priority=20)
     plan.link_job(mid("M-ASSETS"), dep.job_id)
-    # feature discovery waits for recovery jobs that inventory fans out; we gate it on a 'recovery barrier' job.
-    barrier = jobs.create(case_id, "barrier", "Recovery barrier", {}, depends_on=[inv.job_id, dep.job_id], milestone_id="M-RECOVERY", priority=50, max_attempts=100000)
+    # feature discovery waits for the recovery jobs that inventory fans out: inventory adds them as dependencies of this summary job.
+    barrier = jobs.create(case_id, "barrier", "Recovery summary", {}, depends_on=[inv.job_id, dep.job_id], milestone_id="M-RECOVERY", priority=50)
+    plan.link_job(mid("M-RECOVERY"), barrier.job_id)
     feats = jobs.create(case_id, "discover_features", "Discover features", {}, depends_on=[barrier.job_id], milestone_id="M-FEATURES", priority=60)
     plan.link_job(mid("M-FEATURES"), feats.job_id)
     lp = case.get("launch_profile", {})
@@ -32,21 +33,10 @@ def schedule_rebuild(studio, case_id: str) -> dict[str, Any]:
 
 
 def stage_barrier(ctx) -> dict[str, Any]:
-    """Completes only when every recovery job of the case has finished (completed/failed/blocked/cancelled are all 'finished')."""
+    """Runs after every recovery job the inventory fanned out has completed (dynamic dependencies). Summarises recovery."""
     from .jobs import JobState
     st = ctx.services["studio"]
-    pending = [j for j in st.jobs.list(ctx.job.case_id) if j.stage in ("analyze_module", "recover_managed", "recover_engine", "recover_web")
-               and j.state in (JobState.QUEUED, JobState.RUNNING, JobState.BLOCKED)]
-    # Recovery jobs blocked on a missing tool should not hold the barrier forever: report and continue.
-    waiting = [j for j in pending if not (j.state == JobState.BLOCKED and j.blocker and "install" in j.blocker)]
-    if waiting:
-        # re-queue ourselves later: we fail with retry so the scheduler re-runs after other jobs progress
-        import time
-        time.sleep(0.5)
-        from .jobs.runner import StageError
-        raise StageError(f"waiting for {len(waiting)} recovery jobs", retry=True)
-    blocked = [j.blocker for j in pending if j.state == JobState.BLOCKED]
     done = [j for j in st.jobs.list(ctx.job.case_id) if j.stage in ("analyze_module", "recover_managed", "recover_engine", "recover_web")]
     failed = [j.job_id for j in done if j.state == JobState.FAILED]
-    st.plan.update_item(st.plan.milestone_id(ctx.job.case_id, "M-RECOVERY"), status="completed" if not failed and not blocked else ("blocked" if blocked else "failed"), blockers=blocked)
-    return {"recovery_jobs": len(done), "failed": failed, "blocked": blocked}
+    st.plan.update_item(st.plan.milestone_id(ctx.job.case_id, "M-RECOVERY"), status="completed" if not failed else "failed")
+    return {"recovery_jobs": len(done), "completed": sum(1 for j in done if j.state == JobState.COMPLETED), "failed": failed}

@@ -139,3 +139,21 @@ def test_queue_bound(jobs, cases, src_out):
     jobs.create(cid, "x", "1", {}); jobs.create(cid, "x", "2", {})
     with pytest.raises(RuntimeError):
         jobs.create(cid, "x", "3", {})
+
+
+def test_dynamic_dependency_and_blocked_cascade(jobs, runner, registry, cases, src_out):
+    cid = _mk_case(cases, src_out)
+    registry.add("x", lambda ctx: {})
+    registry.add("needs_tool", lambda ctx: (_ for _ in ()).throw(StageError("tool missing", blocker="install tool")))
+    a = jobs.create(cid, "x", "A", {})
+    fanin = jobs.create(cid, "x", "fan-in", {}, depends_on=[a.job_id])
+    late = jobs.create(cid, "needs_tool", "late", {})
+    jobs.add_dependency(fanin.job_id, late.job_id)
+    runner.run_pending()
+    assert jobs.get(late.job_id).state == JobState.BLOCKED
+    f = jobs.get(fanin.job_id)
+    assert f.state == JobState.BLOCKED and "install tool" in f.blocker
+    registry.add("needs_tool", lambda ctx: {})
+    jobs.resume(late.job_id)
+    runner.run_pending()
+    assert jobs.get(fanin.job_id).state == JobState.COMPLETED

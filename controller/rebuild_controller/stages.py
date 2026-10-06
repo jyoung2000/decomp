@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .adapters.contract import Availability
+from .jobs import JobState
 from .backends.inventory import build_dependency_graph, inventory_root
 from .jobs.runner import StageContext, StageError, StageRegistry
 
@@ -72,6 +73,11 @@ def stage_inventory(ctx: StageContext) -> dict[str, Any]:
     if inv["profile"]["primary"] in ("web", "electron") and not created:
         j = st.jobs.create(case["case_id"], "recover_web", "recover web application", {"root": True}, depends_on=[ctx.job.job_id], milestone_id="M-RECOVERY")
         st.plan.link_job(st.plan.milestone_id(case["case_id"], "M-RECOVERY"), j.job_id); created.append(j.job_id)
+    # fan-in: the recovery summary (and everything after it) waits for the jobs created here
+    for bj in st.jobs.list(case["case_id"]):
+        if bj.stage == "barrier" and bj.state in (JobState.QUEUED, JobState.BLOCKED):
+            for jid in created:
+                st.jobs.add_dependency(bj.job_id, jid)
     for u in unsupported:
         st.plan.add_item(case["case_id"], title=f"Unsupported: {u['module']}", outcome=u["reason"], kind="unsupported", reason="detected unsupported profile")
     ctx.progress(files_scanned=inv["file_count"], modules=inv["module_count"], recovery_jobs=len(created), unsupported=len(unsupported))
