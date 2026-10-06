@@ -47,18 +47,33 @@ def test_inventory_truncation_is_visible(tmp_path):
 
 
 def test_inventory_inaccessible_disclosed(tmp_path):
-    if os.geteuid() == 0:
-        pytest.skip("root can read everything")
     root = tmp_path / "r"; root.mkdir()
-    f = root / "locked.bin"; f.write_bytes(b"MZ" + b"\0" * 100); f.chmod(0)
-    inv = inventory_root(root, Limits())
+    f = root / "locked.bin"; f.write_bytes(b"MZ" + b"\0" * 100)
+    if os.name == "nt":
+        # Windows has no chmod 000: deny read to the current user via an ACL (removed in finally so tmp cleanup works).
+        who = f"{os.environ['USERDOMAIN']}\\{os.environ['USERNAME']}"
+        subprocess.run(["icacls", str(f), "/deny", f"{who}:(R)"], check=True, capture_output=True)
+        try:
+            inv = inventory_root(root, Limits())
+        finally:
+            subprocess.run(["icacls", str(f), "/remove:d", who], capture_output=True)
+    else:
+        if os.geteuid() == 0:
+            pytest.skip("root can read everything")
+        f.chmod(0)
+        inv = inventory_root(root, Limits())
     assert any("unreadable" in s["reason"] for s in inv["skipped"])
 
 
 def test_detect_pe_and_dependency_graph(tmp_path):
-    src = tmp_path / "a.c"; src.write_text('#include <stdio.h>\nint main(){puts("x");return 0;}')
     exe = tmp_path / "app" / "a.exe"; exe.parent.mkdir()
-    subprocess.run(["x86_64-w64-mingw32-gcc", "-O1", "-o", str(exe), str(src)], check=True)
+    if os.name == "nt":
+        # Native Windows host: no mingw cross-compiler needed; use a real x64 console PE that ships with Windows.
+        import shutil
+        shutil.copy2(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "whoami.exe", exe)
+    else:
+        src = tmp_path / "a.c"; src.write_text('#include <stdio.h>\nint main(){puts("x");return 0;}')
+        subprocess.run(["x86_64-w64-mingw32-gcc", "-O1", "-o", str(exe), str(src)], check=True)
     d = sniff(exe)
     assert d.format == "pe" and d.profile == "native_pe" and d.arch == "x86_64" and d.bits == 64
     assert d.flags["subsystem"] == "console" and "kernel32.dll" in d.flags["imports"]

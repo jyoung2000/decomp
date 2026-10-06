@@ -330,14 +330,16 @@ def _zip_eocd(f, size: int) -> tuple[int, int, int]:
 
 
 def _zip_member_from_info(zi: zipfile.ZipInfo) -> tuple[str, str, str | None]:
+    # zipfile rewrites os.sep to '/' in .filename on Windows; keep the name exactly as stored in the archive
+    name = getattr(zi, "orig_filename", zi.filename)
     mode = (zi.external_attr >> 16) & 0o170000
     if zi.is_dir():
-        return "dir", zi.filename, None
+        return "dir", name, None
     if mode == stat.S_IFLNK:
-        return "symlink", zi.filename, ""
+        return "symlink", name, ""
     if mode not in (0, stat.S_IFREG):
-        return "other", zi.filename, None
-    return "file", zi.filename, None
+        return "other", name, None
+    return "file", name, None
 
 
 def _zip_partial_listing(f, size: int, cd_off: int, limit: int) -> list[ArchiveMember]:

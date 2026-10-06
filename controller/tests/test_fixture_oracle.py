@@ -41,11 +41,17 @@ def test_pecli_oracle_rejects_wrong_remake_and_accepts_original(studio, tmp_path
     shutil.copytree(wrong, build, ignore=shutil.ignore_patterns("target"))
     subprocess.run(["cargo", "build", "--release", "-q"], cwd=build, check=True)
     exe = next((build / "target" / "release").glob("*"), None)
-    bins = [p for p in (build / "target" / "release").iterdir() if p.is_file() and p.stat().st_mode & 0o111 and not p.suffix]
-    dist = tmp_path / "wrong-dist"; dist.mkdir(); shutil.copy2(bins[0], dist / "pecli")
+    rel = build / "target" / "release"
+    if os.name == "nt":
+        bins = [rel / "pecli.exe"] if (rel / "pecli.exe").is_file() else [p for p in rel.glob("*.exe")]   # no exec bit on Windows
+        wrong_name = "pecli.exe"
+    else:
+        bins = [p for p in rel.iterdir() if p.is_file() and p.stat().st_mode & 0o111 and not p.suffix]
+        wrong_name = "pecli"
+    dist = tmp_path / "wrong-dist"; dist.mkdir(); shutil.copy2(bins[0], dist / wrong_name)
     w = studio.candidates.create(cid, target_language="rust", output_type="exe", plan_revision=1, source_dir=build)
     w = studio.candidates.mark_built(w["candidate_id"], dist)
-    studio.db.update("candidates", "candidate_id", w["candidate_id"], {"meta": {"launch": {"type": "exe", "path": "pecli"}}})
+    studio.db.update("candidates", "candidate_id", w["candidate_id"], {"meta": {"launch": {"type": "exe", "path": wrong_name}}})
     rep = studio.verifier.verify_candidate(cid, w["candidate_id"])
     assert rep["summary"]["passed"] == 0 and rep["summary"]["failed"] == 8, rep["summary"]
     assert studio.candidates.get(w["candidate_id"])["verification"] == "failed"
@@ -65,4 +71,4 @@ def test_dotnetapp_oracle_self_check(studio, tmp_path):
     c = studio.candidates.mark_built(c["candidate_id"], orig)
     studio.db.update("candidates", "candidate_id", c["candidate_id"], {"meta": {"launch": {"type": "dotnet", "path": "dotnetapp.dll"}}})
     rep = studio.verifier.verify_candidate(cid, c["candidate_id"])
-    assert rep["summary"]["passed"] == len(bl["scenarios"]) == 9, rep
+    assert rep["summary"]["passed"] == len(bl["scenarios"]) == 9, rep["summary"]

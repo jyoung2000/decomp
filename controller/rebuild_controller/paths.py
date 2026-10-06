@@ -80,16 +80,38 @@ class RootSet:
         _reject_protected(out)
 
 
-_PROTECTED_WIN = ("c:\\windows", "c:\\program files", "c:\\program files (x86)")
 _PROTECTED_POSIX = ("/", "/usr", "/bin", "/sbin", "/etc", "/lib", "/lib64", "/boot", "/proc", "/sys", "/dev")
+
+
+def _windows_protected_roots() -> tuple[list[str], list[str]]:
+    """Return (trees, exact): trees are protected with everything below; exact are protected only as themselves
+    (a drive root or the user profile directory itself - subfolders of the profile are legitimate output locations)."""
+    trees: list[str] = []
+    exact: list[str] = []
+    for var in ("SystemRoot", "windir", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData"):
+        v = os.environ.get(var)
+        if v:
+            trees.append(_norm_for_compare(Path(v)))
+    sysdrive = os.environ.get("SystemDrive", "C:")
+    for d in {sysdrive.lower().rstrip("\\/"), "c:"}:
+        trees += [d + "\\windows", d + "\\program files", d + "\\program files (x86)", d + "\\programdata"]
+    home = os.environ.get("USERPROFILE")
+    if home:
+        exact.append(_norm_for_compare(Path(home)))
+    users = os.environ.get("PUBLIC")
+    if users:
+        exact.append(_norm_for_compare(Path(users).parent))   # the Users directory itself
+    return sorted(set(trees)), sorted(set(exact))
 
 
 def _reject_protected(out: Path) -> None:
     s = _norm_for_compare(out)
     if os.name == "nt":
-        for p in _PROTECTED_WIN:
-            if s == p or s.startswith(p + "\\"):
-                raise PathPolicyError(f"output destination {out} is inside a protected system directory")
+        trees, exact = _windows_protected_roots()
+        drive = PureWindowsPath(str(out)).anchor.lower()
+        is_drive_root = bool(drive) and s == _norm_for_compare(Path(drive)) or (len(s) == 2 and s[1] == ":")
+        if is_drive_root or s in exact or any(s == p or s.startswith(p + "\\") for p in trees):
+            raise PathPolicyError(f"output destination {out} is a protected system location")
     else:
         if s in _PROTECTED_POSIX or any(s.startswith(p + "/") for p in _PROTECTED_POSIX if p != "/"):
             raise PathPolicyError(f"output destination {out} is inside a protected system directory")

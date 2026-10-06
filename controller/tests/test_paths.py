@@ -24,8 +24,16 @@ def test_rootset_rejects_symlinked_output_into_source(tmp_path):
 
 def test_rootset_rejects_protected(tmp_path):
     src = tmp_path / "src"; src.mkdir()
-    with pytest.raises(PathPolicyError):
-        RootSet(src, Path("/usr/share/x"), tmp_path / "case").validate()
+    if os.name == "nt":
+        protected = [Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "x",
+                     Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "x",
+                     Path(os.environ.get("SystemDrive", "C:") + "\\"),
+                     Path(os.environ["USERPROFILE"])]
+    else:
+        protected = [Path("/usr/share/x")]
+    for out in protected:
+        with pytest.raises(PathPolicyError):
+            RootSet(src, out, tmp_path / "case").validate()
 
 
 @pytest.mark.parametrize("name", ["../x", "a/../../x", "/etc/passwd", "C:\\win\\x", "..\\x", "//server/share"])

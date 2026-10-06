@@ -29,10 +29,13 @@ def convert(doc: dict[str, Any], original_root: Path) -> dict[str, Any]:
             steps_in.append({"args": list(stp["args"]), "stdin": stp.get("stdin") or ""})
             steps_exp.append({"args": list(stp["args"]), "exit_code": stp["exit_code"], "stdout": stp.get("stdout", ""), "stderr": stp.get("stderr", ""), "runner": doc.get("oracle", {}).get("runner", "")})
         files = {name: info["sha256"] for name, info in sc.get("final_files", {}).items() if info.get("sha256")}
+        # Text files the oracle recorded with LF only: the original may emit the host's Environment.NewLine (CRLF on Windows),
+        # so the files channel may need to hash them CRLF-normalised (honoured by the CLI comparator when it supports it).
+        text_files = sorted(n for n, i in sc.get("final_files", {}).items() if isinstance(i.get("text"), str) and "\r" not in i["text"])
         setup = {name: _inline_setup(spec, original_root) for name, spec in (sc.get("setup_files", {}) or {}).items()}
         scenarios.append({"id": sc["id"], "feature_id": sc.get("feature"), "title": sc.get("description", sc["id"]), "steps": steps_in,
                           "setup_files": setup, "channels": ["exit_code", "stdout", "stderr", "files"],
-                          "normalize": {"stdout": ["crlf"], "stderr": ["crlf"]}, "expected": {"steps": steps_exp, "files": files}})
+                          "normalize": {"stdout": ["crlf"], "stderr": ["crlf"], **({"files": ["crlf"], "text_files": text_files} if text_files else {})}, "expected": {"steps": steps_exp, "files": files}})
     return {"kind": "cli", "launch": launch, "scenarios": scenarios, "oracle": doc.get("oracle", {}), "fixture": doc["fixture"],
             "observable_on": doc.get("observable_on"), "newline_policy": doc.get("newline_policy")}
 

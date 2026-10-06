@@ -36,7 +36,11 @@ def outside_snapshot(parent: Path, keep: str) -> set[str]:
 def make_zip(path: Path, members: dict[str, bytes], *, deflate: bool = True, extra: list[tuple[zipfile.ZipInfo, bytes]] | None = None) -> Path:
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED if deflate else zipfile.ZIP_STORED) as z:
         for n, d in members.items():
-            z.writestr(n, d)
+            zi = zipfile.ZipInfo(n, date_time=(2020, 1, 1, 0, 0, 0))
+            zi.filename = n                       # ZipInfo() rewrites os.sep to "/" on Windows; store the hostile name verbatim
+            zi.compress_type = z.compression
+            zi.external_attr = 0o644 << 16
+            z.writestr(zi, d)
         for zi, d in extra or []:
             z.writestr(zi, d)
     return path

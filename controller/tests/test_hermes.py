@@ -46,6 +46,18 @@ def png(r: int, g: int, b: int) -> bytes:
 
 
 def alive(pid: int) -> bool:
+    if os.name == "nt":  # os.kill(pid, 0) would TERMINATE the process on Windows; query the exit code instead
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        k32.OpenProcess.restype = ctypes.c_void_p
+        h = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            return bool(k32.GetExitCodeProcess(ctypes.c_void_p(h), ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
+        finally:
+            k32.CloseHandle(ctypes.c_void_p(h))
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -218,17 +230,27 @@ def transcript(driver_path: str, *, states: list[dict] | None = None, extra_exch
     }
 
 
+def _install_fake(bindir: Path, name: str, template: str) -> Path:
+    """Install a fake executable. POSIX: a shebang script. Windows (no shebang/exec bit): a .py script plus a .cmd launcher
+    that runs it with sys.executable, which is what PATH/PATHEXT lookup and CreateProcess can actually execute."""
+    if os.name != "nt":
+        p = bindir / name
+        p.write_text(template.format(py=PY))
+        p.chmod(0o755)
+        return p
+    (bindir / f"{name}.py").write_text(template.format(py=PY))
+    cmd = bindir / f"{name}.cmd"
+    cmd.write_text(f'@"{PY}" "%~dp0{name}.py" %*' + chr(13) + chr(10), newline="")
+    return cmd
+
+
 @pytest.fixture
 def world(tmp_path, monkeypatch):
     """A tmp PATH holding a fake `hermes` and `cua-driver`, a Hermes profile, and a bridge wired to them."""
     bindir = tmp_path / "bin"
     bindir.mkdir()
-    hermes = bindir / "hermes"
-    hermes.write_text(FAKE_HERMES.format(py=PY))
-    hermes.chmod(0o755)
-    driver = bindir / "cua-driver"
-    driver.write_text(FAKE_DRIVER.format(py=PY))
-    driver.chmod(0o755)
+    hermes = _install_fake(bindir, "hermes", FAKE_HERMES)
+    driver = _install_fake(bindir, "cua-driver", FAKE_DRIVER)
     home = tmp_path / "home"
     profile = home / ".hermes"
     profile.mkdir(parents=True)
@@ -238,7 +260,9 @@ def world(tmp_path, monkeypatch):
     scen = ctl / "scenario.json"
     drv_t = ctl / "driver.json"
     drv_t.write_text(json.dumps(transcript(str(driver))))
-    env = {"PATH": f"{bindir}{os.pathsep}/usr/bin{os.pathsep}/bin", "HOME": str(home), "FAKE_HERMES_SCENARIO": str(scen),
+    sysenv = {k: os.environ[k] for k in ("SystemRoot", "COMSPEC", "PATHEXT", "TEMP", "TMP") if k in os.environ} if os.name == "nt" else {}
+    sysdirs = os.pathsep.join([os.environ.get("SystemRoot", r"C:\Windows") + r"\System32"]) if os.name == "nt" else f"/usr/bin{os.pathsep}/bin"
+    env = {**sysenv, "PATH": f"{bindir}{os.pathsep}{sysdirs}", "HOME": str(home), "USERPROFILE": str(home), "FAKE_HERMES_SCENARIO": str(scen),
            "FAKE_HERMES_INVOKED": str(ctl / "invoked.jsonl"), "FAKE_HERMES_DUMP": str(ctl / "dump.json"),
            "FAKE_HERMES_PIDFILE": str(ctl / "hermes.pid"), "FAKE_DRIVER_TRANSCRIPT": str(drv_t), "FAKE_DRIVER_LOG": str(ctl / "driver.log"),
            "FAKE_DRIVER_ENVDUMP": str(ctl / "driver.env"), "FAKE_DRIVER_PATH": str(driver)}
@@ -318,7 +342,7 @@ def test_detection_missing_gives_clear_next_action(tmp_path):
 def test_detection_installed_and_broken(world):
     inst = world.bridge.detect_installation()
     assert inst["state"] == "installed" and inst["version"] == "0.0.0-fake" and inst["release_date"] == "2026-10-06"
-    assert inst["hermes_path"].endswith("hermes") and inst["profile_dir"] == str(world.profile) and inst["config_exists"]
+    assert Path(inst["hermes_path"]).stem == "hermes" and inst["profile_dir"] == str(world.profile) and inst["config_exists"]
     broken = HermesBridge(world.tmp / "d2", env={**world.env, "FAKE_HERMES_BROKEN": "1"}, probe=FakeProbe("Linux"))
     b = broken.detect_installation()
     assert b["state"] == "broken" and "hermes doctor" in b["next_action"]
