@@ -1,0 +1,160 @@
+{
+ "case_id": "case_01a1110e474dab01c537fc",
+ "candidate_id": "cand_01a1110e68a802f4e4194c",
+ "build_hash": "5cdf1e0f7918ce24",
+ "published_at": "2026-10-06T11:52:08.637Z",
+ "files": [
+  {
+   "path": "dist/app.js",
+   "size": 5138,
+   "sha256": "ac1baeb1e617d82d7353461a2701fdd8298db72f6e30703a54aa103f4d769785"
+  },
+  {
+   "path": "dist/icon.svg",
+   "size": 279,
+   "sha256": "c3a4fd1d9df5ce96a8116aab0708180cb68a5928347036fa1057780526ccd715"
+  },
+  {
+   "path": "dist/index.html",
+   "size": 805,
+   "sha256": "94aabdd18322723907b4d6a73cac58023622c60bad8ca056371d1f4aa325f986"
+  },
+  {
+   "path": "dist/manifest.webmanifest",
+   "size": 300,
+   "sha256": "268f168f2a35e3eb3afc203989fc31fcf1a8ad24a4595c0d8b4a72d5815bf618"
+  },
+  {
+   "path": "dist/styles.css",
+   "size": 1760,
+   "sha256": "bb1df5797120540e722fff93b7a9ade223ffadcc2016db710b1a63ac1b0b4814"
+  },
+  {
+   "path": "dist/sw.js",
+   "size": 1611,
+   "sha256": "7c58d5cbe44e58c3b87f2722f3f72a30a941bb7d3819c4c0a2864871b93e6cc6"
+  },
+  {
+   "path": "evidence/comparisons.json",
+   "size": 18478,
+   "sha256": "31767bf0296f2090d2ef4599d4fe91d548d0f83ba1079ce0ccb61bac5294bc3f"
+  },
+  {
+   "path": "evidence/ev_01a1110e4755fb2cee137f.json",
+   "size": 2551,
+   "sha256": "856953fd583c31949bc79209648ff586b0bfb7f944dcffe185e715f7779303c8"
+  },
+  {
+   "path": "evidence/ev_01a1110e4759dabca17a98.json",
+   "size": 71,
+   "sha256": "750a976298f4725790f9d43c3feacbd06ef06ed13a4c18f5b55dcc6e0685a334"
+  },
+  {
+   "path": "evidence/ev_01a1110e481cbdaf6fa1c3.json",
+   "size": 5121,
+   "sha256": "52362f892081678d423c613e92734bdf228e09c002cceb3dae8200aa1ffb9b92"
+  },
+  {
+   "path": "evidence/ev_01a1110e68a4c1953182a1.json",
+   "size": 8264,
+   "sha256": "7c575119be3d32bd0ef25932909722c56b0b75cae165c0a5b337eeb76ebd4a23"
+  },
+  {
+   "path": "evidence/ev_01a1110e68b53321359b72.json",
+   "size": 2101,
+   "sha256": "ec0b9364f6981502e9efbe3597a6f61bc16f00fec4ad662c7105d9f6d4a0027a"
+  },
+  {
+   "path": "evidence/ev_01a1110e8a7fd8b579f0b2.json",
+   "size": 4300,
+   "sha256": "b3cbab18af3c68ca65df9cde353dec74c9f4ff54640598fd7180e50ca0424fd3"
+  },
+  {
+   "path": "evidence/features.json",
+   "size": 2539,
+   "sha256": "e7676fbd94a56a3f0efcc599ae3de953eaba2e7fa51cc410f19de3c1adff5985"
+  },
+  {
+   "path": "evidence/index.json",
+   "size": 3552,
+   "sha256": "a6394ce729f561bf681a61dcc6c14e5e22f0bedaa89e1269d20b1c4bf51b7a01"
+  },
+  {
+   "path": "evidence/modules.json",
+   "size": 886,
+   "sha256": "3f2f1bce2035ac3e8baa8c4858af982f766b74ad0462242a56a35144096ae4cd"
+  },
+  {
+   "path": "evidence/provenance.json",
+   "size": 13365,
+   "sha256": "5497253e1fae87069a6074ccc391700d9839664a8b75a062c8f3d50e6aa07416"
+  },
+  {
+   "path": "reports/parity-report.json",
+   "size": 18225,
+   "sha256": "2fb44971344d80aba31c67dbab327d3e9efde28f51e708c1c04be0cdb4590606"
+  },
+  {
+   "path": "reports/parity-report.md",
+   "size": 2616,
+   "sha256": "1019c9eccee279c642ef2f08bb08103498f8658ab1c5cfd98641875520203dd5"
+  },
+  {
+   "path": "reports/project-plan.html",
+   "size": 4646,
+   "sha256": "c0a343de4198b49863ff3791375606862e51f7a0bc4863eae4601159651f56d9"
+  },
+  {
+   "path": "reports/project-plan.json",
+   "size": 16913,
+   "sha256": "0c4e0d337f0b97924ed156dfa4953d57aec96abb94c90b5ee919b1508d2b2c3c"
+  },
+  {
+   "path": "reports/unresolved.json",
+   "size": 156,
+   "sha256": "2ce91ff084246995a5f30e75a6f5b7c456cf1f10f540008aff74f64e2a6a54b6"
+  },
+  {
+   "path": "source/README.md",
+   "size": 175,
+   "sha256": "72ee2e08afe5d8a460527e7a113da5f30c0b3de232f38eca4d39e2639065573d"
+  },
+  {
+   "path": "source/site/app.js",
+   "size": 5138,
+   "sha256": "ac1baeb1e617d82d7353461a2701fdd8298db72f6e30703a54aa103f4d769785"
+  },
+  {
+   "path": "source/site/icon.svg",
+   "size": 279,
+   "sha256": "c3a4fd1d9df5ce96a8116aab0708180cb68a5928347036fa1057780526ccd715"
+  },
+  {
+   "path": "source/site/index.html",
+   "size": 805,
+   "sha256": "94aabdd18322723907b4d6a73cac58023622c60bad8ca056371d1f4aa325f986"
+  },
+  {
+   "path": "source/site/manifest.webmanifest",
+   "size": 300,
+   "sha256": "268f168f2a35e3eb3afc203989fc31fcf1a8ad24a4595c0d8b4a72d5815bf618"
+  },
+  {
+   "path": "source/site/styles.css",
+   "size": 1760,
+   "sha256": "bb1df5797120540e722fff93b7a9ade223ffadcc2016db710b1a63ac1b0b4814"
+  },
+  {
+   "path": "source/site/sw.js",
+   "size": 1611,
+   "sha256": "7c58d5cbe44e58c3b87f2722f3f72a30a941bb7d3819c4c0a2864871b93e6cc6"
+  },
+  {
+   "path": "manifest.json",
+   "size": null,
+   "sha256": null
+  }
+ ],
+ "note": "manifest.json itself is listed without a hash",
+ "verification": "verified"
+}

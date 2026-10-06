@@ -1,0 +1,110 @@
+{
+ "case_id": "case_01a1110c53e20db71d8c36",
+ "candidate_id": "cand_01a1110c61d4f8ed89d124",
+ "build_hash": "958b5d3511163011",
+ "published_at": "2026-10-06T11:54:46.902Z",
+ "files": [
+  {
+   "path": "dist/godotgame",
+   "size": 442752,
+   "sha256": "4bc369dcfb23ca44eaafc22246e9fe2c148902254a52a2792b0224b4e65514d2"
+  },
+  {
+   "path": "evidence/comparisons.json",
+   "size": 2,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  {
+   "path": "evidence/ev_01a1110c551dfa58e6c91e.json",
+   "size": 1083,
+   "sha256": "8e4d02261c8044fd05bedc66f034392af025199ec382631eb85fbed185bee463"
+  },
+  {
+   "path": "evidence/ev_01a1110c552121becec00f.json",
+   "size": 62,
+   "sha256": "e8a1f3c33400aa697dd796c393afb9628afcafa31eedb47f5af7afc983e29c56"
+  },
+  {
+   "path": "evidence/ev_01a1110c61cef45a638fa1.json",
+   "size": 6086,
+   "sha256": "a49b0a5ee345787fc4fa4b0c414eee937c644f403d1c13a8d401a9044bf35c06"
+  },
+  {
+   "path": "evidence/ev_01a11110f4cd8ee4d82b97.json",
+   "size": 1016,
+   "sha256": "a97eab703ef2aff64585e6e0f8734f6e446e6d0670d91eee9bfd0d2cde0015f4"
+  },
+  {
+   "path": "evidence/features.json",
+   "size": 2,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  {
+   "path": "evidence/index.json",
+   "size": 3606,
+   "sha256": "0d7ac27495ebabc35afdc89aacad98fcaa89de8589d5c4e96a684c30ccc686d6"
+  },
+  {
+   "path": "evidence/modules.json",
+   "size": 379,
+   "sha256": "8401443d1f29972b312ea5f6f368a4f1095a14d718815fa522ba2dd7203facdd"
+  },
+  {
+   "path": "evidence/provenance.json",
+   "size": 13365,
+   "sha256": "759638aca05c7f92c629b883009e31c60325bdcc0f1e172e27329481d0d21d6c"
+  },
+  {
+   "path": "reports/parity-report.json",
+   "size": 1367,
+   "sha256": "4021661ca9d2c55f2046ba94782c5e284017c16c5a2da09fad7eb9291b407244"
+  },
+  {
+   "path": "reports/parity-report.md",
+   "size": 752,
+   "sha256": "a43a50254d9d42bfbd1ad0ce095e9c272b44edd86a667a05451fc5f69ca79e40"
+  },
+  {
+   "path": "reports/project-plan.html",
+   "size": 4298,
+   "sha256": "9681e0e73d9d6a684f9d64613d5efb8efa5c06477ec2810aaa223cefdfc77d45"
+  },
+  {
+   "path": "reports/project-plan.json",
+   "size": 11557,
+   "sha256": "a0d8ed7f4f64d16d1f9672c9795e58560027a2cdc736a43e4487a421c91b922c"
+  },
+  {
+   "path": "reports/unresolved.json",
+   "size": 38,
+   "sha256": "6e941e2cc5d460155ff326596307a5ba1352d562c09db7929ebd6cbb14b4a864"
+  },
+  {
+   "path": "source/Cargo.lock",
+   "size": 113619,
+   "sha256": "4e8c3b7cc7f687134e5d9f443572a5b578c319204478ebca3b501b3864060d17"
+  },
+  {
+   "path": "source/Cargo.toml",
+   "size": 265,
+   "sha256": "628744f167239e15772eca17a4e0fd9f60c7608ff377829d5478b0d51d850109"
+  },
+  {
+   "path": "source/README.md",
+   "size": 125,
+   "sha256": "5ab72d0443d06602bbaca20ee74e73b2ff98e9b37cddc2ea8dc29d3177bf3fad"
+  },
+  {
+   "path": "source/src/main.rs",
+   "size": 215,
+   "sha256": "0e30d00a91f0441614ebae53201f045bf5df0d811e62d4cdee2dedc741a36d8c"
+  },
+  {
+   "path": "manifest.json",
+   "size": null,
+   "sha256": null
+  }
+ ],
+ "note": "manifest.json itself is listed without a hash",
+ "verification": "untested"
+}

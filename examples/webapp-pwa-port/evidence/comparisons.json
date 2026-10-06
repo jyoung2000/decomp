@@ -1,0 +1,658 @@
+[
+ {
+  "comparison_id": "cmp_01a1110e75ce37684f2dbc",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.render_notes",
+  "channel": "dom",
+  "rule": "innerText:exact(per step)",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": "d24d74a209ca75e6fddcdf57c00e23a3b10fd75200b5c9f5d01df8cbc0e27d28",
+  "candidate_hash": "d24d74a209ca75e6fddcdf57c00e23a3b10fd75200b5c9f5d01df8cbc0e27d28",
+  "details": {
+   "mismatches": [],
+   "scenario": "load"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:02.766Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e75ceed794cb1c4",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.render_notes",
+  "channel": "storage",
+  "rule": "localStorage+hash:exact",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": "8e4a8023ed484d881c2b89e129174551203764beac8345493c65ed9623dcae33",
+  "candidate_hash": "8e4a8023ed484d881c2b89e129174551203764beac8345493c65ed9623dcae33",
+  "details": {
+   "mismatches": [],
+   "scenario": "load"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:02.766Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e75cea4835fba67",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.render_notes",
+  "channel": "offline",
+  "rule": "sw_registered+manifest_present+reload_outcome:exact",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": null,
+  "candidate_hash": null,
+  "details": {
+   "mismatches": [],
+   "scenario": "load"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:02.767Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e75cf12845129d7",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.render_notes",
+  "channel": "screenshot",
+  "rule": "pixel:exact",
+  "tolerance": {
+   "channel_delta": 0,
+   "max_diff_fraction": 0.0
+  },
+  "verdict": "pass",
+  "original_hash": "36bedf5287fefe540f4fd09aae803001b8da469a6b2eeeb6231adf8fd5cdcbdb",
+  "candidate_hash": "36bedf5287fefe540f4fd09aae803001b8da469a6b2eeeb6231adf8fd5cdcbdb",
+  "details": {
+   "diff_fraction": 0.0,
+   "differing_pixels": 0,
+   "label": "exact",
+   "scenario": "load",
+   "size": [
+    1280,
+    800
+   ],
+   "total_pixels": 1024000
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [
+   "/tmp/pipe-web-ibp5p25b/data/blobs/36/36bedf5287fefe540f4fd09aae803001b8da469a6b2eeeb6231adf8fd5cdcbdb",
+   "/tmp/pipe-web-ibp5p25b/data/cases/case_01a1110e474dab01c537fc/verify/cand_01a1110e68a802f4e4194c/scenario-load/candidate/screenshot.png"
+  ],
+  "created_at": "2026-10-06T11:52:02.767Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e75cf873a1657ea",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.render_notes",
+  "channel": "stderr",
+  "rule": "console_errors:count<=baseline",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": null,
+  "candidate_hash": null,
+  "details": {
+   "actual": [],
+   "expected_count": 0,
+   "scenario": "load"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:02.767Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e7c36f082203319",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.add_note",
+  "channel": "dom",
+  "rule": "innerText:exact(per step)",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": "041de37b87f578f74a586e5bd4d2b09c4fb1380ff02a2f5092891be05c84c36e",
+  "candidate_hash": "041de37b87f578f74a586e5bd4d2b09c4fb1380ff02a2f5092891be05c84c36e",
+  "details": {
+   "mismatches": [],
+   "scenario": "add"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:04.406Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e7c36000bdcc544",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.add_note",
+  "channel": "storage",
+  "rule": "localStorage+hash:exact",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": "9bd0ddc63b901a977ca53ef6dc00bdd8f36c23befa530dee55fc61a7730e06ff",
+  "candidate_hash": "9bd0ddc63b901a977ca53ef6dc00bdd8f36c23befa530dee55fc61a7730e06ff",
+  "details": {
+   "mismatches": [],
+   "scenario": "add"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:04.406Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e7c366612ab3774",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.add_note",
+  "channel": "offline",
+  "rule": "sw_registered+manifest_present+reload_outcome:exact",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": null,
+  "candidate_hash": null,
+  "details": {
+   "mismatches": [],
+   "scenario": "add"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:04.406Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e7c371820a2f2cb",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.add_note",
+  "channel": "screenshot",
+  "rule": "pixel:exact",
+  "tolerance": {
+   "channel_delta": 0,
+   "max_diff_fraction": 0.0
+  },
+  "verdict": "pass",
+  "original_hash": "60867118a31cc543df2991501f80b9c4445aff5b295c5fdaa0bc00234063bf73",
+  "candidate_hash": "60867118a31cc543df2991501f80b9c4445aff5b295c5fdaa0bc00234063bf73",
+  "details": {
+   "diff_fraction": 0.0,
+   "differing_pixels": 0,
+   "label": "exact",
+   "scenario": "add",
+   "size": [
+    1280,
+    800
+   ],
+   "total_pixels": 1024000
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [
+   "/tmp/pipe-web-ibp5p25b/data/blobs/60/60867118a31cc543df2991501f80b9c4445aff5b295c5fdaa0bc00234063bf73",
+   "/tmp/pipe-web-ibp5p25b/data/cases/case_01a1110e474dab01c537fc/verify/cand_01a1110e68a802f4e4194c/scenario-add/candidate/screenshot.png"
+  ],
+  "created_at": "2026-10-06T11:52:04.407Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e7c37371c09fc50",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.add_note",
+  "channel": "stderr",
+  "rule": "console_errors:count<=baseline",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": null,
+  "candidate_hash": null,
+  "details": {
+   "actual": [],
+   "expected_count": 0,
+   "scenario": "add"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:04.407Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e829fdb70c8a685",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.route_about",
+  "channel": "dom",
+  "rule": "innerText:exact(per step)",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": "bc7f670b05bf35955dba00400b3248d41940f2cf1b1a531743ef871b00d43266",
+  "candidate_hash": "bc7f670b05bf35955dba00400b3248d41940f2cf1b1a531743ef871b00d43266",
+  "details": {
+   "mismatches": [],
+   "scenario": "about"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:06.047Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e829fe87ee9208f",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.route_about",
+  "channel": "storage",
+  "rule": "localStorage+hash:exact",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": "35de34511b34594ddc8b9a84eecc3511d297e571b38c0e5bf723f8079dbda022",
+  "candidate_hash": "35de34511b34594ddc8b9a84eecc3511d297e571b38c0e5bf723f8079dbda022",
+  "details": {
+   "mismatches": [],
+   "scenario": "about"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:06.047Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e829f27e2910d35",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.route_about",
+  "channel": "offline",
+  "rule": "sw_registered+manifest_present+reload_outcome:exact",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": null,
+  "candidate_hash": null,
+  "details": {
+   "mismatches": [],
+   "scenario": "about"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:06.047Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e829fa1ca79a5ea",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.route_about",
+  "channel": "screenshot",
+  "rule": "pixel:exact",
+  "tolerance": {
+   "channel_delta": 0,
+   "max_diff_fraction": 0.0
+  },
+  "verdict": "pass",
+  "original_hash": "fabde1596313d19e089f9c18303d7ce8ff4a09384a01c0b49d64f29f1f9a8aca",
+  "candidate_hash": "fabde1596313d19e089f9c18303d7ce8ff4a09384a01c0b49d64f29f1f9a8aca",
+  "details": {
+   "diff_fraction": 0.0,
+   "differing_pixels": 0,
+   "label": "exact",
+   "scenario": "about",
+   "size": [
+    1280,
+    800
+   ],
+   "total_pixels": 1024000
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [
+   "/tmp/pipe-web-ibp5p25b/data/blobs/fa/fabde1596313d19e089f9c18303d7ce8ff4a09384a01c0b49d64f29f1f9a8aca",
+   "/tmp/pipe-web-ibp5p25b/data/cases/case_01a1110e474dab01c537fc/verify/cand_01a1110e68a802f4e4194c/scenario-about/candidate/screenshot.png"
+  ],
+  "created_at": "2026-10-06T11:52:06.047Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e829f05033bf957",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.route_about",
+  "channel": "stderr",
+  "rule": "console_errors:count<=baseline",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": null,
+  "candidate_hash": null,
+  "details": {
+   "actual": [],
+   "expected_count": 0,
+   "scenario": "about"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:06.047Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e8a7d73a465f806",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.offline",
+  "channel": "dom",
+  "rule": "innerText:exact(per step)",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": "1b65c759d13f7496f8233a67efbe01e5663b57f9bee15f327afdaf0a87eb0d97",
+  "candidate_hash": "1b65c759d13f7496f8233a67efbe01e5663b57f9bee15f327afdaf0a87eb0d97",
+  "details": {
+   "mismatches": [],
+   "scenario": "offline"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:08.061Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e8a7e58e2c975af",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.offline",
+  "channel": "storage",
+  "rule": "localStorage+hash:exact",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": "468e03b5bb46fac658ebff12f73ee72c696d9989329d5f5cf82071a43bf49565",
+  "candidate_hash": "468e03b5bb46fac658ebff12f73ee72c696d9989329d5f5cf82071a43bf49565",
+  "details": {
+   "mismatches": [],
+   "scenario": "offline"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:08.062Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e8a7ee63f387771",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.offline",
+  "channel": "offline",
+  "rule": "sw_registered+manifest_present+reload_outcome:exact",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": null,
+  "candidate_hash": null,
+  "details": {
+   "mismatches": [],
+   "scenario": "offline"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:08.062Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e8a7e452d0d0495",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.offline",
+  "channel": "screenshot",
+  "rule": "pixel:exact",
+  "tolerance": {
+   "channel_delta": 0,
+   "max_diff_fraction": 0.0
+  },
+  "verdict": "pass",
+  "original_hash": "36bedf5287fefe540f4fd09aae803001b8da469a6b2eeeb6231adf8fd5cdcbdb",
+  "candidate_hash": "36bedf5287fefe540f4fd09aae803001b8da469a6b2eeeb6231adf8fd5cdcbdb",
+  "details": {
+   "diff_fraction": 0.0,
+   "differing_pixels": 0,
+   "label": "exact",
+   "scenario": "offline",
+   "size": [
+    1280,
+    800
+   ],
+   "total_pixels": 1024000
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [
+   "/tmp/pipe-web-ibp5p25b/data/blobs/36/36bedf5287fefe540f4fd09aae803001b8da469a6b2eeeb6231adf8fd5cdcbdb",
+   "/tmp/pipe-web-ibp5p25b/data/cases/case_01a1110e474dab01c537fc/verify/cand_01a1110e68a802f4e4194c/scenario-offline/candidate/screenshot.png"
+  ],
+  "created_at": "2026-10-06T11:52:08.062Z",
+  "writer": "verifier"
+ },
+ {
+  "comparison_id": "cmp_01a1110e8a7e64d3b76a6c",
+  "case_id": "case_01a1110e474dab01c537fc",
+  "candidate_id": "cand_01a1110e68a802f4e4194c",
+  "feature_id": "webapp.offline",
+  "channel": "stderr",
+  "rule": "console_errors:count<=baseline",
+  "tolerance": {},
+  "verdict": "pass",
+  "original_hash": null,
+  "candidate_hash": null,
+  "details": {
+   "actual": [],
+   "expected_count": 0,
+   "scenario": "offline"
+  },
+  "command": "node web_harness.mjs spec.json record.json",
+  "environment": {
+   "host_certifies_windows": false,
+   "locale": "",
+   "machine": "x86_64",
+   "os": "Linux",
+   "os_release": "6.18.44-fc-v70",
+   "python": "3.13.16",
+   "tz": "UTC",
+   "wine": true
+  },
+  "artifacts": [],
+  "created_at": "2026-10-06T11:52:08.062Z",
+  "writer": "verifier"
+ }
+]

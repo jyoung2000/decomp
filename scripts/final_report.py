@@ -113,7 +113,8 @@ def render(r: dict) -> str:
     L += ["", "## Demonstrations (verifier-decided)", ""]
     for d in r["demos"]:
         p = d["parity"]
-        L.append(f"- **{d['example']}** ({d['case']} → {d['target']}): full parity {'YES' if p['full_parity'] else 'NO'}; {p['verified']}/{p['features_total']} features verified, {p['failed']} failed, {p['untested']} untested; {d['comparisons']} comparisons; AI calls: {d['ai_usage'] or 'none'}; host runner wine={d['host'].get('wine') if d['host'] else 'n/a'}")
+        author = (d.get("candidate") or {}).get("author") or "controller"
+        L.append(f"- **{d['example']}** ({d['case']} → {d['target']}): full parity {'YES' if p['full_parity'] else 'NO'}; {p['verified']}/{p['features_total']} features verified, {p['failed']} failed, {p['untested']} untested; {d['comparisons']} comparisons; candidate author: {author}; AI calls via app routes: {d['ai_usage'] or 'none'}; host certifies Windows: {(d['host'] or {}).get('host_certifies_windows', 'n/a')}")
     L += ["", "## Windows release gates (not certified here)", ""] + [f"- {g}" for g in r["windows_gates"]]
     L += ["", "## Hermes gates", ""] + [f"- {g}" for g in r["hermes_gates"]]
     L += ["", "## Limits and remaining user-dependent actions", ""] + [f"- {l}" for l in r["limits"]]

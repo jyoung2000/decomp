@@ -1,0 +1,53 @@
+{
+ "generated_at": "2026-10-06T11:54:46.899Z",
+ "case": {
+  "case_id": "case_01a1110c53e20db71d8c36",
+  "name": "godotgame",
+  "source_root": "/home/user/decomp/fixtures/godotgame/original",
+  "output_root": "/tmp/pipe-godot-xipi2p95/out",
+  "target_language": "rust_bevy",
+  "output_type": "exe",
+  "status": "running",
+  "ai_policy": {
+   "mode": "no_ai"
+  }
+ },
+ "candidate": {
+  "candidate_id": "cand_01a1110c61d4f8ed89d124",
+  "revision": 1,
+  "build_hash": "958b5d3511163011",
+  "build_status": "built",
+  "verification": "untested",
+  "last_known_good": false
+ },
+ "parity": {
+  "full_parity": false,
+  "features_total": 0,
+  "verified": 0,
+  "partial": 0,
+  "failed": 0,
+  "untested": 0,
+  "stale": 0,
+  "critical_incomplete": [],
+  "scope_note": "feature counts are semantic features, not files/functions; undiscovered scope is not counted"
+ },
+ "features": [],
+ "comparisons": [],
+ "unresolved": [],
+ "blockers": [],
+ "ai_usage": [],
+ "jobs": {
+  "queued": 0,
+  "running": 1,
+  "blocked": 0,
+  "failed": 0,
+  "cancelled": 0,
+  "completed": 7,
+  "needs_retest": 0
+ },
+ "reproduction": {
+  "cli": "rebuildctl rebuild --source \"/home/user/decomp/fixtures/godotgame/original\" --output \"/tmp/pipe-godot-xipi2p95/out\" --language rust_bevy --type exe",
+  "verify": "rebuildctl verify case_01a1110c53e20db71d8c36 cand_01a1110c61d4f8ed89d124"
+ },
+ "host": null
+}
