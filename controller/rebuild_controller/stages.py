@@ -185,6 +185,22 @@ def stage_recover_managed(ctx: StageContext) -> dict[str, Any]:
     return out
 
 
+def _registers_service_worker(root: Path, max_files: int = 200, max_bytes: int = 2_000_000) -> bool:
+    """Bounded scan of a web app's own .html/.js files for a service worker registration."""
+    seen = 0
+    for p in root.rglob("*"):
+        if seen >= max_files:
+            break
+        if p.suffix.lower() in (".html", ".htm", ".js", ".mjs") and p.is_file() and "node_modules" not in p.parts:
+            seen += 1
+            try:
+                if p.stat().st_size <= max_bytes and "serviceWorker.register" in p.read_text("utf-8", "replace"):
+                    return True
+            except OSError:
+                continue
+    return False
+
+
 def stage_recover_jvm(ctx: StageContext) -> dict[str, Any]:
     """Java (.jar/.class) via CFR, Android (.apk/.dex) via jadx. The tool-free inspection (manifest, main class, dex
     inventory) is always recorded first, so a missing decompiler still leaves useful evidence and a precise blocker."""
@@ -331,7 +347,12 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
     if inferred and not scenarios:
         # Minimal, explicitly labelled check so the comparison measures something; users add real scenarios in the app.
         scenarios = [{"id": "start_page", "feature_id": None, "title": "Start page renders the same text (automatic minimal check)",
-                      "text_selectors": ["body"], "auto": True}]
+                      "text_selectors": ["body"], "auto": True,
+                      # let a service worker settle first, or status text captured mid-registration differs run to run;
+                      # only when the app registers one (navigator.serviceWorker.ready never resolves otherwise)
+                      "actions": [{"type": "wait_sw"}] if _registers_service_worker(Path(case["source_root"])) else []}]
+        if scenarios[0]["actions"]:
+            scenarios[0]["initial_snapshot"] = False   # the pre-registration snapshot is inherently racy
     if bl["kind"] == "web":
         from .comparators.web import run_web_scenario
         from .previews import _free_port, _QuietHandler

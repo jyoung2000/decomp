@@ -86,7 +86,7 @@ def run_web_scenario(url: str, scenario: dict[str, Any], out_dir: Path, *, timeo
             "capture": {"text_selectors": scenario.get("text_selectors", ["body"]), "storage": True, "sw": scenario.get("sw", True),
                         "screenshot": str(out_dir / "screenshot.png") if scenario.get("screenshot", True) else None},
             "executablePath": chromium_path(), "locale": scenario.get("locale", "en-US"), "timezone": scenario.get("timezone", "UTC"),
-            "dpr": scenario.get("dpr", 1), "colorScheme": scenario.get("color_scheme", "light"), "wait_for": scenario.get("wait_for")}
+            "dpr": scenario.get("dpr", 1), "initial_snapshot": scenario.get("initial_snapshot", True), "colorScheme": scenario.get("color_scheme", "light"), "wait_for": scenario.get("wait_for")}
     spec_path = out_dir / "spec.json"; spec_path.write_text(json.dumps(spec))
     rec_path = out_dir / "record.json"
     # The page under test (original or candidate web app) runs inside Chromium's own renderer sandbox. The node/Chromium

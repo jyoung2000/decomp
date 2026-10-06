@@ -41,7 +41,7 @@ async function snapshot(label) {
   }
   return snap;
 }
-record.steps.push(await snapshot('initial'));
+if (spec.initial_snapshot !== false) record.steps.push(await snapshot('initial'));   // off: compare only settled states
 for (const a of spec.actions || []) {
   try {
     if (a.type === 'click') await page.click(a.selector, { timeout: 5000 });
