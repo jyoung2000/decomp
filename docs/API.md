@@ -4,7 +4,7 @@ Transport: loopback HTTP (`http://127.0.0.1:<port>`) + WebSocket `/ws`. The port
 `<data_dir>/controller.json` (`{"port":..,"token":..,"pid":..}`) by the sidecar; the Tauri shell reads it and injects both into the UI
 via `window.__REBUILD_STUDIO__ = {baseUrl, token}` (dev: Vite proxy with `VITE_CONTROLLER_URL`/`VITE_CONTROLLER_TOKEN`).
 Every request carries `Authorization: Bearer <token>`. Requests whose `Origin` is not the app origin / `http://localhost:*` / `tauri://localhost` are refused (403).
-All JSON. Timestamps ISO-8601 UTC. Errors: `{"error": {"code": str, "message": str, "affected": str?, "next_action": str?}}`.
+All JSON. Timestamps ISO-8601 UTC. Errors: `{"error": {"code": str, "message": str, "affected": str?, "next_action": str?}}`. Status mapping: 401 auth, 403 origin/permission, 404 unknown id, 400 validation/path policy, 402 BudgetExhausted, 409 ApprovalRequired (unknown pricing), 424 NoRoute/AllCandidatesFailed, 503 optional service unavailable.
 
 ## Events (WebSocket `/ws?token=..&since=<seq>`)
 Server sends `{"seq", "ts", "case_id", "job_id", "kind", "payload"}` objects, one per message, strictly increasing `seq`.
@@ -22,6 +22,8 @@ Kinds: `case.created|case.status`, `job.created|started|progress|log|retry|unblo
 - `GET /cases` / `POST /cases` body `{name, source_root, output_root, target_language: rust|rust_bevy|web|auto, output_type: exe|installer|portable|web|pwa, ai_policy:{mode: no_ai|assist_on_failure|assisted, budget_usd?}, launch_profile:{execute_original: bool, command?: [..], scenarios?: [..]}}`
 - `GET /cases/{id}` → case + counts (`jobs` by state, features by status, candidates, previews, open feedback)
 - `POST /cases/{id}/start` → `{job_ids}`; `POST /cases/{id}/pause`; `POST /cases/{id}/resume`; `POST /cases/{id}/cancel`
+- `POST /cases/{id}/deliver` body `{candidate_id?}` → deliver job (default: last known good, else newest built candidate)
+- `POST /features/{id}/review` body `{review: accepted|rejected|null}` — user acceptance, separate from machine verification
 - `GET /cases/{id}/jobs` → `[job]` with `progress` (raw counts + denominators, never synthesized %), `blocker`, `attempt`, `heartbeat_at`
 - `POST /jobs/{id}/cancel` / `POST /jobs/{id}/resume`
 - `GET /cases/{id}/modules`, `GET /cases/{id}/evidence?kind=&module_id=`, `GET /evidence/{id}?max_bytes=`, `GET /cases/{id}/evidence/search?q=`
@@ -36,7 +38,8 @@ Kinds: `case.created|case.status`, `job.created|started|progress|log|retry|unblo
 - `POST /feedback/{id}/triage` body `{status, note, create_work: bool}`; `POST /feedback/{id}/reopen`; `GET /feedback/{id}`
 - `GET /connections` / `POST /connections` `{provider, label, endpoint?, auth_mode, api_key?, models?}`; `POST /connections/{id}/probe`; `DELETE /connections/{id}`
 - `GET /routes` / `PUT /routes/{task}` `{primary_connection, primary_model, fallbacks:[{connection, model}]}`
-- `GET /budgets`; `GET /ai/calls?case_id=`
+- `GET /budgets` → `{budgets, quotas}`; `GET /ai/calls?case_id=`; `GET /subscriptions` → handoff modes with `supported`, `access_method`, `limits`, `checked_on`, `cli_available`
+- `GET /doctor?smoke=0|1` states: `missing|detected|installed|usable|verified` (`usable` = smoke op passed now; `verified` = `rebuildctl doctor --verify` fixture regression recorded for these exact tool versions)
 - `GET /knowledge`; `GET /knowledge/{id}`; `POST /knowledge/{id}/validate`; `POST /knowledge/{id}/rollback`
 - `GET /settings` / `PUT /settings` (dependency manager, storage, concurrency, capture, network/output policies)
 - `GET /hermes/status`; `POST /hermes/pair` `{profile_path?}`; `POST /hermes/register_mcp` `{dry_run}`
