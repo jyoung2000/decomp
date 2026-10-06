@@ -1,0 +1,29 @@
+[
+ {
+  "name": "controller unit+integration (not e2e, not live)",
+  "command": "cd controller && pytest -q tests -m 'not e2e and not live'",
+  "passed": 598,
+  "failed": 0,
+  "skipped": 1,
+  "when": "2026-10-06T12:15:19+00:00",
+  "log_tail": "counted from pytest progress output (log: scratchpad/fullsuite.log); includes real rizin+rz-ghidra, ILSpy, GDRE, Playwright, wine runs"
+ },
+ {
+  "name": "ui vitest",
+  "command": "cd ui && npm test",
+  "passed": 53,
+  "failed": 0,
+  "skipped": 0,
+  "when": "2026-10-06T12:15:19+00:00",
+  "log_tail": "Test Files 3 passed (3); Tests 53 passed (53)"
+ },
+ {
+  "name": "desktop cargo check (Linux)",
+  "command": "cd desktop/src-tauri && cargo check",
+  "passed": 1,
+  "failed": 0,
+  "skipped": 0,
+  "when": "2026-10-06T12:15:19+00:00",
+  "log_tail": "Finished `dev` profile"
+ }
+]
