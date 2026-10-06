@@ -25,5 +25,14 @@
   "skipped": 0,
   "when": "2026-10-06T12:15:19+00:00",
   "log_tail": "Finished `dev` profile"
+ },
+ {
+  "name": "controller e2e pipelines (pecli full + crash/resume, web preview/feedback cycle)",
+  "command": "cd controller && pytest -q tests -m e2e",
+  "passed": 3,
+  "failed": 0,
+  "skipped": 0,
+  "when": "2026-10-06T12:15:55+00:00",
+  "log_tail": "k.py::test_preview_feedback_retest_cycle\n  /home/user/decomp/controller/rebuild_controller/comparators/images.py:24: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.\n    px = diff.getdata()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n3 passed, 602 deselected, 5 warnings in 9.16s\nexit 0\n"
  }
 ]
