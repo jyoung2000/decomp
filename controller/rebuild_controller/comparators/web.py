@@ -56,7 +56,7 @@ def run_web_scenario(url: str, scenario: dict[str, Any], out_dir: Path, *, timeo
             "dpr": scenario.get("dpr", 1), "colorScheme": scenario.get("color_scheme", "light"), "wait_for": scenario.get("wait_for")}
     spec_path = out_dir / "spec.json"; spec_path.write_text(json.dumps(spec))
     rec_path = out_dir / "record.json"
-    env = dict(os.environ); env["NODE_PATH"] = str(harness_dir() / "node_modules")
+    env = dict(os.environ); env["REBUILD_HARNESS_DIR"] = str(harness_dir())
     p = subprocess.run(["node", str(HARNESS), str(spec_path), str(rec_path)], cwd=str(harness_dir()), capture_output=True, timeout=timeout, env=env)
     if p.returncode != 0 or not rec_path.exists():
         raise RuntimeError(f"web harness failed: {p.stderr.decode('utf-8', 'replace')[-2000:]}")

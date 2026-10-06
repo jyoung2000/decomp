@@ -2,7 +2,11 @@
 // Spec: {url, viewport:{width,height}, actions:[{type:'click'|'fill'|'press'|'goto'|'wait'|'offline'|'online'|'reload'|'eval', ...}],
 //        capture:{text_selectors:[..], storage:true, screenshot:'path.png', offline_reload:true}, executablePath?}
 import fs from 'node:fs';
-import { chromium } from 'playwright';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+const harnessDir = process.env.REBUILD_HARNESS_DIR || process.cwd();
+const require = createRequire(path.join(harnessDir, 'package.json'));
+const { chromium } = require('playwright');
 
 const [,, specPath, outPath] = process.argv;
 const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));

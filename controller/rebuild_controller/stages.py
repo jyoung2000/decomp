@@ -65,12 +65,12 @@ def stage_inventory(ctx: StageContext) -> dict[str, Any]:
         if stage is None:
             unsupported.append({"module": rel, "profile": profile, "reason": UNSUPPORTED_PROFILES.get(profile, f"no backend for profile {profile}")})
             continue
-        if profile == "web" and not rel.endswith((".js", ".mjs", ".cjs", ".asar")):
-            continue
+        if profile in ("web", "electron"):
+            continue  # web/electron recovery runs once for the whole root (below)
         j = st.jobs.create(case["case_id"], stage, f"{stage.replace('_', ' ')}: {rel}", {"module_id": mid}, depends_on=[ctx.job.job_id], milestone_id="M-RECOVERY")
         st.plan.link_job(st.plan.milestone_id(case["case_id"], "M-RECOVERY"), j.job_id)
         created.append(j.job_id)
-    if inv["profile"]["primary"] in ("web", "electron") and not created:
+    if inv["profile"]["primary"] in ("web", "electron") or any(p in ("web", "electron") for _, _, p in modules):
         j = st.jobs.create(case["case_id"], "recover_web", "recover web application", {"root": True}, depends_on=[ctx.job.job_id], milestone_id="M-RECOVERY")
         st.plan.link_job(st.plan.milestone_id(case["case_id"], "M-RECOVERY"), j.job_id); created.append(j.job_id)
     # fan-in: the recovery summary (and everything after it) waits for the jobs created here
