@@ -6,28 +6,41 @@
   "tools": {
     "rizin": {
       "version": "0.9.1",
-      "role": "Native analysis engine (subprocess via rzpipe; LGPL-3.0, never linked)",
-      "license": "LGPL-3.0-only",
+      "role": "Native analysis engine with the rz-ghidra decompiler (subprocess via rzpipe; never linked). Windows artifact is the official Cutter v2.5.0 build, which bundles rizin at the same commit as rizin v0.9.1 plus rz-ghidra; the plain rizin Windows release has no decompiler plugin.",
+      "license": "LGPL-3.0-only (rizin), LGPL-3.0 (rz-ghidra), Apache-2.0 (Ghidra decompiler), GPL-3.0 (Cutter GUI files in the archive; not used)",
       "source": {
         "repo": "https://github.com/rizinorg/rizin",
         "tag": "v0.9.1",
-        "commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7"
+        "commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7",
+        "cutter": {
+          "repo": "https://github.com/rizinorg/cutter",
+          "tag": "v2.5.0",
+          "rizin_submodule_commit": "c3a90e9226d977f58f4e9c75f78fa6b07afe13c7"
+        }
       },
       "artifact": {
-        "name": "rizin-windows-static-v0.9.1.zip",
-        "url": "https://github.com/rizinorg/rizin/releases/download/v0.9.1/rizin-windows-static-v0.9.1.zip",
-        "size_bytes": 115391593,
-        "sha256": "2d14e0a6ecba1196dcd742d63de83bbaffed2a7a78ef5a0a9b4e92a0f73d1d28",
+        "name": "Cutter-v2.5.0-Windows-x86_64.zip",
+        "url": "https://github.com/rizinorg/cutter/releases/download/v2.5.0/Cutter-v2.5.0-Windows-x86_64.zip",
+        "size_bytes": 140530846,
+        "sha256": "a04154a03a392dbf5886a629938582f7d23a93636fa0611c3e1c34905b197e69",
         "verify_required": false,
-        "hash_provenance": "computed by downloading the release asset on 2026-10-06 (Linux build host)"
+        "hash_provenance": "2026-10-06 on Windows 11: downloaded; sha256 equals the GitHub release asset digest (sha256:a04154a0…). rizin.exe reports 'rizin 0.9.1'; Cutter v2.5.0's rizin submodule is c3a90e92 (= rizin v0.9.1). pdg verified on fixtures/pecli with ghidra.sleighhome set.",
+        "previous": {
+          "name": "rizin-windows-static-v0.9.1.zip",
+          "sha256": "2d14e0a6ecba1196dcd742d63de83bbaffed2a7a78ef5a0a9b4e92a0f73d1d28",
+          "why_replaced": "no rz-ghidra: no decompilation on Windows"
+        }
       },
       "layout": {
-        "archive_root": "rizin-win-installer-vs2019_static-64",
-        "entry": "bin/rizin.exe",
-        "entry_sha256": "986c06775f08d7645502f49f630db3f2f443a554f82fa304661fda0b2b00ee79",
+        "archive_root": "Cutter-v2.5.0-Windows-x86_64",
+        "entry": "rizin.exe",
+        "entry_sha256": "0b04fc8f44376f16a3f0cf4bd3402b7a28cd5dbc9cbd362840d765ac1712919f",
         "version_args": [
           "-v"
-        ]
+        ],
+        "extra_files": {
+          "lib/rizin/plugins/core_ghidra.dll": "98abf3213feb7105cee733da539ade180406fdc36736caa293e06b8724f823e2"
+        }
       },
       "install_dir": "rizin"
     },
@@ -239,6 +252,33 @@
         ]
       },
       "install_dir": "node"
+    },
+    "playwright-core": {
+      "version": "1.58.2",
+      "role": "Optional: Playwright library the browser comparison harness drives (Edge/Chromium). Not required for native/.NET/Java/Godot paths.",
+      "license": "Apache-2.0",
+      "optional": true,
+      "source": {
+        "npm": "https://www.npmjs.com/package/playwright-core/v/1.58.2"
+      },
+      "artifact": {
+        "name": "playwright-core-1.58.2.tgz",
+        "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.58.2.tgz",
+        "size_bytes": 2208739,
+        "sha256": "50e358de81526d5b20ce75a89c96bdc50ae653f077bbc834ada26d92046ce713",
+        "verify_required": false,
+        "format": "tgz",
+        "hash_provenance": "2026-10-06 on Windows 11: downloaded from registry.npmjs.org; SHA-512 matched the registry dist.integrity sha512-yZkEtftgwS8CsfYo7nm0KE8jsvm6i/PTgVtB8DL726wNf6H2IMsDuxCpJj59KDaxCtSnrWan2AeDqM7JBaultg==; sha256 computed from the same bytes"
+      },
+      "layout": {
+        "archive_root": "package",
+        "entry": "package.json",
+        "entry_sha256": "16a25dbd7368a87af8b58a45c6216b9cec5a91a72cf704533344701997ebde22",
+        "requires": [
+          "node"
+        ]
+      },
+      "install_dir": "playwright-core"
     }
   },
   "system_prerequisites": {

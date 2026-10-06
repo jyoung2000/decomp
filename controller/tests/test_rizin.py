@@ -308,6 +308,35 @@ def test_concurrent_callers_are_serialized(backend, cases, case):
     assert len(pids) == 1, f"one rizin process must serve the module, saw {pids}"
 
 
+def _gone(pid: int, wait: float = 3.0) -> bool:
+    """Portable 'process has exited'. os.kill(pid, 0) is a liveness probe on POSIX but *terminates* the process on Windows."""
+    deadline = time.time() + wait
+    while True:
+        if os.name == "nt":
+            import ctypes
+            k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            k32.OpenProcess.restype = ctypes.c_void_p
+            h = k32.OpenProcess(0x00100000 | 0x1000, False, pid)   # SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION
+            alive = bool(h) and k32.WaitForSingleObject(ctypes.c_void_p(h), 0) == 0x102
+            if h:
+                k32.CloseHandle(ctypes.c_void_p(h))
+        else:
+            try:
+                os.kill(pid, 0)
+                alive = True
+            except ProcessLookupError:
+                alive = False
+        if not alive:
+            return True
+        if time.time() > deadline:
+            return False
+        time.sleep(0.1)
+
+
+def _hard_kill(pid: int) -> None:
+    os.kill(pid, getattr(signal, "SIGKILL", signal.SIGTERM))   # SIGTERM -> TerminateProcess on Windows
+
+
 def test_crashed_rizin_is_recreated(backend, cases, case):
     case_id, mods = case
     r = backend.op_functions(cases, case_id=case_id, module_id=mods["elf"])
@@ -316,7 +345,7 @@ def test_crashed_rizin_is_recreated(backend, cases, case):
     sess.analyze()
     pid, gen = sess.pid, sess.generation
     assert pid
-    os.kill(pid, signal.SIGKILL)
+    _hard_kill(pid)
     time.sleep(0.2)
     d = backend.op_disasm(cases, case_id=case_id, module_id=mods["elf"], function="add_numbers")
     assert d.ok, d.error
@@ -356,8 +385,7 @@ def test_idle_timeout_closes_process(cases, case):
         while sess.pid and time.time() < deadline:
             time.sleep(0.2)
         assert sess.pid is None
-        with pytest.raises(ProcessLookupError):
-            os.kill(pid, 0)
+        assert _gone(pid)
         # transparently reopened on next use
         assert b.op_sections(cases, case_id=case_id, module_id=mods["elf"]).ok and sess.pid
     finally:
@@ -385,8 +413,7 @@ def test_cancellation_kills_process_tree(cases, case):
             sess.analyze(poll)          # PE aaa takes seconds; first poll cancels it
         assert calls
         time.sleep(0.2)
-        with pytest.raises(ProcessLookupError):
-            os.kill(pid, 0)
+        assert _gone(pid)
         assert sess.pid is None
         assert sess.info()[0]["bintype"] == "pe"   # recreated on demand
     finally:

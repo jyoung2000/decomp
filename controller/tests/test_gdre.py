@@ -169,6 +169,7 @@ def no_tools(tmp_path, monkeypatch):
     empty = tmp_path / "empty_path"
     empty.mkdir()
     monkeypatch.setenv("PATH", str(empty))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "no_localappdata"))   # the per-user tools dir is a discovery location too
     return GDREBackend(Settings(tools_dir=tmp_path / "no_tools", data_dir=tmp_path / "data"))
 
 
@@ -179,7 +180,7 @@ def test_probe_reports_pinned_tool_with_verified_integrity(backend):
     info = backend.probe()
     t = info.tools[0]
     assert t.availability == Availability.INSTALLED and t.version == "2.7.0" and t.pinned == "2.7.0"
-    assert t.license == "MIT" and "GDRETools/gdsdecomp" in t.source and Path(t.path).name == "gdre_tools.x86_64"
+    assert t.license == "MIT" and "GDRETools/gdsdecomp" in t.source and Path(t.path).name == ("gdre_tools.exe" if os.name == "nt" else "gdre_tools.x86_64")
     if (Path(Settings().tools_dir) / "GDRE_tools-v2.7.0-linux.zip").exists():
         assert t.integrity == PINNED_ZIP_SHA and "matches the pinned sha256" in t.detail
     assert info.profiles == ["godot"] and {o.name for o in info.operations} == {"detect", "recover"}

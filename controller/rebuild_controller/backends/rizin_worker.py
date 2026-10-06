@@ -130,6 +130,7 @@ def _plugin_candidates(tools_dir: Path) -> list[Path]:
     env = os.environ.get("REBUILD_STUDIO_RIZIN")
     if env:
         out.append(Path(env))
+    out.append(tools_dir / "rizin" / _exe_name())                         # Windows: Cutter's bundled rizin + rz-ghidra (pinned)
     out.append(tools_dir / "rizin" / "bin" / _exe_name())                 # pinned static release (integrity-checked)
     out.append(tools_dir / "rizin-src-install" / "bin" / _exe_name())     # source build (D1), carries rz-ghidra
     which = shutil.which("rizin")
@@ -137,6 +138,7 @@ def _plugin_candidates(tools_dir: Path) -> list[Path]:
         out.append(Path(which))
     if os.name == "nt":
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+        out.append(base / "RebuildStudio" / "tools" / "rizin" / "rizin.exe")
         out.append(base / "RebuildStudio" / "tools" / "rizin" / "bin" / "rizin.exe")
     seen: set[str] = set()
     uniq = []
@@ -249,10 +251,15 @@ class _RizinPipe(OpenBase):
         self._stderr: collections.deque[bytes] = collections.deque(maxlen=64)
         argv = [str(tool.exe), "-q0", "-N",
                 "-e", "scr.color=0", "-e", "scr.utf8=false", "-e", "scr.interactive=false",
-                "-e", "scr.prompt=false", "-e", "cfg.fortunes=false", "-e", "scr.columns=160",
-                str(target)]
+                "-e", "scr.prompt=false", "-e", "cfg.fortunes=false", "-e", "scr.columns=160"]
+        argv.append(str(target))
         kwargs: dict[str, Any] = {"stdin": subprocess.PIPE, "stdout": subprocess.PIPE, "stderr": subprocess.PIPE,
                                   "bufsize": 0, "env": tool.child_env()}
+        sleigh = tool.ghidra_plugin.parent / "rz_ghidra_sleigh" if tool.ghidra_plugin else None
+        if sleigh is not None and sleigh.is_dir() and "SLEIGHHOME" not in kwargs["env"]:
+            # Windows builds (Cutter's bundled rizin) ship the sleigh specs next to the plugin without configuring them.
+            # `-e ghidra.sleighhome=` collides with the plugin's own variable; the SLEIGHHOME env var is what rz-ghidra reads.
+            kwargs["env"]["SLEIGHHOME"] = str(sleigh)
         if os.name == "nt":
             kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | getattr(subprocess, "CREATE_NO_WINDOW", 0)
         else:
