@@ -1,0 +1,28 @@
+{
+  "file_count": 4,
+  "files": [
+    {
+      "path": "dotnetapp.deps.json",
+      "sha256": "c896a9cf305aa81e1a2e281db152e1509cfcf1dea614dd0bd055d8683e5d78d1",
+      "size": 449
+    },
+    {
+      "path": "dotnetapp.dll",
+      "sha256": "e646609f6c070447dd675f96093b1b62444f574f85d8bd7a8325ec3efe60a4cd",
+      "size": 9216
+    },
+    {
+      "path": "dotnetapp.exe",
+      "sha256": "30f6eb8006c616d776ff002706d4705ee601aee9674255e954e035bfbacb16c2",
+      "size": 151552
+    },
+    {
+      "path": "dotnetapp.runtimeconfig.json",
+      "sha256": "3d25821758613e4cd940d143ccb03c93704140077e69104996832510f38f6598",
+      "size": 433
+    }
+  ],
+  "fixture": "dotnetapp",
+  "root": "original",
+  "total_bytes": 161650
+}

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "dotnetapp.menu_navigation",
+    "description": "main <-> notes/settings navigation, unknown choice handling, q/0 to quit",
+    "observable_on": "linux_via_dotnet8"
+  },
+  {
+    "id": "dotnetapp.menu_notes",
+    "description": "add notes, list; JSON state byte-exact",
+    "observable_on": "linux_via_dotnet8"
+  },
+  {
+    "id": "dotnetapp.menu_settings",
+    "description": "set user name, toggle theme; persisted",
+    "observable_on": "linux_via_dotnet8"
+  },
+  {
+    "id": "dotnetapp.menu_eof",
+    "description": "stdin EOF mid-menu exits 0 and saves",
+    "observable_on": "linux_via_dotnet8"
+  },
+  {
+    "id": "dotnetapp.state_save",
+    "description": "state JSON written to argv path on exit/after each change",
+    "observable_on": "linux_via_dotnet8"
+  },
+  {
+    "id": "dotnetapp.state_load",
+    "description": "existing state loaded, greeting reflects it, deletion persists across runs",
+    "observable_on": "linux_via_dotnet8"
+  },
+  {
+    "id": "dotnetapp.error_corrupt_state",
+    "description": "malformed or null JSON -> friendly message, exit 4, file untouched",
+    "observable_on": "linux_via_dotnet8"
+  },
+  {
+    "id": "dotnetapp.error_usage",
+    "description": "wrong argv count -> usage, exit 2",
+    "observable_on": "linux_via_dotnet8"
+  },
+  {
+    "id": "dotnetapp.apphost_exe",
+    "description": "dotnetapp.exe win-x64 apphost launching the dll with the Windows .NET runtime",
+    "observable_on": "windows_only"
+  }
+]

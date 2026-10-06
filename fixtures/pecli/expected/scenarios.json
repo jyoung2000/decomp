@@ -1,0 +1,446 @@
+{
+  "fixture": "pecli",
+  "launcher": [
+    "wine",
+    "{ORIG}/pecli.exe"
+  ],
+  "newline_policy": "mingw text-mode stdout emits CRLF; comparators must compare stdout_normalized (CRLF->LF)",
+  "observable_on": "linux_via_wine",
+  "oracle": {
+    "certifying": false,
+    "note": "Original PE x64 executed under Wine on Linux; non-certifying for Windows (DR-9).",
+    "runner": "wine"
+  },
+  "scenarios": [
+    {
+      "description": "init creates an empty store: byte-exact 16-byte file",
+      "feature": "pecli.file_roundtrip",
+      "final_files": {
+        "store.dat": {
+          "changed_or_new": true,
+          "sha256": "85f7928254c8f416b916c13d1c6d5047e91983cc4054f4fcef9792e93188028a",
+          "size": 16,
+          "text": "PCLI\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+        }
+      },
+      "id": "init_roundtrip",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "init",
+            "store.dat"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "initialized store.dat (0 records)\r\n",
+          "stdout_normalized": "initialized store.dat (0 records)\n"
+        }
+      ]
+    },
+    {
+      "description": "init, add three records, get one, list all; final file byte-exact",
+      "feature": "pecli.add_get_list",
+      "final_files": {
+        "store.dat": {
+          "changed_or_new": true,
+          "hex": "50434c490100000003000000c83dc7be05000300616c7068616f6e6504000e006265746174776f20776f72647320686572650500010067616d6d6133",
+          "sha256": "7df4951df63fde0c4749f47087cb2edd38228723a523f2022be7f18fc596a153",
+          "size": 60
+        }
+      },
+      "id": "add_get_list",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "init",
+            "store.dat"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "initialized store.dat (0 records)\r\n",
+          "stdout_normalized": "initialized store.dat (0 records)\n"
+        },
+        {
+          "args": [
+            "add",
+            "store.dat",
+            "alpha",
+            "one"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added alpha (1 records)\r\n",
+          "stdout_normalized": "added alpha (1 records)\n"
+        },
+        {
+          "args": [
+            "add",
+            "store.dat",
+            "beta",
+            "two words here"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added beta (2 records)\r\n",
+          "stdout_normalized": "added beta (2 records)\n"
+        },
+        {
+          "args": [
+            "add",
+            "store.dat",
+            "gamma",
+            "3"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "added gamma (3 records)\r\n",
+          "stdout_normalized": "added gamma (3 records)\n"
+        },
+        {
+          "args": [
+            "get",
+            "store.dat",
+            "beta"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "two words here\r\n",
+          "stdout_normalized": "two words here\n"
+        },
+        {
+          "args": [
+            "list",
+            "store.dat"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "3 records\r\nalpha=one\r\nbeta=two words here\r\ngamma=3\r\n",
+          "stdout_normalized": "3 records\nalpha=one\nbeta=two words here\ngamma=3\n"
+        }
+      ]
+    },
+    {
+      "description": "replace an existing key, remove another, list; final file byte-exact",
+      "feature": "pecli.update_remove",
+      "final_files": {
+        "store.dat": {
+          "changed_or_new": true,
+          "hex": "50434c4901000000020000008fed71dc04000c006e616d657065636c692073616d706c65050002006c6576656c3939",
+          "sha256": "029f06019dbaf0f38f019452ee531e67eaa8b96852919fca48991d16e1a7a5b0",
+          "size": 47
+        }
+      },
+      "id": "update_and_remove",
+      "setup_files": {
+        "store.dat": {
+          "from_original": "sample.dat"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "add",
+            "store.dat",
+            "level",
+            "99"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "updated level\r\n",
+          "stdout_normalized": "updated level\n"
+        },
+        {
+          "args": [
+            "remove",
+            "store.dat",
+            "owner"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "removed owner (2 records)\r\n",
+          "stdout_normalized": "removed owner (2 records)\n"
+        },
+        {
+          "args": [
+            "list",
+            "store.dat"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "2 records\r\nname=pecli sample\r\nlevel=99\r\n",
+          "stdout_normalized": "2 records\nname=pecli sample\nlevel=99\n"
+        }
+      ]
+    },
+    {
+      "description": "checksum of the shipped sample.dat; file unchanged",
+      "feature": "pecli.checksum",
+      "final_files": {
+        "sample.dat": {
+          "changed_or_new": false,
+          "hex": "50434c4901000000030000009591bb3004000c006e616d657065636c692073616d706c65050008006f776e65726669787475726573050001006c6576656c37",
+          "sha256": "684850dd1e421d33f687f2fdece05722baf9d77ab3660344215295200fec3b18",
+          "size": 63
+        }
+      },
+      "id": "checksum_sample",
+      "setup_files": {
+        "sample.dat": {
+          "from_original": "sample.dat"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "checksum",
+            "sample.dat"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "stored:   30bb9195\r\ncomputed: 30bb9195\r\nrecords:  3\r\n",
+          "stdout_normalized": "stored:   30bb9195\ncomputed: 30bb9195\nrecords:  3\n"
+        },
+        {
+          "args": [
+            "list",
+            "sample.dat"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": null,
+          "stdout": "3 records\r\nname=pecli sample\r\nowner=fixtures\r\nlevel=7\r\n",
+          "stdout_normalized": "3 records\nname=pecli sample\nowner=fixtures\nlevel=7\n"
+        }
+      ]
+    },
+    {
+      "description": "file with wrong magic: exit 2, message on stderr, file untouched",
+      "feature": "pecli.error_bad_magic",
+      "final_files": {
+        "bad.dat": {
+          "changed_or_new": false,
+          "sha256": "6e343f8a665b14ab78f2678434cc8af5ab8c51e90da227d62ce322bd36d00d8d",
+          "size": 41,
+          "text": "NOPE this is not a pcli save file at all\n"
+        }
+      },
+      "id": "err_bad_magic",
+      "setup_files": {
+        "bad.dat": {
+          "text": "NOPE this is not a pcli save file at all\n"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "list",
+            "bad.dat"
+          ],
+          "exit_code": 2,
+          "stderr": "error: bad magic in bad.dat (not a PCLI file)\r\n",
+          "stderr_normalized": "error: bad magic in bad.dat (not a PCLI file)\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "add",
+            "bad.dat",
+            "k",
+            "v"
+          ],
+          "exit_code": 2,
+          "stderr": "error: bad magic in bad.dat (not a PCLI file)\r\n",
+          "stderr_normalized": "error: bad magic in bad.dat (not a PCLI file)\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    },
+    {
+      "description": "missing file: exit 3; no file is created",
+      "feature": "pecli.error_missing_file",
+      "final_files": {},
+      "id": "err_missing_file",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "get",
+            "nothere.dat",
+            "k"
+          ],
+          "exit_code": 3,
+          "stderr": "error: file not found: nothere.dat\r\n",
+          "stderr_normalized": "error: file not found: nothere.dat\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "list",
+            "nothere.dat"
+          ],
+          "exit_code": 3,
+          "stderr": "error: file not found: nothere.dat\r\n",
+          "stderr_normalized": "error: file not found: nothere.dat\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "checksum",
+            "nothere.dat"
+          ],
+          "exit_code": 3,
+          "stderr": "error: file not found: nothere.dat\r\n",
+          "stderr_normalized": "error: file not found: nothere.dat\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    },
+    {
+      "description": "valid header but a flipped record byte: CRC mismatch, exit 4",
+      "feature": "pecli.error_corrupt",
+      "final_files": {
+        "corrupt.dat": {
+          "changed_or_new": false,
+          "hex": "50434c4901000000030000009591bb3004000c006e616d657065636c69208c616d706c65050008006f776e65726669787475726573050001006c6576656c37",
+          "sha256": "52e4652add3aab62f726e58b52ce1577c7f10f9167ff0d570b0f4b565e57a9fd",
+          "size": 63
+        }
+      },
+      "id": "err_corrupt_crc",
+      "setup_files": {
+        "corrupt.dat": {
+          "flip_byte": 30,
+          "from_original": "sample.dat"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "list",
+            "corrupt.dat"
+          ],
+          "exit_code": 4,
+          "stderr": "error: checksum mismatch in corrupt.dat (file is corrupt)\r\n",
+          "stderr_normalized": "error: checksum mismatch in corrupt.dat (file is corrupt)\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "checksum",
+            "corrupt.dat"
+          ],
+          "exit_code": 4,
+          "stderr": "error: checksum mismatch in corrupt.dat (file is corrupt)\r\n",
+          "stderr_normalized": "error: checksum mismatch in corrupt.dat (file is corrupt)\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    },
+    {
+      "description": "missing key exits 1; unknown command and no args print usage and exit 1",
+      "feature": "pecli.error_usage",
+      "final_files": {
+        "store.dat": {
+          "changed_or_new": false,
+          "hex": "50434c4901000000030000009591bb3004000c006e616d657065636c692073616d706c65050008006f776e65726669787475726573050001006c6576656c37",
+          "sha256": "684850dd1e421d33f687f2fdece05722baf9d77ab3660344215295200fec3b18",
+          "size": 63
+        }
+      },
+      "id": "err_key_not_found_and_usage",
+      "setup_files": {
+        "store.dat": {
+          "from_original": "sample.dat"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "get",
+            "store.dat",
+            "absent"
+          ],
+          "exit_code": 1,
+          "stderr": "error: key not found: absent\r\n",
+          "stderr_normalized": "error: key not found: absent\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "remove",
+            "store.dat",
+            "absent"
+          ],
+          "exit_code": 1,
+          "stderr": "error: key not found: absent\r\n",
+          "stderr_normalized": "error: key not found: absent\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "frobnicate",
+            "store.dat"
+          ],
+          "exit_code": 1,
+          "stderr": "usage: pecli <command> <file> [args]\r\n  init <file>               create an empty store\r\n  add <file> <key> <value>  add or replace a record\r\n  get <file> <key>          print a record value\r\n  list <file>               list all records\r\n  remove <file> <key>       delete a record\r\n  checksum <file>           print stored and computed CRC32\r\n",
+          "stderr_normalized": "usage: pecli <command> <file> [args]\n  init <file>               create an empty store\n  add <file> <key> <value>  add or replace a record\n  get <file> <key>          print a record value\n  list <file>               list all records\n  remove <file> <key>       delete a record\n  checksum <file>           print stored and computed CRC32\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [],
+          "exit_code": 1,
+          "stderr": "usage: pecli <command> <file> [args]\r\n  init <file>               create an empty store\r\n  add <file> <key> <value>  add or replace a record\r\n  get <file> <key>          print a record value\r\n  list <file>               list all records\r\n  remove <file> <key>       delete a record\r\n  checksum <file>           print stored and computed CRC32\r\n",
+          "stderr_normalized": "usage: pecli <command> <file> [args]\n  init <file>               create an empty store\n  add <file> <key> <value>  add or replace a record\n  get <file> <key>          print a record value\n  list <file>               list all records\n  remove <file> <key>       delete a record\n  checksum <file>           print stored and computed CRC32\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    }
+  ]
+}

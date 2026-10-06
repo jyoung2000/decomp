@@ -1,0 +1,9 @@
+{
+  "name": "pocket-notes-electron",
+  "productName": "Pocket Notes",
+  "version": "1.0.0",
+  "description": "Electron-style package of the Pocket Notes fixture app",
+  "main": "main.js",
+  "author": "rebuild-studio fixtures",
+  "license": "MIT"
+}

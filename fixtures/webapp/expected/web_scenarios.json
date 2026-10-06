@@ -1,0 +1,919 @@
+{
+  "browser": {
+    "name": "chromium",
+    "version": "141.0.7390.37"
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "original": {
+    "site": "original",
+    "scenarios": [
+      {
+        "id": "initial_load",
+        "feature": "webapp.render_notes",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n0 notes\n\nNo notes yet.",
+        "notes": [],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {},
+        "cache_keys": [
+          "notes-cache-v1"
+        ]
+      },
+      {
+        "id": "add_notes",
+        "feature": "webapp.add_note",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n2 notes\n\nBuy milk\nDelete\nWalk dog\nDelete",
+        "notes": [
+          "Buy milk",
+          "Walk dog"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"Buy milk\"},{\"id\":2,\"text\":\"Walk dog\"}]}"
+        }
+      },
+      {
+        "id": "persistence_after_reload",
+        "feature": "webapp.localstorage_state",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n2 notes\n\nBuy milk\nDelete\nWalk dog\nDelete",
+        "notes": [
+          "Buy milk",
+          "Walk dog"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"Buy milk\"},{\"id\":2,\"text\":\"Walk dog\"}]}"
+        }
+      },
+      {
+        "id": "route_about_click",
+        "feature": "webapp.hash_routes",
+        "title": "About - Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": false,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": true,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/about",
+        "app_text": "About\n\nPocket Notes 1.0.0\n\nNotes stored: 2\n\nCache: notes-cache-v1",
+        "notes": [],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"Buy milk\"},{\"id\":2,\"text\":\"Walk dog\"}]}"
+        },
+        "cache_info_text": "Cache: notes-cache-v1"
+      },
+      {
+        "id": "route_back_notes_direct",
+        "feature": "webapp.hash_routes",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n2 notes\n\nBuy milk\nDelete\nWalk dog\nDelete",
+        "notes": [
+          "Buy milk",
+          "Walk dog"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"Buy milk\"},{\"id\":2,\"text\":\"Walk dog\"}]}"
+        }
+      },
+      {
+        "id": "delete_note",
+        "feature": "webapp.delete_note",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n1 note\n\nWalk dog\nDelete",
+        "notes": [
+          "Walk dog"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":2,\"text\":\"Walk dog\"}]}"
+        }
+      },
+      {
+        "id": "quota_error_real_setitem",
+        "feature": "webapp.quota_error_state",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n1 note\n\nkept note\nDelete",
+        "notes": [
+          "kept note"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": false,
+          "text": "Storage is full. Your latest change was not saved.",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":2,\"notes\":[{\"id\":1,\"text\":\"kept note\"}]}"
+        }
+      },
+      {
+        "id": "quota_recovery",
+        "feature": "webapp.quota_error_state",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n2 notes\n\nkept note\nDelete\nafter recovery\nDelete",
+        "notes": [
+          "kept note",
+          "after recovery"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"kept note\"},{\"id\":2,\"text\":\"after recovery\"}]}"
+        }
+      },
+      {
+        "id": "quota_error_flag",
+        "feature": "webapp.quota_error_state",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n0 notes\n\nNo notes yet.",
+        "notes": [],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": false,
+          "text": "Storage is full. Your latest change was not saved.",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {}
+      },
+      {
+        "id": "offline_reload",
+        "feature": "webapp.offline_reload",
+        "online_before": {
+          "title": "Pocket Notes",
+          "h1": "Pocket Notes",
+          "nav": [
+            {
+              "text": "Notes",
+              "active": true,
+              "href": "#/notes"
+            },
+            {
+              "text": "About",
+              "active": false,
+              "href": "#/about"
+            }
+          ],
+          "hash": "#/notes",
+          "app_text": "Your notes\nAdd\n\n1 note\n\noffline survivor\nDelete",
+          "notes": [
+            "offline survivor"
+          ],
+          "banner": {
+            "hidden": true,
+            "text": ""
+          },
+          "error": {
+            "hidden": true,
+            "text": "",
+            "role": "alert"
+          },
+          "sw_status": "offline support: ready",
+          "localStorage": {
+            "pocket-notes:v1": "{\"nextId\":2,\"notes\":[{\"id\":1,\"text\":\"offline survivor\"}]}"
+          },
+          "cache_keys": [
+            "notes-cache-v1"
+          ]
+        },
+        "from_service_worker": true,
+        "status": 200,
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n1 note\n\noffline survivor\nDelete",
+        "notes": [
+          "offline survivor"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":2,\"notes\":[{\"id\":1,\"text\":\"offline survivor\"}]}"
+        },
+        "navigator_onLine": false
+      },
+      {
+        "id": "offline_route_about",
+        "feature": "webapp.offline_reload",
+        "title": "About - Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": false,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": true,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/about",
+        "app_text": "About\n\nPocket Notes 1.0.0\n\nNotes stored: 1\n\nCache: notes-cache-v1",
+        "notes": [],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: ready",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":2,\"notes\":[{\"id\":1,\"text\":\"offline survivor\"}]}"
+        },
+        "cache_info_text": "Cache: notes-cache-v1"
+      },
+      {
+        "id": "offline_navigation_fallback",
+        "feature": "webapp.offline_reload",
+        "status": 200,
+        "from_service_worker": true,
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes"
+      },
+      {
+        "id": "offline_uncached_asset_fails",
+        "feature": "webapp.offline_reload",
+        "fetch_result": {
+          "error": "TypeError"
+        }
+      },
+      {
+        "id": "sw_cache_upgrade",
+        "feature": "webapp.sw_cache_upgrade",
+        "before": {
+          "cache_keys": [
+            "notes-cache-v1"
+          ],
+          "sw_message": {
+            "type": "VERSION",
+            "version": "notes-cache-v1"
+          }
+        },
+        "after": {
+          "cache_keys": [
+            "notes-cache-v2"
+          ],
+          "sw_message": {
+            "type": "VERSION",
+            "version": "notes-cache-v2"
+          },
+          "title": "Pocket Notes",
+          "h1": "Pocket Notes",
+          "nav": [
+            {
+              "text": "Notes",
+              "active": true,
+              "href": "#/notes"
+            },
+            {
+              "text": "About",
+              "active": false,
+              "href": "#/about"
+            }
+          ],
+          "hash": "#/notes",
+          "app_text": "Your notes\nAdd\n\n0 notes\n\nNo notes yet.",
+          "notes": [],
+          "banner": {
+            "hidden": false,
+            "text": "A new version was installed."
+          },
+          "error": {
+            "hidden": true,
+            "text": "",
+            "role": "alert"
+          },
+          "sw_status": "offline support: ready",
+          "localStorage": {}
+        },
+        "about_cache_info": "Cache: notes-cache-v2"
+      }
+    ],
+    "screenshots": [
+      {
+        "name": "notes",
+        "file": "screens/notes_1280x800.png",
+        "width": 1280,
+        "height": 800,
+        "sha256": "5ad7dbf6175a8be5f26a2ed81a064fb0be5493fa546810934e8ff7dbf4ee61d0",
+        "bytes": 23938
+      },
+      {
+        "name": "about",
+        "file": "screens/about_1280x800.png",
+        "width": 1280,
+        "height": 800,
+        "sha256": "ffeae23b7a7fb78f51ab8153ad105149266cf748f8883da1841c2073430d5d45",
+        "bytes": 21802
+      },
+      {
+        "name": "quota_error",
+        "file": "screens/quota_error_1280x800.png",
+        "width": 1280,
+        "height": 800,
+        "sha256": "2e81d305361078edbf60af51f56f047eeae61686e5e4a4083846075dc215793a",
+        "bytes": 27176
+      }
+    ]
+  },
+  "electron_asar": {
+    "site": "original-electron/resources/app.asar (extracted, loaded via file:// like Electron loadFile)",
+    "asar_entries": [
+      "/app.js",
+      "/icon.svg",
+      "/index.html",
+      "/main.js",
+      "/manifest.webmanifest",
+      "/package.json",
+      "/styles.css",
+      "/sw.js"
+    ],
+    "package_json": {
+      "name": "pocket-notes-electron",
+      "productName": "Pocket Notes",
+      "version": "1.0.0",
+      "description": "Electron-style package of the Pocket Notes fixture app",
+      "main": "main.js",
+      "author": "rebuild-studio fixtures",
+      "license": "MIT"
+    },
+    "scenarios": [
+      {
+        "id": "initial_load",
+        "feature": "webapp.render_notes",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n0 notes\n\nNo notes yet.",
+        "notes": [],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: unavailable",
+        "localStorage": {},
+        "cache_keys": null
+      },
+      {
+        "id": "add_notes",
+        "feature": "webapp.add_note",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n2 notes\n\nBuy milk\nDelete\nWalk dog\nDelete",
+        "notes": [
+          "Buy milk",
+          "Walk dog"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: unavailable",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"Buy milk\"},{\"id\":2,\"text\":\"Walk dog\"}]}"
+        }
+      },
+      {
+        "id": "persistence_after_reload",
+        "feature": "webapp.localstorage_state",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n2 notes\n\nBuy milk\nDelete\nWalk dog\nDelete",
+        "notes": [
+          "Buy milk",
+          "Walk dog"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: unavailable",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"Buy milk\"},{\"id\":2,\"text\":\"Walk dog\"}]}"
+        }
+      },
+      {
+        "id": "route_about_click",
+        "feature": "webapp.hash_routes",
+        "title": "About - Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": false,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": true,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/about",
+        "app_text": "About\n\nPocket Notes 1.0.0\n\nNotes stored: 2\n\nCache: none",
+        "notes": [],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: unavailable",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"Buy milk\"},{\"id\":2,\"text\":\"Walk dog\"}]}"
+        },
+        "cache_info_text": "Cache: none"
+      },
+      {
+        "id": "route_back_notes_direct",
+        "feature": "webapp.hash_routes",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n2 notes\n\nBuy milk\nDelete\nWalk dog\nDelete",
+        "notes": [
+          "Buy milk",
+          "Walk dog"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: unavailable",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"Buy milk\"},{\"id\":2,\"text\":\"Walk dog\"}]}"
+        }
+      },
+      {
+        "id": "delete_note",
+        "feature": "webapp.delete_note",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n1 note\n\nWalk dog\nDelete",
+        "notes": [
+          "Walk dog"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: unavailable",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":2,\"text\":\"Walk dog\"}]}"
+        }
+      },
+      {
+        "id": "quota_error_real_setitem",
+        "feature": "webapp.quota_error_state",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n1 note\n\nkept note\nDelete",
+        "notes": [
+          "kept note"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": false,
+          "text": "Storage is full. Your latest change was not saved.",
+          "role": "alert"
+        },
+        "sw_status": "offline support: unavailable",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":2,\"notes\":[{\"id\":1,\"text\":\"kept note\"}]}"
+        }
+      },
+      {
+        "id": "quota_recovery",
+        "feature": "webapp.quota_error_state",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n2 notes\n\nkept note\nDelete\nafter recovery\nDelete",
+        "notes": [
+          "kept note",
+          "after recovery"
+        ],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": true,
+          "text": "",
+          "role": "alert"
+        },
+        "sw_status": "offline support: unavailable",
+        "localStorage": {
+          "pocket-notes:v1": "{\"nextId\":3,\"notes\":[{\"id\":1,\"text\":\"kept note\"},{\"id\":2,\"text\":\"after recovery\"}]}"
+        }
+      },
+      {
+        "id": "quota_error_flag",
+        "feature": "webapp.quota_error_state",
+        "title": "Pocket Notes",
+        "h1": "Pocket Notes",
+        "nav": [
+          {
+            "text": "Notes",
+            "active": true,
+            "href": "#/notes"
+          },
+          {
+            "text": "About",
+            "active": false,
+            "href": "#/about"
+          }
+        ],
+        "hash": "#/notes",
+        "app_text": "Your notes\nAdd\n\n0 notes\n\nNo notes yet.",
+        "notes": [],
+        "banner": {
+          "hidden": true,
+          "text": ""
+        },
+        "error": {
+          "hidden": false,
+          "text": "Storage is full. Your latest change was not saved.",
+          "role": "alert"
+        },
+        "sw_status": "offline support: unavailable",
+        "localStorage": {}
+      }
+    ],
+    "screenshots": [
+      {
+        "name": "notes",
+        "file": "screens/electron_notes_1280x800.png",
+        "width": 1280,
+        "height": 800,
+        "sha256": "b88f708411a3adce26c0c7263b73fa61a8bb36aca180263b6207a1e2699a00f8",
+        "bytes": 24169
+      },
+      {
+        "name": "about",
+        "file": "screens/electron_about_1280x800.png",
+        "width": 1280,
+        "height": 800,
+        "sha256": "3aab4746e77f2ce34723a595cc789ac0fd3ab8cb753fabd656cfee71d5bca8bf",
+        "bytes": 21400
+      },
+      {
+        "name": "quota_error",
+        "file": "screens/electron_quota_error_1280x800.png",
+        "width": 1280,
+        "height": 800,
+        "sha256": "572131b37cb980ae296c4f15c0b2771c93a63d244abddb573ddf1b84f056ffc7",
+        "bytes": 27404
+      }
+    ]
+  },
+  "screenshot_determinism": {
+    "identical_across_two_runs": true,
+    "differing": []
+  },
+  "notes": [
+    "Recorded by `npm test` in fixtures/webapp/harness against the pre-installed Chromium via Playwright 1.56.1; every value was observed, none typed by hand.",
+    "Screenshots depend on the host font stack and Chromium build: compare with a declared tolerance, never by hash across machines.",
+    "The electron_asar target is loaded via file:// in plain Chromium (no Electron binary here), so service-worker features are unavailable there by design."
+  ]
+}

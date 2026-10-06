@@ -1,0 +1,18 @@
+{
+  "file_count": 2,
+  "files": [
+    {
+      "path": "ELECTRON_BINARY_MISSING.txt",
+      "sha256": "ecda7f55c822d1fdf002b21769654c239a5a936f31ebcc6629294d516483043f",
+      "size": 419
+    },
+    {
+      "path": "resources/app.asar",
+      "sha256": "bc0700ee2a66944c31c3992dd2663c93c9782e2e2c2fe3280bbe63968f3a7174",
+      "size": 12691
+    }
+  ],
+  "fixture": "webapp-electron",
+  "root": "original-electron",
+  "total_bytes": 13110
+}

@@ -1,0 +1,5 @@
+godotgame.x86_64 is the Godot 4.3 export template / engine executable that would normally sit next to
+game.pck. The engine binary is NOT redistributed with this fixture (licence/size; Rebuild Studio only
+ever analyses game.pck). This file is a placeholder so the install root has the usual two-file shape.
+
+game.pck : Godot PCK, pack format 2, engine version fields 4.3.0, 7 entries (see ../README.md).

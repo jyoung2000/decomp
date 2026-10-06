@@ -1,0 +1,47 @@
+[
+  {
+    "id": "pecli.file_roundtrip",
+    "description": "init writes a byte-exact 16-byte empty store",
+    "observable_on": "linux_via_wine"
+  },
+  {
+    "id": "pecli.add_get_list",
+    "description": "add/get/list over a growing store; final file byte-exact incl. CRC32",
+    "observable_on": "linux_via_wine"
+  },
+  {
+    "id": "pecli.update_remove",
+    "description": "replace existing key and remove another; byte-exact file",
+    "observable_on": "linux_via_wine"
+  },
+  {
+    "id": "pecli.checksum",
+    "description": "checksum prints stored and computed CRC32 and record count",
+    "observable_on": "linux_via_wine"
+  },
+  {
+    "id": "pecli.error_bad_magic",
+    "description": "bad magic -> exit 2, message on stderr, file untouched",
+    "observable_on": "linux_via_wine"
+  },
+  {
+    "id": "pecli.error_missing_file",
+    "description": "missing file -> exit 3, no file created",
+    "observable_on": "linux_via_wine"
+  },
+  {
+    "id": "pecli.error_corrupt",
+    "description": "CRC mismatch -> exit 4",
+    "observable_on": "linux_via_wine"
+  },
+  {
+    "id": "pecli.error_usage",
+    "description": "usage / key-not-found -> exit 1",
+    "observable_on": "linux_via_wine"
+  },
+  {
+    "id": "pecli.windows_native_exec",
+    "description": "native Windows execution (console code page, CRLF through cmd/PowerShell redirection, Windows path forms)",
+    "observable_on": "windows_only"
+  }
+]

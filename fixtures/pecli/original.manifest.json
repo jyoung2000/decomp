@@ -1,0 +1,23 @@
+{
+  "file_count": 3,
+  "files": [
+    {
+      "path": "README.txt",
+      "sha256": "0c97f441b5dcd415b8f52b87ee662f88143d0f8d6711957152c6a20458e5c845",
+      "size": 405
+    },
+    {
+      "path": "pecli.exe",
+      "sha256": "c4b793465784b0d816e6c56c996f8a2c27e0e2499cf4183d19e159a79413c68f",
+      "size": 44032
+    },
+    {
+      "path": "sample.dat",
+      "sha256": "684850dd1e421d33f687f2fdece05722baf9d77ab3660344215295200fec3b18",
+      "size": 63
+    }
+  ],
+  "fixture": "pecli",
+  "root": "original",
+  "total_bytes": 44500
+}

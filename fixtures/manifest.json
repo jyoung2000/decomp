@@ -1,0 +1,336 @@
+{
+  "fixtures": {
+    "dotnetapp": {
+      "dir": "dotnetapp",
+      "expected": {
+        "expected/scenarios.json": {
+          "path": "dotnetapp/expected/scenarios.json",
+          "sha256": "e916b5f06a677ce840460f6a8a9d79643e510e479345e419bf5154a5d5f59957"
+        }
+      },
+      "features": [
+        {
+          "description": "main <-> notes/settings navigation, unknown choice handling, q/0 to quit",
+          "id": "dotnetapp.menu_navigation",
+          "observable_on": "linux_via_dotnet8"
+        },
+        {
+          "description": "add notes, list; JSON state byte-exact",
+          "id": "dotnetapp.menu_notes",
+          "observable_on": "linux_via_dotnet8"
+        },
+        {
+          "description": "set user name, toggle theme; persisted",
+          "id": "dotnetapp.menu_settings",
+          "observable_on": "linux_via_dotnet8"
+        },
+        {
+          "description": "stdin EOF mid-menu exits 0 and saves",
+          "id": "dotnetapp.menu_eof",
+          "observable_on": "linux_via_dotnet8"
+        },
+        {
+          "description": "state JSON written to argv path on exit/after each change",
+          "id": "dotnetapp.state_save",
+          "observable_on": "linux_via_dotnet8"
+        },
+        {
+          "description": "existing state loaded, greeting reflects it, deletion persists across runs",
+          "id": "dotnetapp.state_load",
+          "observable_on": "linux_via_dotnet8"
+        },
+        {
+          "description": "malformed or null JSON -> friendly message, exit 4, file untouched",
+          "id": "dotnetapp.error_corrupt_state",
+          "observable_on": "linux_via_dotnet8"
+        },
+        {
+          "description": "wrong argv count -> usage, exit 2",
+          "id": "dotnetapp.error_usage",
+          "observable_on": "linux_via_dotnet8"
+        },
+        {
+          "description": "dotnetapp.exe win-x64 apphost launching the dll with the Windows .NET runtime",
+          "id": "dotnetapp.apphost_exe",
+          "observable_on": "windows_only"
+        }
+      ],
+      "kind": "dotnet8_console",
+      "oracle": "dotnet 8 runtime on Linux (non-certifying)",
+      "originals": {
+        "original": {
+          "file_count": 4,
+          "files": {
+            "dotnetapp.deps.json": "c896a9cf305aa81e1a2e281db152e1509cfcf1dea614dd0bd055d8683e5d78d1",
+            "dotnetapp.dll": "e646609f6c070447dd675f96093b1b62444f574f85d8bd7a8325ec3efe60a4cd",
+            "dotnetapp.exe": "30f6eb8006c616d776ff002706d4705ee601aee9674255e954e035bfbacb16c2",
+            "dotnetapp.runtimeconfig.json": "3d25821758613e4cd940d143ccb03c93704140077e69104996832510f38f6598"
+          },
+          "manifest": "dotnetapp/original.manifest.json",
+          "manifest_sha256": "afcadc5878a38c39fe07f0ea676e62cf9c31c644ffe82d9ba819f0fab6323e3c",
+          "path": "dotnetapp/original",
+          "total_bytes": 161650
+        }
+      },
+      "src_dir": "dotnetapp/src (evaluation harness only)"
+    },
+    "godotgame": {
+      "dir": "godotgame",
+      "expected": {
+        "expected/resources.json": {
+          "path": "godotgame/expected/resources.json",
+          "sha256": "a0113cdd26792322504e8a1f24856c949d45094812b1b092e000c36a404759fa"
+        }
+      },
+      "features": [
+        {
+          "description": "Recover all 7 entries from game.pck with byte-identical content",
+          "id": "godotgame.pck_recover",
+          "observable_on": "linux_via_gdre"
+        },
+        {
+          "description": "Detect engine version 4.3.0 / pack format 2 from the PCK header",
+          "id": "godotgame.engine_version_detect",
+          "observable_on": "linux_via_gdre"
+        },
+        {
+          "description": "Recover the 3 GDScript sources (sha256 listed)",
+          "id": "godotgame.scripts_recover",
+          "observable_on": "linux_via_gdre"
+        },
+        {
+          "description": "Recover 2 text scenes with node trees and resource links",
+          "id": "godotgame.scenes_recover",
+          "observable_on": "linux_via_gdre"
+        },
+        {
+          "description": "Recover beep.wav (16-bit mono 22050 Hz)",
+          "id": "godotgame.audio_asset",
+          "observable_on": "linux_via_gdre"
+        },
+        {
+          "description": "Recover project.godot: main scene, autoload, input map",
+          "id": "godotgame.project_settings",
+          "observable_on": "linux_via_gdre"
+        },
+        {
+          "description": "Player moves with move_* actions at speed 200",
+          "id": "godotgame.player_movement",
+          "observable_on": "godot_engine_only"
+        },
+        {
+          "description": "SaveSystem writes/reads user://save.json (score, player_x, player_y)",
+          "id": "godotgame.save_system",
+          "observable_on": "godot_engine_only"
+        },
+        {
+          "description": "AudioPlayer node plays beep.wav on collect",
+          "id": "godotgame.audio_player",
+          "observable_on": "godot_engine_only"
+        },
+        {
+          "description": "ScoreLabel shows 'Score: N' and updates on collect",
+          "id": "godotgame.score_label",
+          "observable_on": "godot_engine_only"
+        }
+      ],
+      "kind": "godot4_pck",
+      "oracle": "GDRE tools 2.7.0 recovery (game itself not executable here)",
+      "originals": {
+        "original": {
+          "file_count": 2,
+          "files": {
+            "game.pck": "37dbad2fae3c98651ffa69163a7e4d431c852c63f5ab09df6a58d34dd3e713cb",
+            "godotgame.x86_64.README": "04e064a54e344aa540636ea5c587d2788ba7603746e1747183a2b65efadefa11"
+          },
+          "manifest": "godotgame/original.manifest.json",
+          "manifest_sha256": "c823ae23f268b1b2023f81bccf49400928f9ce356c82907396b9a6fe195cbe64",
+          "path": "godotgame/original",
+          "total_bytes": 12083
+        }
+      },
+      "src_dir": "godotgame/src (evaluation harness only)"
+    },
+    "pecli": {
+      "dir": "pecli",
+      "expected": {
+        "expected/scenarios.json": {
+          "path": "pecli/expected/scenarios.json",
+          "sha256": "f2eb8c66cb9086dda4dbfd762455f023b6f3e84b9ae6c2becfc01441778cd7d7"
+        }
+      },
+      "features": [
+        {
+          "description": "init writes a byte-exact 16-byte empty store",
+          "id": "pecli.file_roundtrip",
+          "observable_on": "linux_via_wine"
+        },
+        {
+          "description": "add/get/list over a growing store; final file byte-exact incl. CRC32",
+          "id": "pecli.add_get_list",
+          "observable_on": "linux_via_wine"
+        },
+        {
+          "description": "replace existing key and remove another; byte-exact file",
+          "id": "pecli.update_remove",
+          "observable_on": "linux_via_wine"
+        },
+        {
+          "description": "checksum prints stored and computed CRC32 and record count",
+          "id": "pecli.checksum",
+          "observable_on": "linux_via_wine"
+        },
+        {
+          "description": "bad magic -> exit 2, message on stderr, file untouched",
+          "id": "pecli.error_bad_magic",
+          "observable_on": "linux_via_wine"
+        },
+        {
+          "description": "missing file -> exit 3, no file created",
+          "id": "pecli.error_missing_file",
+          "observable_on": "linux_via_wine"
+        },
+        {
+          "description": "CRC mismatch -> exit 4",
+          "id": "pecli.error_corrupt",
+          "observable_on": "linux_via_wine"
+        },
+        {
+          "description": "usage / key-not-found -> exit 1",
+          "id": "pecli.error_usage",
+          "observable_on": "linux_via_wine"
+        },
+        {
+          "description": "native Windows execution (console code page, CRLF through cmd/PowerShell redirection, Windows path forms)",
+          "id": "pecli.windows_native_exec",
+          "observable_on": "windows_only"
+        }
+      ],
+      "kind": "native_pe_x64_cli",
+      "oracle": "wine (non-certifying)",
+      "originals": {
+        "original": {
+          "file_count": 3,
+          "files": {
+            "README.txt": "0c97f441b5dcd415b8f52b87ee662f88143d0f8d6711957152c6a20458e5c845",
+            "pecli.exe": "c4b793465784b0d816e6c56c996f8a2c27e0e2499cf4183d19e159a79413c68f",
+            "sample.dat": "684850dd1e421d33f687f2fdece05722baf9d77ab3660344215295200fec3b18"
+          },
+          "manifest": "pecli/original.manifest.json",
+          "manifest_sha256": "f2c43d80eedd12f9e923a5271da8fd1673e61044698d940764435aae6b5e141c",
+          "path": "pecli/original",
+          "total_bytes": 44500
+        }
+      },
+      "src_dir": "pecli/src (evaluation harness only)",
+      "wrong_remake": "pecli/wrong_remake"
+    },
+    "webapp": {
+      "dir": "webapp",
+      "expected": {
+        "expected/web_scenarios.json": {
+          "path": "webapp/expected/web_scenarios.json",
+          "sha256": "e0d62b41e93633e43f2f15ecfe93aaf7f1af596aa135cf1075a2e21f31f8972d"
+        },
+        "screens": {
+          "about_1280x800.png": "ffeae23b7a7fb78f51ab8153ad105149266cf748f8883da1841c2073430d5d45",
+          "electron_about_1280x800.png": "3aab4746e77f2ce34723a595cc789ac0fd3ab8cb753fabd656cfee71d5bca8bf",
+          "electron_notes_1280x800.png": "b88f708411a3adce26c0c7263b73fa61a8bb36aca180263b6207a1e2699a00f8",
+          "electron_quota_error_1280x800.png": "572131b37cb980ae296c4f15c0b2771c93a63d244abddb573ddf1b84f056ffc7",
+          "notes_1280x800.png": "5ad7dbf6175a8be5f26a2ed81a064fb0be5493fa546810934e8ff7dbf4ee61d0",
+          "quota_error_1280x800.png": "2e81d305361078edbf60af51f56f047eeae61686e5e4a4083846075dc215793a"
+        }
+      },
+      "features": [
+        {
+          "description": "initial render of the notes route: heading, nav, empty state",
+          "id": "webapp.render_notes",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "add via button and Enter; blank input ignored; list and count update",
+          "id": "webapp.add_note",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "delete a note by id; localStorage updated",
+          "id": "webapp.delete_note",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "state persisted under localStorage key pocket-notes:v1 and restored after reload",
+          "id": "webapp.localstorage_state",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "#/notes and #/about routes, active nav class, document.title",
+          "id": "webapp.hash_routes",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "QuotaExceededError (real setItem throw and ?simulate-quota=1) shows role=alert message, keeps previous state, recovers",
+          "id": "webapp.quota_error_state",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "after SW install the app reloads and navigates offline from cache; uncached asset fails; unknown navigation falls back to index.html",
+          "id": "webapp.offline_reload",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "bumping CACHE_VERSION installs new cache, deletes old one, shows banner, SW reports new version",
+          "id": "webapp.sw_cache_upgrade",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "1280x800 screenshots of notes, about and quota-error views",
+          "id": "webapp.screenshot_1280x800",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "app.asar lists the web app plus main.js and package.json and renders identically via file://",
+          "id": "webapp.electron_asar_payload",
+          "observable_on": "linux_via_playwright_chromium"
+        },
+        {
+          "description": "launching the app in Electron (BrowserWindow, loadFile, menu)",
+          "id": "webapp.electron_runtime",
+          "observable_on": "electron_runtime_only"
+        }
+      ],
+      "kind": "pwa_and_electron_asar",
+      "oracle": "Playwright 1.56.1 + Chromium",
+      "originals": {
+        "original": {
+          "file_count": 6,
+          "files": {
+            "app.js": "ac1baeb1e617d82d7353461a2701fdd8298db72f6e30703a54aa103f4d769785",
+            "icon.svg": "c3a4fd1d9df5ce96a8116aab0708180cb68a5928347036fa1057780526ccd715",
+            "index.html": "94aabdd18322723907b4d6a73cac58023622c60bad8ca056371d1f4aa325f986",
+            "manifest.webmanifest": "268f168f2a35e3eb3afc203989fc31fcf1a8ad24a4595c0d8b4a72d5815bf618",
+            "styles.css": "bb1df5797120540e722fff93b7a9ade223ffadcc2016db710b1a63ac1b0b4814",
+            "sw.js": "7c58d5cbe44e58c3b87f2722f3f72a30a941bb7d3819c4c0a2864871b93e6cc6"
+          },
+          "manifest": "webapp/original.manifest.json",
+          "manifest_sha256": "98d0bcfef53cf739b9a77eff15dfffa7eda13a99e8900745f3f724fc02138502",
+          "path": "webapp/original",
+          "total_bytes": 9893
+        },
+        "original-electron": {
+          "file_count": 2,
+          "files": {
+            "ELECTRON_BINARY_MISSING.txt": "ecda7f55c822d1fdf002b21769654c239a5a936f31ebcc6629294d516483043f",
+            "resources/app.asar": "bc0700ee2a66944c31c3992dd2663c93c9782e2e2c2fe3280bbe63968f3a7174"
+          },
+          "manifest": "webapp/original-electron.manifest.json",
+          "manifest_sha256": "3e18f1b880b45706b1104898a717262fa50d0a2a9b85f1bbc4537cc7750b8e9f",
+          "path": "webapp/original-electron",
+          "total_bytes": 13110
+        }
+      },
+      "src_dir": "webapp/src (evaluation harness only)"
+    }
+  },
+  "note": "generated by fixtures/tools/make_fixtures_manifest.py; adapters must only read <fixture>/<originals>",
+  "schema": 1
+}

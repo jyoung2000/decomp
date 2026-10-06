@@ -1,0 +1,8 @@
+{
+  "fixture": "dotnetapp",
+  "original_launcher": ["dotnet", "{ORIG}/dotnetapp.dll"],
+  "env": {"DOTNET_CLI_TELEMETRY_OPTOUT": "1", "DOTNET_NOLOGO": "1", "DOTNET_gcServer": "0", "LC_ALL": "C.UTF-8"},
+  "oracle": {"runner": "dotnet8", "certifying": false,
+             "note": "Original framework-dependent assembly executed with the .NET 8 runtime on Linux; dotnetapp.exe (win-x64 apphost) is shipped but not executable on this host."},
+  "newline_policy": "stdout always LF (explicit writer); stderr uses Console.Error (Environment.NewLine: LF on Linux, CRLF on Windows) so compare stderr_normalized"
+}

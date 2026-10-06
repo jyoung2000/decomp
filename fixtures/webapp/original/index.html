@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pocket Notes</title>
+  <meta name="theme-color" content="#1f6feb">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Pocket Notes</h1>
+    <nav aria-label="Main">
+      <a id="nav-notes" href="#/notes">Notes</a>
+      <a id="nav-about" href="#/about">About</a>
+    </nav>
+  </header>
+  <div id="banner" role="status" hidden></div>
+  <div id="error" role="alert" hidden></div>
+  <main id="app"></main>
+  <footer><span id="sw-status">offline support: checking</span></footer>
+  <script src="app.js"></script>
+</body>
+</html>

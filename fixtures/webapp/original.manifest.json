@@ -1,0 +1,38 @@
+{
+  "file_count": 6,
+  "files": [
+    {
+      "path": "app.js",
+      "sha256": "ac1baeb1e617d82d7353461a2701fdd8298db72f6e30703a54aa103f4d769785",
+      "size": 5138
+    },
+    {
+      "path": "icon.svg",
+      "sha256": "c3a4fd1d9df5ce96a8116aab0708180cb68a5928347036fa1057780526ccd715",
+      "size": 279
+    },
+    {
+      "path": "index.html",
+      "sha256": "94aabdd18322723907b4d6a73cac58023622c60bad8ca056371d1f4aa325f986",
+      "size": 805
+    },
+    {
+      "path": "manifest.webmanifest",
+      "sha256": "268f168f2a35e3eb3afc203989fc31fcf1a8ad24a4595c0d8b4a72d5815bf618",
+      "size": 300
+    },
+    {
+      "path": "styles.css",
+      "sha256": "bb1df5797120540e722fff93b7a9ade223ffadcc2016db710b1a63ac1b0b4814",
+      "size": 1760
+    },
+    {
+      "path": "sw.js",
+      "sha256": "7c58d5cbe44e58c3b87f2722f3f72a30a941bb7d3819c4c0a2864871b93e6cc6",
+      "size": 1611
+    }
+  ],
+  "fixture": "webapp",
+  "root": "original",
+  "total_bytes": 9893
+}

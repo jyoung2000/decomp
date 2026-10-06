@@ -1,0 +1,14 @@
+[package]
+name = "pecli_wrong_remake"
+version = "0.1.0"
+edition = "2021"
+description = "DELIBERATELY WRONG remake of pecli used to prove the verifier gate rejects bad remakes"
+
+[[bin]]
+name = "pecli"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 1

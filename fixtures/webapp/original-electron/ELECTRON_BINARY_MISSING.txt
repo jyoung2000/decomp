@@ -1,0 +1,4 @@
+Placeholder: the Electron runtime (electron.exe / electron, *.dll, *.pak, locales/, ...) is NOT included in
+this fixture; only the application payload resources/app.asar is shipped, exactly as an Electron app's
+resources/ folder would contain it. Rebuild Studio analyses app.asar; it never needs to launch Electron.
+Package metadata: name pocket-notes-electron 1.0.0, main = main.js (see package.json inside the asar).

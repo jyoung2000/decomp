@@ -1,0 +1,57 @@
+[
+  {
+    "id": "webapp.render_notes",
+    "description": "initial render of the notes route: heading, nav, empty state",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.add_note",
+    "description": "add via button and Enter; blank input ignored; list and count update",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.delete_note",
+    "description": "delete a note by id; localStorage updated",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.localstorage_state",
+    "description": "state persisted under localStorage key pocket-notes:v1 and restored after reload",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.hash_routes",
+    "description": "#/notes and #/about routes, active nav class, document.title",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.quota_error_state",
+    "description": "QuotaExceededError (real setItem throw and ?simulate-quota=1) shows role=alert message, keeps previous state, recovers",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.offline_reload",
+    "description": "after SW install the app reloads and navigates offline from cache; uncached asset fails; unknown navigation falls back to index.html",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.sw_cache_upgrade",
+    "description": "bumping CACHE_VERSION installs new cache, deletes old one, shows banner, SW reports new version",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.screenshot_1280x800",
+    "description": "1280x800 screenshots of notes, about and quota-error views",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.electron_asar_payload",
+    "description": "app.asar lists the web app plus main.js and package.json and renders identically via file://",
+    "observable_on": "linux_via_playwright_chromium"
+  },
+  {
+    "id": "webapp.electron_runtime",
+    "description": "launching the app in Electron (BrowserWindow, loadFile, menu)",
+    "observable_on": "electron_runtime_only"
+  }
+]

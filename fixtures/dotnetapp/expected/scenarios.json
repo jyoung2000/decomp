@@ -1,0 +1,285 @@
+{
+  "fixture": "dotnetapp",
+  "launcher": [
+    "dotnet",
+    "{ORIG}/dotnetapp.dll"
+  ],
+  "newline_policy": "stdout always LF (explicit writer); stderr uses Console.Error (Environment.NewLine: LF on Linux, CRLF on Windows) so compare stderr_normalized",
+  "observable_on": "linux_via_dotnet8",
+  "oracle": {
+    "certifying": false,
+    "note": "Original framework-dependent assembly executed with the .NET 8 runtime on Linux; dotnetapp.exe (win-x64 apphost) is shipped but not executable on this host.",
+    "runner": "dotnet8"
+  },
+  "scenarios": [
+    {
+      "description": "quit immediately: defaults are saved to the state path on exit",
+      "feature": "dotnetapp.state_save",
+      "final_files": {
+        "state.json": {
+          "changed_or_new": true,
+          "sha256": "fc0306bd353c8b54d0b38eea19dbb83cb8490c882e86e10e858453cee17a53dd",
+          "size": 77,
+          "text": "{\n  \"Version\": 1,\n  \"UserName\": \"guest\",\n  \"Theme\": \"light\",\n  \"Notes\": []\n}\n"
+        }
+      },
+      "id": "quit_creates_state",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "state.json"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": "0\n",
+          "stdout": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, guest.\n",
+          "stdout_normalized": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, guest.\n"
+        }
+      ]
+    },
+    {
+      "description": "main -> notes -> add two notes, list, back, quit; state JSON byte-exact",
+      "feature": "dotnetapp.menu_notes",
+      "final_files": {
+        "state.json": {
+          "changed_or_new": true,
+          "sha256": "589b00c126ea6c9681ecd11127707def8e4d489de619697a05e92d48efc14790",
+          "size": 111,
+          "text": "{\n  \"Version\": 1,\n  \"UserName\": \"guest\",\n  \"Theme\": \"light\",\n  \"Notes\": [\n    \"Buy milk\",\n    \"Call Bob\"\n  ]\n}\n"
+        }
+      },
+      "id": "notes_flow",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "state.json"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": "1\n1\nBuy milk\n1\nCall Bob\n2\n0\n0\n",
+          "stdout": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Text: Added note #1.\n--- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Text: Added note #2.\n--- Notes (2) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> 1. Buy milk\n2. Call Bob\n--- Notes (2) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, guest.\n",
+          "stdout_normalized": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Text: Added note #1.\n--- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Text: Added note #2.\n--- Notes (2) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> 1. Buy milk\n2. Call Bob\n--- Notes (2) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, guest.\n"
+        }
+      ]
+    },
+    {
+      "description": "main -> settings -> set name, toggle theme, back, quit",
+      "feature": "dotnetapp.menu_settings",
+      "final_files": {
+        "state.json": {
+          "changed_or_new": true,
+          "sha256": "3215ec85b541d41c037552f36734f4e2adc6e896ae98a8bd13925ea57cd472c0",
+          "size": 76,
+          "text": "{\n  \"Version\": 1,\n  \"UserName\": \"Alice\",\n  \"Theme\": \"dark\",\n  \"Notes\": []\n}\n"
+        }
+      },
+      "id": "settings_flow",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "state.json"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": "2\n1\nAlice\n2\n0\n0\n",
+          "stdout": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Settings ---\n1) User name: guest\n2) Theme: light\n0) Back\nsettings> New name: Name set to Alice.\n--- Settings ---\n1) User name: Alice\n2) Theme: light\n0) Back\nsettings> Theme is now dark.\n--- Settings ---\n1) User name: Alice\n2) Theme: dark\n0) Back\nsettings> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, Alice.\n",
+          "stdout_normalized": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Settings ---\n1) User name: guest\n2) Theme: light\n0) Back\nsettings> New name: Name set to Alice.\n--- Settings ---\n1) User name: Alice\n2) Theme: light\n0) Back\nsettings> Theme is now dark.\n--- Settings ---\n1) User name: Alice\n2) Theme: dark\n0) Back\nsettings> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, Alice.\n"
+        }
+      ]
+    },
+    {
+      "description": "enter/leave both submenus, unknown choices, empty note/name rejected, delete of missing note",
+      "feature": "dotnetapp.menu_navigation",
+      "final_files": {
+        "state.json": {
+          "changed_or_new": true,
+          "sha256": "fc0306bd353c8b54d0b38eea19dbb83cb8490c882e86e10e858453cee17a53dd",
+          "size": 77,
+          "text": "{\n  \"Version\": 1,\n  \"UserName\": \"guest\",\n  \"Theme\": \"light\",\n  \"Notes\": []\n}\n"
+        }
+      },
+      "id": "navigation_and_unknown",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "state.json"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": "1\n0\n2\n0\n9\n1\n7\n1\n\n3\n5\n0\n2\n1\n\n0\nq\n",
+          "stdout": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Settings ---\n1) User name: guest\n2) Theme: light\n0) Back\nsettings> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Unknown choice: 9\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Unknown choice: 7\n--- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Text: Note not added (empty).\n--- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Delete which number? No such note.\n--- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Settings ---\n1) User name: guest\n2) Theme: light\n0) Back\nsettings> New name: Name unchanged.\n--- Settings ---\n1) User name: guest\n2) Theme: light\n0) Back\nsettings> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, guest.\n",
+          "stdout_normalized": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Settings ---\n1) User name: guest\n2) Theme: light\n0) Back\nsettings> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Unknown choice: 9\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Unknown choice: 7\n--- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Text: Note not added (empty).\n--- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Delete which number? No such note.\n--- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Settings ---\n1) User name: guest\n2) Theme: light\n0) Back\nsettings> New name: Name unchanged.\n--- Settings ---\n1) User name: guest\n2) Theme: light\n0) Back\nsettings> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, guest.\n"
+        }
+      ]
+    },
+    {
+      "description": "pre-existing state is loaded (greeting shows it), a note is deleted and persisted, second run sees result",
+      "feature": "dotnetapp.state_load",
+      "final_files": {
+        "state.json": {
+          "changed_or_new": true,
+          "sha256": "1ebbf17113da62b2589beb8da65add874b2451e190d5440508d2345d93f454d9",
+          "size": 90,
+          "text": "{\n  \"Version\": 1,\n  \"UserName\": \"Bob\",\n  \"Theme\": \"dark\",\n  \"Notes\": [\n    \"second\"\n  ]\n}\n"
+        }
+      },
+      "id": "load_and_delete",
+      "setup_files": {
+        "state.json": {
+          "text": "{\n  \"Version\": 1,\n  \"UserName\": \"Bob\",\n  \"Theme\": \"dark\",\n  \"Notes\": [\n    \"first\",\n    \"second\"\n  ]\n}\n"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "state.json"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": "1\n2\n3\n1\n2\n0\n0\n",
+          "stdout": "Notes App 1.0 - hello, Bob (2 notes, theme dark)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (2) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> 1. first\n2. second\n--- Notes (2) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Delete which number? Deleted: first\n--- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> 1. second\n--- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, Bob.\n",
+          "stdout_normalized": "Notes App 1.0 - hello, Bob (2 notes, theme dark)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (2) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> 1. first\n2. second\n--- Notes (2) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> Delete which number? Deleted: first\n--- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> 1. second\n--- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, Bob.\n"
+        },
+        {
+          "args": [
+            "state.json"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": "1\n2\n0\n0\n",
+          "stdout": "Notes App 1.0 - hello, Bob (1 notes, theme dark)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> 1. second\n--- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, Bob.\n",
+          "stdout_normalized": "Notes App 1.0 - hello, Bob (1 notes, theme dark)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> 1. second\n--- Notes (1) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> === Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> Goodbye, Bob.\n"
+        }
+      ]
+    },
+    {
+      "description": "stdin ends mid-menu: app saves and exits 0",
+      "feature": "dotnetapp.menu_eof",
+      "final_files": {
+        "state.json": {
+          "changed_or_new": true,
+          "sha256": "fc0306bd353c8b54d0b38eea19dbb83cb8490c882e86e10e858453cee17a53dd",
+          "size": 77,
+          "text": "{\n  \"Version\": 1,\n  \"UserName\": \"guest\",\n  \"Theme\": \"light\",\n  \"Notes\": []\n}\n"
+        }
+      },
+      "id": "stdin_eof_exits_cleanly",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [
+            "state.json"
+          ],
+          "exit_code": 0,
+          "stderr": "",
+          "stderr_normalized": "",
+          "stdin": "1\n",
+          "stdout": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> \n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> \nGoodbye, guest.\n",
+          "stdout_normalized": "Notes App 1.0 - hello, guest (0 notes, theme light)\n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> --- Notes (0) ---\n1) Add note\n2) List notes\n3) Delete note\n0) Back\nnotes> \n=== Main Menu ===\n1) Notes\n2) Settings\n0) Quit\n> \nGoodbye, guest.\n"
+        }
+      ]
+    },
+    {
+      "description": "malformed JSON: friendly message on stderr, exit 4, file untouched",
+      "feature": "dotnetapp.error_corrupt_state",
+      "final_files": {
+        "state.json": {
+          "changed_or_new": false,
+          "sha256": "c31f4acc6bfa121f401e6793f23abaa1e3922ba66751cea8b03088baeb7e72dd",
+          "size": 31,
+          "text": "{ \"Version\": 1, \"Notes\": [ oops"
+        }
+      },
+      "id": "err_corrupt_json",
+      "setup_files": {
+        "state.json": {
+          "text": "{ \"Version\": 1, \"Notes\": [ oops"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "state.json"
+          ],
+          "exit_code": 4,
+          "stderr": "Sorry, your saved data in 'state.json' could not be read (state file is not valid JSON).\nPlease fix or delete the file and start again.\n",
+          "stderr_normalized": "Sorry, your saved data in 'state.json' could not be read (state file is not valid JSON).\nPlease fix or delete the file and start again.\n",
+          "stdin": "0\n",
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    },
+    {
+      "description": "valid JSON but null document: treated as corrupt, exit 4",
+      "feature": "dotnetapp.error_corrupt_state",
+      "final_files": {
+        "state.json": {
+          "changed_or_new": false,
+          "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "size": 4,
+          "text": "null"
+        }
+      },
+      "id": "err_null_json",
+      "setup_files": {
+        "state.json": {
+          "text": "null"
+        }
+      },
+      "steps": [
+        {
+          "args": [
+            "state.json"
+          ],
+          "exit_code": 4,
+          "stderr": "Sorry, your saved data in 'state.json' could not be read (state file has missing fields).\nPlease fix or delete the file and start again.\n",
+          "stderr_normalized": "Sorry, your saved data in 'state.json' could not be read (state file has missing fields).\nPlease fix or delete the file and start again.\n",
+          "stdin": "0\n",
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    },
+    {
+      "description": "wrong argument count: usage on stderr, exit 2",
+      "feature": "dotnetapp.error_usage",
+      "final_files": {},
+      "id": "err_usage",
+      "setup_files": {},
+      "steps": [
+        {
+          "args": [],
+          "exit_code": 2,
+          "stderr": "usage: dotnetapp <state.json>\n",
+          "stderr_normalized": "usage: dotnetapp <state.json>\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        },
+        {
+          "args": [
+            "a.json",
+            "b.json"
+          ],
+          "exit_code": 2,
+          "stderr": "usage: dotnetapp <state.json>\n",
+          "stderr_normalized": "usage: dotnetapp <state.json>\n",
+          "stdin": null,
+          "stdout": "",
+          "stdout_normalized": ""
+        }
+      ]
+    }
+  ]
+}

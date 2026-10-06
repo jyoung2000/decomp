@@ -1,0 +1,315 @@
+{
+  "features": [
+    {
+      "description": "Recover all 7 entries from game.pck with byte-identical content",
+      "evidence": "gdre",
+      "id": "godotgame.pck_recover",
+      "observable_on": "linux_via_gdre"
+    },
+    {
+      "description": "Detect engine version 4.3.0 / pack format 2 from the PCK header",
+      "evidence": "gdre",
+      "id": "godotgame.engine_version_detect",
+      "observable_on": "linux_via_gdre"
+    },
+    {
+      "description": "Recover the 3 GDScript sources (sha256 listed)",
+      "evidence": "static",
+      "id": "godotgame.scripts_recover",
+      "observable_on": "linux_via_gdre"
+    },
+    {
+      "description": "Recover 2 text scenes with node trees and resource links",
+      "evidence": "static",
+      "id": "godotgame.scenes_recover",
+      "observable_on": "linux_via_gdre"
+    },
+    {
+      "description": "Recover beep.wav (16-bit mono 22050 Hz)",
+      "evidence": "static",
+      "id": "godotgame.audio_asset",
+      "observable_on": "linux_via_gdre"
+    },
+    {
+      "description": "Recover project.godot: main scene, autoload, input map",
+      "evidence": "static",
+      "id": "godotgame.project_settings",
+      "observable_on": "linux_via_gdre"
+    },
+    {
+      "description": "Player moves with move_* actions at speed 200",
+      "evidence": "runtime",
+      "id": "godotgame.player_movement",
+      "observable_on": "godot_engine_only"
+    },
+    {
+      "description": "SaveSystem writes/reads user://save.json (score, player_x, player_y)",
+      "evidence": "runtime",
+      "id": "godotgame.save_system",
+      "observable_on": "godot_engine_only"
+    },
+    {
+      "description": "AudioPlayer node plays beep.wav on collect",
+      "evidence": "runtime",
+      "id": "godotgame.audio_player",
+      "observable_on": "godot_engine_only"
+    },
+    {
+      "description": "ScoreLabel shows 'Score: N' and updates on collect",
+      "evidence": "runtime",
+      "id": "godotgame.score_label",
+      "observable_on": "godot_engine_only"
+    }
+  ],
+  "fixture": "godotgame",
+  "gdre": {
+    "detected_engine_version": "4.3.0",
+    "diff_vs_src": {
+      "content_mismatch": [],
+      "missing_from_recovery": [],
+      "unexpected_in_recovery": []
+    },
+    "extract_result": "no errors detected",
+    "extracted_files": 7,
+    "list_files_exit": 0,
+    "listed": [
+      "res://audio/beep.wav",
+      "res://project.godot",
+      "res://scenes/main.tscn",
+      "res://scenes/player.tscn",
+      "res://scripts/main.gd",
+      "res://scripts/player.gd",
+      "res://scripts/save_system.gd"
+    ],
+    "md5_verified_files": 7,
+    "md5_verify_result": "no errors detected",
+    "recover_exit": 0,
+    "recovered_identical_to_src": true,
+    "recovered_sha256": {
+      "audio/beep.wav": "ecf4d5fd1cbdcf1404ad9a18af82f84ba8d1b8901092ebc84cfbd18bd2473c88",
+      "project.godot": "d94e08f019165ba571b623515af0012365ae76b4147a1cdb05c67fcbef73aa12",
+      "scenes/main.tscn": "3d0849d03695b6b3c57b313e9f3699bc19c734814d9b1c44437fb30602319ceb",
+      "scenes/player.tscn": "3e35dd49e83ac9788cea45037e927448df7d2a82641f5b0acd4aa7de3ba184db",
+      "scripts/main.gd": "3ff0920ca51c6f911babd6e51c7949798bdb37dc7083c43d247014b558454ff7",
+      "scripts/player.gd": "8c104ed211d72c626acf1f0b73f6350c31c43dffaeef66d64d019ccf127077a1",
+      "scripts/save_system.gd": "d27b2798e128bdcce79379c7a2130835dbe02a85b216e727e2f8292b2775e647"
+    },
+    "tool": "GDRE tools 2.7.0 (gdre_tools.x86_64 --headless)",
+    "warnings": [
+      "No import files found!"
+    ]
+  },
+  "pck": {
+    "path": "original/game.pck",
+    "sha256": "37dbad2fae3c98651ffa69163a7e4d431c852c63f5ab09df6a58d34dd3e713cb",
+    "size": 11680
+  },
+  "runtime": {
+    "executable_here": false,
+    "note": "runtime features carry no expected values; they must be exercised on a machine with Godot 4.3 or via a Windows/Linux engine in CI",
+    "reason": "no Godot engine binary is installed or redistributed; GDRE tools embed an editor-only 4.8-dev build that cannot run the project's game loop headlessly in this harness"
+  },
+  "static": {
+    "audio": {
+      "audio/beep.wav": {
+        "channels": 1,
+        "frames": 2646,
+        "rate": 22050,
+        "sample_width_bytes": 2
+      }
+    },
+    "files": {
+      "audio/beep.wav": {
+        "sha256": "ecf4d5fd1cbdcf1404ad9a18af82f84ba8d1b8901092ebc84cfbd18bd2473c88",
+        "size": 5336
+      },
+      "project.godot": {
+        "sha256": "d94e08f019165ba571b623515af0012365ae76b4147a1cdb05c67fcbef73aa12",
+        "size": 2379
+      },
+      "scenes/main.tscn": {
+        "sha256": "3d0849d03695b6b3c57b313e9f3699bc19c734814d9b1c44437fb30602319ceb",
+        "size": 780
+      },
+      "scenes/player.tscn": {
+        "sha256": "3e35dd49e83ac9788cea45037e927448df7d2a82641f5b0acd4aa7de3ba184db",
+        "size": 587
+      },
+      "scripts/main.gd": {
+        "sha256": "3ff0920ca51c6f911babd6e51c7949798bdb37dc7083c43d247014b558454ff7",
+        "size": 842
+      },
+      "scripts/player.gd": {
+        "sha256": "8c104ed211d72c626acf1f0b73f6350c31c43dffaeef66d64d019ccf127077a1",
+        "size": 376
+      },
+      "scripts/save_system.gd": {
+        "sha256": "d27b2798e128bdcce79379c7a2130835dbe02a85b216e727e2f8292b2775e647",
+        "size": 705
+      }
+    },
+    "project": {
+      "autoloads": {
+        "SaveSystem": "res://scripts/save_system.gd"
+      },
+      "input_actions": [
+        "collect",
+        "move_down",
+        "move_left",
+        "move_right",
+        "move_up"
+      ],
+      "main_scene": "res://scenes/main.tscn",
+      "name": "Godot Game Fixture",
+      "viewport": [
+        640,
+        360
+      ]
+    },
+    "scenes": {
+      "scenes/main.tscn": {
+        "ext_resources": [
+          {
+            "id": "1_main",
+            "path": "res://scripts/main.gd",
+            "type": "Script"
+          },
+          {
+            "id": "2_player",
+            "path": "res://scenes/player.tscn",
+            "type": "PackedScene",
+            "uid": "uid://c8k2fixplayer1"
+          },
+          {
+            "id": "3_beep",
+            "path": "res://audio/beep.wav",
+            "type": "AudioStream"
+          }
+        ],
+        "format": 3,
+        "nodes": [
+          {
+            "name": "Main",
+            "type": "Node2D"
+          },
+          {
+            "name": "Player",
+            "parent": "."
+          },
+          {
+            "name": "AudioPlayer",
+            "parent": ".",
+            "type": "AudioStreamPlayer"
+          },
+          {
+            "name": "HUD",
+            "parent": ".",
+            "type": "CanvasLayer"
+          },
+          {
+            "name": "ScoreLabel",
+            "parent": "HUD",
+            "type": "Label"
+          }
+        ],
+        "sub_resources": [],
+        "uid": "uid://c8k2fixmain001"
+      },
+      "scenes/player.tscn": {
+        "ext_resources": [
+          {
+            "id": "1_player",
+            "path": "res://scripts/player.gd",
+            "type": "Script"
+          }
+        ],
+        "format": 3,
+        "nodes": [
+          {
+            "name": "Player",
+            "type": "CharacterBody2D"
+          },
+          {
+            "name": "Body",
+            "parent": ".",
+            "type": "ColorRect"
+          },
+          {
+            "name": "CollisionShape2D",
+            "parent": ".",
+            "type": "CollisionShape2D"
+          }
+        ],
+        "sub_resources": [
+          {
+            "id": "RectangleShape2D_body",
+            "type": "RectangleShape2D"
+          }
+        ],
+        "uid": "uid://c8k2fixplayer1"
+      }
+    },
+    "scripts": {
+      "scripts/main.gd": {
+        "consts": [],
+        "exports": [],
+        "extends": "Node2D",
+        "functions": [
+          "_ready",
+          "_unhandled_input",
+          "_update_score",
+          "_notification"
+        ],
+        "input_actions_used": [
+          "collect"
+        ],
+        "line_count": 26,
+        "signals": [],
+        "user_paths": []
+      },
+      "scripts/player.gd": {
+        "consts": [],
+        "exports": [
+          "speed"
+        ],
+        "extends": "CharacterBody2D",
+        "functions": [
+          "_physics_process"
+        ],
+        "input_actions_used": [
+          "move_down",
+          "move_left",
+          "move_right",
+          "move_up"
+        ],
+        "line_count": 13,
+        "signals": [
+          "moved"
+        ],
+        "user_paths": []
+      },
+      "scripts/save_system.gd": {
+        "consts": [
+          "SAVE_PATH"
+        ],
+        "exports": [],
+        "extends": "Node",
+        "functions": [
+          "save_game",
+          "load_game"
+        ],
+        "input_actions_used": [],
+        "line_count": 23,
+        "signals": [],
+        "user_paths": [
+          "user://save.json"
+        ]
+      }
+    },
+    "scripts_sha256": {
+      "scripts/main.gd": "3ff0920ca51c6f911babd6e51c7949798bdb37dc7083c43d247014b558454ff7",
+      "scripts/player.gd": "8c104ed211d72c626acf1f0b73f6350c31c43dffaeef66d64d019ccf127077a1",
+      "scripts/save_system.gd": "d27b2798e128bdcce79379c7a2130835dbe02a85b216e727e2f8292b2775e647"
+    }
+  }
+}

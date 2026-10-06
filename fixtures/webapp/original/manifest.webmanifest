@@ -1,0 +1,12 @@
+{
+  "name": "Pocket Notes",
+  "short_name": "Notes",
+  "start_url": "./index.html#/notes",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f8fa",
+  "theme_color": "#1f6feb",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

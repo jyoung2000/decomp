@@ -1,0 +1,18 @@
+{
+  "file_count": 2,
+  "files": [
+    {
+      "path": "game.pck",
+      "sha256": "37dbad2fae3c98651ffa69163a7e4d431c852c63f5ab09df6a58d34dd3e713cb",
+      "size": 11680
+    },
+    {
+      "path": "godotgame.x86_64.README",
+      "sha256": "04e064a54e344aa540636ea5c587d2788ba7603746e1747183a2b65efadefa11",
+      "size": 403
+    }
+  ],
+  "fixture": "godotgame",
+  "root": "original",
+  "total_bytes": 12083
+}

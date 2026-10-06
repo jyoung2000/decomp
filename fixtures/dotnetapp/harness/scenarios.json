@@ -1,0 +1,145 @@
+[
+ {
+  "id": "quit_creates_state",
+  "feature": "dotnetapp.state_save",
+  "description": "quit immediately: defaults are saved to the state path on exit",
+  "steps": [
+   {
+    "args": [
+     "state.json"
+    ],
+    "stdin": "0\n"
+   }
+  ]
+ },
+ {
+  "id": "notes_flow",
+  "feature": "dotnetapp.menu_notes",
+  "description": "main -> notes -> add two notes, list, back, quit; state JSON byte-exact",
+  "steps": [
+   {
+    "args": [
+     "state.json"
+    ],
+    "stdin": "1\n1\nBuy milk\n1\nCall Bob\n2\n0\n0\n"
+   }
+  ]
+ },
+ {
+  "id": "settings_flow",
+  "feature": "dotnetapp.menu_settings",
+  "description": "main -> settings -> set name, toggle theme, back, quit",
+  "steps": [
+   {
+    "args": [
+     "state.json"
+    ],
+    "stdin": "2\n1\nAlice\n2\n0\n0\n"
+   }
+  ]
+ },
+ {
+  "id": "navigation_and_unknown",
+  "feature": "dotnetapp.menu_navigation",
+  "description": "enter/leave both submenus, unknown choices, empty note/name rejected, delete of missing note",
+  "steps": [
+   {
+    "args": [
+     "state.json"
+    ],
+    "stdin": "1\n0\n2\n0\n9\n1\n7\n1\n\n3\n5\n0\n2\n1\n\n0\nq\n"
+   }
+  ]
+ },
+ {
+  "id": "load_and_delete",
+  "feature": "dotnetapp.state_load",
+  "description": "pre-existing state is loaded (greeting shows it), a note is deleted and persisted, second run sees result",
+  "steps": [
+   {
+    "args": [
+     "state.json"
+    ],
+    "stdin": "1\n2\n3\n1\n2\n0\n0\n"
+   },
+   {
+    "args": [
+     "state.json"
+    ],
+    "stdin": "1\n2\n0\n0\n"
+   }
+  ],
+  "files": {
+   "state.json": {
+    "text": "{\n  \"Version\": 1,\n  \"UserName\": \"Bob\",\n  \"Theme\": \"dark\",\n  \"Notes\": [\n    \"first\",\n    \"second\"\n  ]\n}\n"
+   }
+  }
+ },
+ {
+  "id": "stdin_eof_exits_cleanly",
+  "feature": "dotnetapp.menu_eof",
+  "description": "stdin ends mid-menu: app saves and exits 0",
+  "steps": [
+   {
+    "args": [
+     "state.json"
+    ],
+    "stdin": "1\n"
+   }
+  ]
+ },
+ {
+  "id": "err_corrupt_json",
+  "feature": "dotnetapp.error_corrupt_state",
+  "description": "malformed JSON: friendly message on stderr, exit 4, file untouched",
+  "steps": [
+   {
+    "args": [
+     "state.json"
+    ],
+    "stdin": "0\n"
+   }
+  ],
+  "files": {
+   "state.json": {
+    "text": "{ \"Version\": 1, \"Notes\": [ oops"
+   }
+  }
+ },
+ {
+  "id": "err_null_json",
+  "feature": "dotnetapp.error_corrupt_state",
+  "description": "valid JSON but null document: treated as corrupt, exit 4",
+  "steps": [
+   {
+    "args": [
+     "state.json"
+    ],
+    "stdin": "0\n"
+   }
+  ],
+  "files": {
+   "state.json": {
+    "text": "null"
+   }
+  }
+ },
+ {
+  "id": "err_usage",
+  "feature": "dotnetapp.error_usage",
+  "description": "wrong argument count: usage on stderr, exit 2",
+  "steps": [
+   {
+    "args": [],
+    "stdin": null
+   },
+   {
+    "args": [
+     "a.json",
+     "b.json"
+    ],
+    "stdin": null
+   }
+  ]
+ }
+]

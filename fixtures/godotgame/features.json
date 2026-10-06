@@ -1,0 +1,52 @@
+[
+  {
+    "id": "godotgame.pck_recover",
+    "description": "Recover all 7 entries from game.pck with byte-identical content",
+    "observable_on": "linux_via_gdre"
+  },
+  {
+    "id": "godotgame.engine_version_detect",
+    "description": "Detect engine version 4.3.0 / pack format 2 from the PCK header",
+    "observable_on": "linux_via_gdre"
+  },
+  {
+    "id": "godotgame.scripts_recover",
+    "description": "Recover the 3 GDScript sources (sha256 listed)",
+    "observable_on": "linux_via_gdre"
+  },
+  {
+    "id": "godotgame.scenes_recover",
+    "description": "Recover 2 text scenes with node trees and resource links",
+    "observable_on": "linux_via_gdre"
+  },
+  {
+    "id": "godotgame.audio_asset",
+    "description": "Recover beep.wav (16-bit mono 22050 Hz)",
+    "observable_on": "linux_via_gdre"
+  },
+  {
+    "id": "godotgame.project_settings",
+    "description": "Recover project.godot: main scene, autoload, input map",
+    "observable_on": "linux_via_gdre"
+  },
+  {
+    "id": "godotgame.player_movement",
+    "description": "Player moves with move_* actions at speed 200",
+    "observable_on": "godot_engine_only"
+  },
+  {
+    "id": "godotgame.save_system",
+    "description": "SaveSystem writes/reads user://save.json (score, player_x, player_y)",
+    "observable_on": "godot_engine_only"
+  },
+  {
+    "id": "godotgame.audio_player",
+    "description": "AudioPlayer node plays beep.wav on collect",
+    "observable_on": "godot_engine_only"
+  },
+  {
+    "id": "godotgame.score_label",
+    "description": "ScoreLabel shows 'Score: N' and updates on collect",
+    "observable_on": "godot_engine_only"
+  }
+]

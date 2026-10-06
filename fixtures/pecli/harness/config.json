@@ -1,0 +1,8 @@
+{
+  "fixture": "pecli",
+  "original_launcher": ["wine", "{ORIG}/pecli.exe"],
+  "env": {"WINEDEBUG": "-all", "WINEPREFIX": "/opt/rebuild-tools/wineprefix"},
+  "oracle": {"runner": "wine", "certifying": false,
+             "note": "Original PE x64 executed under Wine on Linux; non-certifying for Windows (DR-9)."},
+  "newline_policy": "mingw text-mode stdout emits CRLF; comparators must compare stdout_normalized (CRLF->LF)"
+}

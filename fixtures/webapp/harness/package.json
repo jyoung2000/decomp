@@ -1,0 +1,16 @@
+{
+  "name": "webapp-fixture-harness",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Builds the Electron-style asar and records/checks the Pocket Notes oracle with Playwright",
+  "type": "module",
+  "scripts": {
+    "test": "node record.mjs",
+    "record": "node record.mjs",
+    "check": "node record.mjs --check"
+  },
+  "devDependencies": {
+    "@electron/asar": "4.3.1",
+    "playwright": "1.56.1"
+  }
+}

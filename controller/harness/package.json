@@ -1,0 +1,10 @@
+{
+  "name": "rebuild-controller-harness",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Node harness used by the Rebuild Studio verifier for browser-channel comparisons (DOM, storage, offline, screenshots).",
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.58.2"
+  }
+}
