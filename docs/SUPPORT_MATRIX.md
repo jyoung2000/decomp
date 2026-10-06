@@ -15,3 +15,6 @@
 | Windows installer/portable | – | Tauri 2.12.1 NSIS | pinned in desktop/src-tauri/Cargo.toml | `cargo check` passes on Linux | gate: build + install + launch |
 | Hermes computer use | – | hermes-agent CLI + cua-driver MCP | commit daefc2b7; cua-driver 0.21.0 | recorded-protocol tests 36 passed | gates G1–G9 (docs/HERMES.md) |
 | AI providers | – | OpenAI Responses / Anthropic / Gemini / OpenRouter / local | httpx | 208 mocked protocol tests; 0 live calls | opt-in live checks with keys |
+| Desktop UI (React/TS) | – | Vite build; Playwright e2e | React 18.3.1, @playwright/test 1.56.1 | 68 vitest; 18 e2e vs mock; 4/4 real-controller spec (web fixture end to end, stale/disconnect detection) | gate W9: sizes/DPI matrix on Windows |
+| Cutter plugin | – | Cutter Python plugin + stdlib client | cutter commit d7f11b22 (2.5.0 dev) | 20 client tests vs real controller; Qt dock smoke offscreen | gate: load inside Cutter on Windows |
+| Windows packaging | – | PowerShell scripts + NSIS + PyInstaller | pwsh 7.5.4 parse; pyinstaller pinned in scripts/windows | parse/dry-run/actionlint only | gates W1–W20 (docs/WINDOWS_RELEASE_GATES.md) |
