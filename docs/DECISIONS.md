@@ -1,0 +1,14 @@
+# Component decision record
+
+| ID | Decision | Rationale | Alternatives rejected |
+|----|----------|-----------|-----------------------|
+| DR-1 | Tauri 2 shell + React/TypeScript UI + packaged Python controller sidecar | Matches the specification's default; Rust shell owns process launch, folder pickers and credential storage; Python has the richest bindings for rizin (rzpipe), LIEF and the MCP SDK | Electron (heavier, duplicate runtime); single Rust binary (would re-implement rzpipe/LIEF/MCP) |
+| DR-2 | Loopback HTTP + WebSocket between UI and controller, authenticated with a per-launch random token, origin-restricted; stdio JSON-RPC/MCP for CLI and model clients | WebView needs a browser-compatible transport; token+origin check prevents other local pages from driving the controller | named pipes only (not reachable from WebView JS) |
+| DR-3 | One SQLite database (WAL) + content-addressed blob store per data dir; one scheduler (`JobStore`/`JobRunner`) | Single durable source of truth for jobs/events/evidence; no duplicated schedulers | separate per-service stores |
+| DR-4 | Rizin 0.9.1 static release via rzpipe as the primary native engine; rz-ghidra 0.9.0 attempted as plugin; full Ghidra 12.1.4 headless optional | Rizin provides typed extraction without Java; rz-ghidra is the Rizin-compatible tag; Ghidra is a heavier optional backend | radare2 (no rz-ghidra), RetDec (limited maintenance; benchmark later) |
+| DR-5 | ILSpy (`ilspycmd` 9.1.0.7988 on .NET 8) for managed code; GDRE tools 2.7.0 for Godot; `@electron/asar` + bounded extraction for JS/Electron | Real upstream CLIs with documented contracts; all run headless on Linux and Windows | dnSpy (GUI only), hand-written PCK parser as primary (kept as fallback only) |
+| DR-6 | Verifier is the only writer of `comparisons` and `features.verify_status`; AI adapters return proposals only | Specification hard requirement; prevents model-authored verdicts | – |
+| DR-7 | Deterministic routing first; JeV advisory router optional, cached, capped at $0.05 setup / $1 per month | Spec requirement; keeps routing cheap and non-blocking | model-chosen routing |
+| DR-8 | Fixture originals built from source kept in `fixtures/<name>/src`; adapters only ever see `fixtures/<name>/original` | Keeps source out of the reconstruction path; evaluation harness uses `src` for ground truth | – |
+| DR-9 | Windows-only gates (installer, WebView2, UI capture, Hermes desktop) are produced as CI/PowerShell handoffs from this Linux host | No interactive Windows session is available; Wine/Linux runs are labelled non-certifying | claiming Windows certification from Linux |
+| DR-10 | Upstream repos are consumed through CLI/library interfaces; no source trees are vendored | Licensing and maintenance; forks only when a specific fix is needed | monorepo of upstream clones |

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rebuild-controller"
+version = "0.1.0"
+description = "Rebuild Studio controller: durable job DAG, recovery backends, verifier, MCP and API"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.13,<3",
+  "fastapi>=0.142,<1",
+  "uvicorn[standard]>=0.54,<1",
+  "websockets>=15",
+  "httpx>=0.28,<1",
+  "rzpipe==0.6.2",
+  "lief>=1.0,<2",
+  "pefile>=2024.8",
+  "mcp>=2.3,<3",
+  "pillow>=12",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9", "pytest-asyncio>=1.4", "anyio>=4"]
+
+[project.scripts]
+rebuildctl = "rebuild_controller.cli.main:main"
+rebuild-mcp = "rebuild_controller.mcp.server:main"
+
+[tool.setuptools.packages.find]
+include = ["rebuild_controller*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["e2e: end-to-end fixture runs (slow)", "live: opt-in live provider checks (need keys)"]
+asyncio_mode = "auto"

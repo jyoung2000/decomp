@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: rebuild-controller
+Version: 0.1.0
+Summary: Rebuild Studio controller: durable job DAG, recovery backends, verifier, MCP and API
+Requires-Python: >=3.11
+Requires-Dist: pydantic<3,>=2.13
+Requires-Dist: fastapi<1,>=0.142
+Requires-Dist: uvicorn[standard]<1,>=0.54
+Requires-Dist: websockets>=15
+Requires-Dist: httpx<1,>=0.28
+Requires-Dist: rzpipe==0.6.2
+Requires-Dist: lief<2,>=1.0
+Requires-Dist: pefile>=2024.8
+Requires-Dist: mcp<3,>=2.3
+Requires-Dist: pillow>=12
+Provides-Extra: dev
+Requires-Dist: pytest>=9; extra == "dev"
+Requires-Dist: pytest-asyncio>=1.4; extra == "dev"
+Requires-Dist: anyio>=4; extra == "dev"
