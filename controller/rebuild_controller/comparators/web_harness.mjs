@@ -6,7 +6,12 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 const harnessDir = process.env.REBUILD_HARNESS_DIR || process.cwd();
 const require = createRequire(path.join(harnessDir, 'package.json'));
-const { chromium } = require('playwright');
+// Dev checkout: harness/node_modules/playwright. Installed app: playwright-core from the Tools page (REBUILD_PLAYWRIGHT_MODULE).
+const pw = (() => {
+  if (process.env.REBUILD_PLAYWRIGHT_MODULE) return require(process.env.REBUILD_PLAYWRIGHT_MODULE);
+  return require('playwright');
+})();
+const { chromium } = pw;
 
 const [,, specPath, outPath] = process.argv;
 const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));

@@ -401,3 +401,32 @@ def test_live_install_dotnet_and_ilspycmd_then_decompile(tmp_path):
     cs = list(out.rglob("*.cs"))
     assert cs, "no C# files produced"
     assert any("class" in p.read_text(encoding="utf-8", errors="replace") for p in cs)
+
+
+@pytest.mark.live
+@pytest.mark.skipif(os.name != "nt" or not os.environ.get("REBUILD_LIVE_TOOLS"), reason="opt-in (REBUILD_LIVE_TOOLS=1): downloads Node.js + playwright-core")
+def test_live_installed_app_browser_comparison_uses_tools_page_node_playwright_and_edge(tmp_path, monkeypatch):
+    """What the installed (frozen) app does: Node.js + playwright-core from the Tools page, Microsoft Edge as the browser."""
+    import sys
+    import time as _t
+    from rebuild_controller.comparators import web
+    from rebuild_controller.config import Settings, set_settings
+    tools = tmp_path / "tools"
+    s = Settings(data_dir=tmp_path / "data"); s.tools_dir = tools; s.ensure_dirs(); set_settings(s)
+    ts = ToolSetup(s)
+    ts.install("playwright-core")          # pulls in its dependency (node) first
+    deadline = _t.monotonic() + 600
+    while ts.status("playwright-core")["status"] != "installed" and _t.monotonic() < deadline:
+        assert ts.status("playwright-core")["status"] in ("installing", "not_installed"), ts.status("playwright-core")
+        _t.sleep(1)
+    assert ts.status("node")["status"] == "installed" and ts.status("playwright-core")["status"] == "installed"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setenv("PATH", os.environ.get("SystemRoot", r"C:\Windows") + r"\System32")   # no developer node on PATH
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path / "none"))                  # no downloaded Chromium
+    assert web.harness_dir() == tools / "harness"
+    assert web.web_available() == (True, "ok"), web.web_available()
+    assert web.chromium_path().lower().endswith("msedge.exe")
+    site = tmp_path / "site"; site.mkdir()
+    (site / "index.html").write_text("<!doctype html><title>t</title><h1 id=h>Hello installed app</h1>", encoding="utf-8")
+    rec = web.run_web_scenario(site.joinpath("index.html").as_uri(), {"text_selectors": ["#h"], "screenshot": False, "sw": False}, tmp_path / "out")
+    assert "Hello installed app" in json.dumps(rec)

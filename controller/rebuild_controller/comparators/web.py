@@ -16,30 +16,64 @@ from .images import compare_images
 HARNESS = Path(__file__).parent / "web_harness.mjs"
 
 
+def _tools_dir() -> Path:
+    from ..config import get_settings
+    return Path(get_settings().tools_dir)
+
+
 def harness_dir() -> Path:
-    return Path(__file__).resolve().parents[2] / "harness"
+    """Source checkout: controller/harness (npm ci). Installed app (frozen): <tools>/harness, filled by the Tools page."""
+    import sys
+    dev = Path(__file__).resolve().parents[2] / "harness"
+    if not getattr(sys, "frozen", False) and (dev / "package.json").exists():
+        return dev
+    d = _tools_dir() / "harness"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def node_path() -> str | None:
+    exe = "node.exe" if os.name == "nt" else "node"
+    tool = _tools_dir() / "node" / exe
+    return shutil.which("node") or (str(tool) if tool.is_file() else None)
+
+
+def playwright_module() -> Path | None:
+    """The Playwright package the harness loads: a dev `playwright` install, or `playwright-core` installed by the Tools page."""
+    for cand in (harness_dir() / "node_modules" / "playwright", _tools_dir() / "playwright-core"):
+        if (cand / "package.json").exists():
+            return cand
+    return None
 
 
 def chromium_path() -> str | None:
     env = os.environ.get("REBUILD_CHROMIUM")
     if env and Path(env).exists():
         return env
-    base = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
-    for pat in ("chromium-*/chrome-linux/chrome", "chromium-*/chrome-win/chrome.exe", "chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium"):
-        hits = sorted(glob.glob(str(Path(base) / pat)))
-        if hits:
-            return hits[-1]
+    bases = [os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")]
+    if os.name == "nt":
+        bases.append(str(_tools_dir() / "pw-browsers"))
+    for base in bases:
+        for pat in ("chromium-*/chrome-linux*/chrome", "chromium-*/chrome-win64/chrome.exe", "chromium-*/chrome-win/chrome.exe",
+                    "chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium"):
+            hits = sorted(glob.glob(str(Path(base) / pat)))
+            if hits:
+                return hits[-1]
+    if os.name == "nt":
+        # Microsoft Edge is Chromium-based and ships with Windows 11; Playwright drives it via executablePath.
+        for root in (os.environ.get("ProgramFiles(x86)"), os.environ.get("ProgramFiles"), os.environ.get("LOCALAPPDATA")):
+            if root and (Path(root) / "Microsoft" / "Edge" / "Application" / "msedge.exe").is_file():
+                return str(Path(root) / "Microsoft" / "Edge" / "Application" / "msedge.exe")
     return None
 
 
 def web_available() -> tuple[bool, str]:
-    node = shutil.which("node")
-    if not node:
-        return False, "node not installed"
-    if not (harness_dir() / "node_modules" / "playwright").exists():
-        return False, f"playwright not installed in {harness_dir()} (run npm ci there)"
+    if not node_path():
+        return False, "Node.js is not installed (install 'Node.js' on the Tools page)"
+    if not playwright_module():
+        return False, "the browser test library is not installed (install 'Browser test library (Playwright)' on the Tools page)"
     if not chromium_path():
-        return False, "no Chromium found (set REBUILD_CHROMIUM or PLAYWRIGHT_BROWSERS_PATH)"
+        return False, "no Chromium-based browser found (Microsoft Edge or a Playwright Chromium)"
     return True, "ok"
 
 
@@ -59,16 +93,24 @@ def run_web_scenario(url: str, scenario: dict[str, Any], out_dir: Path, *, timeo
     # tree itself runs in a Job Object (tree kill, memory/process caps) with an allow-listed environment, but at MEDIUM
     # integrity: Chromium's sandbox needs a normal-integrity browser process. Recorded as a downgrade in rec["isolation"].
     from .. import sandbox
-    node = shutil.which("node") or "node"
+    node = node_path() or "node"
     policy = sandbox.IsolationPolicy.from_spec(scenario.get("isolation") or {"integrity": "medium", "reason": "Chromium's renderer sandbox needs a medium-integrity browser process"},
                                                wall_time_s=timeout, process_memory_bytes=4 * sandbox.GiB, job_memory_bytes=8 * sandbox.GiB,
                                                max_processes=128, ui_restrictions="interactive",
                                                env_passthrough=("PLAYWRIGHT_BROWSERS_PATH", "REBUILD_CHROMIUM"))
-    iso_root = out_dir.parent / f".{out_dir.name}.isohome"
+    # Short private home (TEMP/APPDATA/profile) outside the case tree: Chromium's profile paths under a deep case work dir
+    # exceed Windows' 260-character limit ("sql::Database is not opened" / mkdtemp ENOENT), so keep the prefix short.
+    import tempfile
+    import uuid
+    iso_root = Path(tempfile.gettempdir()) / f"rsw-{uuid.uuid4().hex[:8]}"
     for d in (out_dir, iso_root):
         sandbox.prepare_work_dir(d, policy)
-    env = sandbox.build_env(iso_root, program_dirs=[str(Path(node).parent)], policy=policy, declared={"REBUILD_HARNESS_DIR": str(harness_dir())})
-    p = sandbox.run([node, str(HARNESS), str(spec_path), str(rec_path)], work=iso_root, cwd=harness_dir(), policy=policy, env=env)
+    env = sandbox.build_env(iso_root, program_dirs=[str(Path(node).parent)], policy=policy, declared={"REBUILD_HARNESS_DIR": str(harness_dir()),
+                                                                                                         **({"REBUILD_PLAYWRIGHT_MODULE": str(playwright_module())} if playwright_module() and playwright_module().name == "playwright-core" else {})})
+    try:
+        p = sandbox.run([node, str(HARNESS), str(spec_path), str(rec_path)], work=iso_root, cwd=harness_dir(), policy=policy, env=env)
+    finally:
+        shutil.rmtree(iso_root, ignore_errors=True)
     if p.returncode != 0 or not rec_path.exists():
         why = "timed out" if p.timed_out else p.stderr.decode('utf-8', 'replace')[-2000:]
         raise RuntimeError(f"web harness failed: {why}")

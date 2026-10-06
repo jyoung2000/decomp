@@ -14,6 +14,7 @@ pytestmark = pytest.mark.e2e
 def studio(settings):
     from rebuild_controller.services import StudioServices
     settings.limits.max_stage_seconds = 900
+    settings.limits.lease_timeout_seconds = 120   # browser comparisons outlive the 2 s test default lease
     s = StudioServices(settings)
     yield s
     s.stop()
@@ -40,7 +41,9 @@ def test_preview_feedback_retest_cycle(studio, tmp_path, settings):
     assert studio.plan.current_revision(cid) > rev0
     # a real, versioned preview exists for the built candidate
     previews = studio.previews.list(cid)
-    assert previews and previews[0]["kind"] == "real" and previews[0]["build_hash"] and previews[0]["verification"] == "verified"
+    diag = [(r["channel"], r["rule"], r["verdict"], str(r["details"])[-700:]) for r in studio.db.query("SELECT * FROM comparisons WHERE case_id=?", (cid,)) if r["verdict"] != "pass"]
+    diag += [(j.stage, j.state.value, (j.error or "")[:300]) for j in studio.jobs.list(cid) if j.state != JobState.COMPLETED]
+    assert previews and previews[0]["kind"] == "real" and previews[0]["build_hash"] and previews[0]["verification"] == "verified", diag
     opened = studio.previews.open(previews[0]["preview_id"])
     assert opened["opened"] and opened["kind"] == "browser"
     html = urllib.request.urlopen(opened["url"].split("#")[0], timeout=10).read().decode()

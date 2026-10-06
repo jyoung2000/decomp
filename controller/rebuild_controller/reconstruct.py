@@ -232,30 +232,41 @@ def _task_packet(st, case: dict[str, Any], target: str, profile: str) -> dict[st
     limit = PACKET_MAX
     size = len(json.dumps(packet, default=str))
     evs = st.cases.list_evidence(cid)
+    def cost(entry: Any) -> int:   # exact bytes the entry adds to json.dumps(packet), incl. the ", " separator
+        return len(json.dumps(entry, default=str)) + 2
+
     for ev in evs:
         if ev["kind"] in _SKIP_INDEX:
             continue
-        packet["evidence_index"].append({"id": ev["evidence_id"], "kind": ev["kind"], "title": ev["title"], "module_id": ev["module_id"]})
+        entry = {"id": ev["evidence_id"], "kind": ev["kind"], "title": ev["title"], "module_id": ev["module_id"]}
+        if size + cost(entry) > limit // 4:   # the index may use at most a quarter of the budget
+            packet["evidence_index_truncated"] = True
+            break
+        packet["evidence_index"].append(entry)
+        size += cost(entry)
     rank = {k: i for i, k in enumerate(EXCERPT_PRIORITY)}
     for ev in sorted([e for e in evs if e["kind"] in rank], key=lambda e: (rank[e["kind"]], e["revision"])):
         body = st.cases.evidence_body(ev["evidence_id"], max_bytes=20_000)
-        text = json.dumps(body, default=str)[:20_000]
-        if size + len(text) > limit:
+        if len(json.dumps(body, default=str)) > 20_000:   # never store more than was measured
+            body = {"truncated_text": json.dumps(body, default=str)[:20_000]}
+        entry = {"id": ev["evidence_id"], "kind": ev["kind"], "title": ev["title"], "untrusted": True, "body": body}
+        if size + cost(entry) > limit:
             packet["truncated"] = True
             break
-        packet["excerpts"].append({"id": ev["evidence_id"], "kind": ev["kind"], "title": ev["title"], "untrusted": True, "body": body})
-        size += len(text)
+        packet["excerpts"].append(entry)
+        size += cost(entry)
     # recovered managed source (ILSpy C#): files, not evidence rows, so they would otherwise never reach the model
     rec = st.cases.case_root(cid) / "recovered"
     if rec.is_dir() and not packet.get("truncated"):
         for p in sorted((q for q in rec.rglob("*.cs") if q.is_file()), key=lambda q: q.stat().st_size)[:200]:
             text = p.read_text("utf-8", "replace")[:20_000]
-            if size + len(text) > limit:
+            entry = {"id": f"recovered/{p.relative_to(rec).as_posix()}", "kind": "managed_source", "title": p.name, "untrusted": True, "body": text}
+            if size + cost(entry) > limit:
                 packet["truncated"] = True
                 break
-            packet["excerpts"].append({"id": f"recovered/{p.relative_to(rec).as_posix()}", "kind": "managed_source", "title": p.name, "untrusted": True, "body": text})
-            size += len(text)
-    packet["bytes"] = size
+            packet["excerpts"].append(entry)
+            size += cost(entry)
+    packet["bytes"] = len(json.dumps(packet, default=str))
     return packet
 
 

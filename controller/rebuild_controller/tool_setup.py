@@ -26,6 +26,7 @@ import subprocess
 import threading
 import time
 import uuid
+import tarfile
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -50,10 +51,8 @@ FRIENDLY = {
     "gdre": ("GDRE Tools", "Needed to recover Godot games (.pck files)."),
     "ilspycmd": ("ILSpy", "Needed to recover .NET programs (C# source from .exe and .dll files)."),
     "dotnet-runtime": ("Private .NET runtime", "Runs the .NET recovery tool. Installed privately inside Rebuild Studio, not on your PC."),
-    "temurin-jre": ("Private Java runtime", "Runs the Java recovery tools. Installed privately inside Rebuild Studio, not on your PC."),
-    "cfr": ("CFR", "Needed to recover Java programs (.jar and .class files)."),
-    "jadx": ("JADX", "Needed to recover Android apps (.apk and .dex files)."),
-    "node": ("Node.js (optional)", "Optional. Helps unpack Electron and JavaScript apps."),
+    "node": ("Node.js (optional)", "Optional. Unpacks Electron and JavaScript apps and runs browser behaviour tests."),
+    "playwright-core": ("Browser test library (optional)", "Optional. Lets Rebuild Studio compare web apps in a browser (uses Microsoft Edge, already on Windows 11). Needs Node.js."),
     "temurin-jre": ("Private Java runtime (optional)", "Optional. Runs the Java and Android recovery tools. Installed privately inside Rebuild Studio, not on your PC."),
     "cfr": ("CFR (optional)", "Optional. Needed to recover Java programs (.jar files)."),
     "jadx": ("jadx (optional)", "Optional. Needed to recover Android apps (.apk files)."),
@@ -649,9 +648,52 @@ class ToolSetup:
                                  next_action="The file was deleted. Retry; if it fails again do not use this file.")
 
     # -- extraction -------------------------------------------------------------------------------------------------
+    def _extract_tar(self, archive: Path, staged: Path, root_parts: list[str], cancel: threading.Event) -> None:
+        """.tgz artifacts (npm packages). Same rules as zip: refuse links/devices/unsafe paths before writing anything."""
+        limits = self.settings.limits
+        try:
+            tf = tarfile.open(archive, "r:*")
+        except tarfile.TarError as e:
+            raise ToolSetupError("bad_archive", "The archive is not a valid tar file; nothing was installed.", retryable=False) from e
+        with tf:
+            members = tf.getmembers()
+            if len(members) > limits.max_archive_entries or sum(m.size for m in members) > limits.max_archive_expansion_bytes:
+                raise ToolSetupError("unsafe_archive", "The archive is larger than the safety limit; nothing was installed.")
+            for m in members:
+                if not (m.isfile() or m.isdir()):
+                    raise ToolSetupError("unsafe_archive", f"The archive contains a link or special file ({m.name}); nothing was installed.",
+                                         affected=m.name, next_action="Do not use this file.")
+                try:
+                    safe_archive_target(staged, m.name)
+                except PathPolicyError as e:
+                    raise ToolSetupError("unsafe_archive", f"The archive contains an unsafe path ({m.name}); nothing was installed.",
+                                         affected=m.name, next_action="Do not use this file.") from e
+            for m in members:
+                if cancel.is_set():
+                    raise _Cancelled()
+                parts = [p for p in m.name.replace("\\", "/").split("/") if p not in ("", ".")]
+                if root_parts:
+                    if parts[:len(root_parts)] != root_parts:
+                        continue
+                    parts = parts[len(root_parts):]
+                if not parts:
+                    continue
+                target = safe_archive_target(staged, "/".join(parts))
+                if m.isdir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                src = tf.extractfile(m)
+                if src is None:
+                    continue
+                with src, open(target, "wb") as dst:
+                    shutil.copyfileobj(src, dst, CHUNK)
+
     def _extract(self, name: str, archive: Path, staged: Path, archive_root: str, cancel: threading.Event) -> None:
         limits = self.settings.limits
         root_parts = [p for p in archive_root.replace("\\", "/").split("/") if p]
+        if not zipfile.is_zipfile(archive) and tarfile.is_tarfile(archive):
+            return self._extract_tar(archive, staged, root_parts, cancel)
         try:
             zf = zipfile.ZipFile(archive)
         except zipfile.BadZipFile as e:
