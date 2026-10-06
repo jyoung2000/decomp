@@ -81,3 +81,4 @@ Baseline on this host (before changes): controller 503 passed / 30 failed / 90 s
 Revision history
 - 2026-10-06 r1: P-series created from the production-readiness brief; removed stray committed file `works and reuses the kept data` (duplicate of an older gates doc).
 - 2026-10-06 r2: P4/P5/P6 done; installed-app findings: CORS preflight blocked the packaged UI, frozen controller missing all backends; both fixed with regression checks. Linux CI dispatched on branch (workflows only trigger on main/PR otherwise).
+- 2026-10-06 r3: session stopped at usage limit. In flight (uncommitted): P7 AI loop, P8 support matrix, consent+scenario UI subagents; Linux CI POSIX sandbox/dotnet diagnostics (run 37493764724). Pending interactive: pin/relaunch, Start-menu launch, full UI walk, uninstall with/without data, forced-kill drill; final rebuild with backend-load check; final report Windows sections.
