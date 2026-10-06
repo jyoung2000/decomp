@@ -347,7 +347,7 @@ def test_feedback_validation_errors(live):
     with pytest.raises(C.ApiError) as ei:
         sess.client.create_feedback(live.case_id, {"target_kind": "evidence", "target_id": "ev_x", "classification": "nonsense",
                                                    "priority": "low", "comment": "c"})
-    assert ei.value.status == 422
+    assert ei.value.status == 400  # documented validation error shape
 
 
 # ------------------------------------------------------------------------------------------------ following the cursor

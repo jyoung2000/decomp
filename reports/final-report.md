@@ -1,9 +1,18 @@
 # Rebuild Studio — final report
 
-Generated 2026-10-06T12:20:17.639663+00:00 on Linux 6.18.44-fc-v70 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
+Generated 2026-10-06T12:31:34.895555+00:00 on Linux 6.18.44-fc-v70 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
 
 ## Implementation commits
 
+- `93e323a Record UI e2e and desktop test runs`
+- `8e3b532 Support matrix rows for UI, Cutter, packaging; DR-4 note`
+- `e27e3c6 Plan/checkpoint: workers integrated`
+- `593c32e UI e2e/polish (worker); validation error shape; /capabilities; API doc corrections; screenshot settle wait; refreshed Godot example evidence`
+- `61a9e73 Cutter plugin + client tests (worker); HTTP briefing endpoint; feedback requires an existing case`
+- `03bbf80 Windows packaging/CI handoff (worker); package data for schema/harness; untrack build artifacts; OS-aware test skips`
+- `52aa8a8 Checkpoint: in-progress worker output (UI e2e screens/specs, desktop shell fixes, packaging scripts)`
+- `739b7bd Checkpoint`
+- `44a9a9a Web and Godot example records; final report wording`
 - `53cb214 dotnetapp managed-path demo (Rust from ILSpy evidence via MCP, verified 9/9); report wording: runners used, candidate author`
 - `78d26a1 Scaffold candidates carry recovered original-language material and decompiled C as intermediate evidence`
 - `1422b3b API doc: deliver, review, subscriptions, doctor states, error mapping`
@@ -48,11 +57,13 @@ Generated 2026-10-06T12:20:17.639663+00:00 on Linux 6.18.44-fc-v70 (certifies Wi
 
 | Suite | Command | Passed | Failed | Skipped | When |
 |---|---|---|---|---|---|
-| controller unit+integration (not e2e, not live) | `cd controller && pytest -q tests -m 'not e2e and not live'` | 598 | 0 | 1 | 2026-10-06T12:15:19+00:00 |
-| ui vitest | `cd ui && npm test` | 53 | 0 | 0 | 2026-10-06T12:15:19+00:00 |
-| desktop cargo check (Linux) | `cd desktop/src-tauri && cargo check` | 1 | 0 | 0 | 2026-10-06T12:15:19+00:00 |
+| controller unit+integration (not e2e, not live) — final | `cd controller && pytest -q tests -m 'not e2e and not live'` | 619 | 0 | 1 | 2026-10-06T12:31:34+00:00 |
 | controller e2e pipelines (pecli full + crash/resume, web preview/feedback cycle) | `cd controller && pytest -q tests -m e2e` | 3 | 0 | 0 | 2026-10-06T12:15:55+00:00 |
 | rebuildctl doctor --verify --smoke (fixture regressions per backend) | `cd controller && rebuildctl doctor --verify --smoke --json` | 4 | 0 | 1 | 2026-10-06T12:20:17+00:00 |
+| desktop shell cargo test (Linux; Windows-only tests compiled out) | `cd desktop && sh scripts/check.sh test` | 24 | 0 | 0 | 2026-10-06T12:28:37+00:00 |
+| ui playwright e2e vs mock controller | `cd ui && npm run e2e` | 18 | 0 | 4 | 2026-10-06T12:29:00+00:00 |
+| ui vitest | `cd ui && npm test` | 68 | 0 | 0 | 2026-10-06T12:29:00+00:00 |
+| ui playwright real-controller spec (worker run, web fixture end to end) | `cd ui && REAL_CONTROLLER=1 REAL_CONTROLLER_DATA=<data> npx playwright test real-controller` | 4 | 0 | 0 | 2026-10-06T12:40:00+00:00 |
 
 ## Fixtures
 
@@ -63,8 +74,10 @@ Generated 2026-10-06T12:20:17.639663+00:00 on Linux 6.18.44-fc-v70 (certifies Wi
 
 ## Demonstrations (verifier-decided)
 
-- **dotnetapp-rust-from-evidence** (dotnetapp → rust): full parity YES; 8/8 features verified, 0 failed, 0 untested; 42 comparisons; AI calls: none; host runner wine=True
-- **pecli-rust-from-evidence** (pecli → rust): full parity YES; 8/8 features verified, 0 failed, 0 untested; 77 comparisons; AI calls: none; host runner wine=True
+- **dotnetapp-rust-from-evidence** (dotnetapp → rust): full parity YES; 8/8 features verified, 0 failed, 0 untested; 42 comparisons; candidate author: controller; AI calls via app routes: none; host certifies Windows: False
+- **godotgame-bevy-scaffold** (godotgame → rust_bevy): full parity NO; 0/0 features verified, 0 failed, 0 untested; 0 comparisons; candidate author: controller; AI calls via app routes: none; host certifies Windows: n/a
+- **pecli-rust-from-evidence** (pecli → rust): full parity YES; 8/8 features verified, 0 failed, 0 untested; 77 comparisons; candidate author: controller; AI calls via app routes: none; host certifies Windows: False
+- **webapp-pwa-port** (webapp → web): full parity NO; 4/5 features verified, 0 failed, 1 untested; 20 comparisons; candidate author: controller; AI calls via app routes: none; host certifies Windows: False
 
 ## Windows release gates (not certified here)
 
