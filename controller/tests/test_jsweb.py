@@ -75,6 +75,7 @@ def test_probe_native_engine_installed_and_optional_tools_do_not_lower_availabil
     empty = tmp_path / "empty"
     empty.mkdir()
     monkeypatch.setenv("PATH", str(empty))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "no_localappdata"))   # the per-user tools dir is a discovery location too
     b2 = JSWebBackend(Settings(tools_dir=tmp_path / "none", data_dir=tmp_path / "d2"))
     i2 = b2.probe()
     assert i2.availability == Availability.INSTALLED
