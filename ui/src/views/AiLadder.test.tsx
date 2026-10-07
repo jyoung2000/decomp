@@ -83,7 +83,7 @@ describe('model ladder editor', () => {
     expect(rows[0]).toHaveTextContent('gpt-demo-small');
     expect(rows[1]).toHaveTextContent('qwen2.5:14b');
     // focus stays on the moved rung so repeated moves work (moved after the re-render, so wait for it: CI runners are slower)
-    await waitFor(() => expect(within(sec).getByTestId('lad-interpretation-ladder').querySelectorAll('[data-testid^="lad-interpretation-rung"]')[1]).toHaveFocus());
+    await waitFor(() => expect(within(sec).getByTestId('lad-interpretation-ladder').querySelectorAll('[data-testid^="lad-interpretation-rung"]')[1]).toHaveFocus(), { timeout: 5000 });
     // Alt+ArrowUp on the focused row moves it back
     await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
     rows = within(sec).getByTestId('lad-interpretation-ladder').querySelectorAll('[data-testid^="lad-interpretation-rung"]');
