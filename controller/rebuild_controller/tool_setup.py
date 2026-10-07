@@ -60,7 +60,7 @@ FRIENDLY = {
     "node": ("Node.js (optional)", "Optional. Unpacks Electron and JavaScript apps and runs browser behaviour tests."),
     "playwright-core": ("Browser test library (optional)", "Optional. Lets Rebuild Studio compare web apps in a browser (uses Microsoft Edge, already on Windows 11). Needs Node.js."),
     "temurin-jre": ("Private Java runtime (optional)", "Optional. Runs the Java and Android recovery tools. Installed privately inside Rebuild Studio, not on your PC."),
-    "rust": ("Rust compiler (private)", "Needed to build rebuilt programs as Windows .exe files. Installed privately inside Rebuild Studio (no administrator rights, no Visual Studio). Large: about 150 MB to download and 850 MB of disk."),
+    "rust": ("Rust compiler (private)", "Optional. Needed to build rebuilt programs as Windows .exe files (Rust remakes). Installed privately inside Rebuild Studio (no administrator rights, no Visual Studio). Large: about 150 MB to download and 850 MB of disk."),
     "cfr": ("CFR (optional)", "Optional. Needed to recover Java programs (.jar files)."),
     "jadx": ("jadx (optional)", "Optional. Needed to recover Android apps (.apk files)."),
 }

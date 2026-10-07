@@ -509,7 +509,7 @@ def test_real_lock_has_private_rust_entry():
     from rebuild_controller.tool_setup import FRIENDLY, find_lock_path
     ts = ToolSetup(Settings(tools_dir=Path("nonexistent-tools-dir")), None, find_lock_path())
     t = {x["name"]: x for x in ts.snapshot()["tools"]}["rust"]
-    assert t["title"] == FRIENDLY["rust"][0] == "Rust compiler (private)" and "Windows .exe" in t["purpose"] and not t["optional"]
+    assert t["title"] == FRIENDLY["rust"][0] == "Rust compiler (private)" and "Windows .exe" in t["purpose"] and t["optional"]   # only Rust remakes need it
     assert t["status"] == "not_installed" and t["blocked_reason"] is None and len(t["sha256"]) == 64
     assert t["url"] == "https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe"
     assert t["footprint"]["disk_bytes"] > 100_000_000 and t["footprint"]["installer_download_bytes"] > 50_000_000
