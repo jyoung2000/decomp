@@ -9,12 +9,16 @@ import { Availability, Capabilities, LocalityBadge, PriceLabel } from './Badges'
  */
 export function LadderList({ id, label, entries, onChange, readOnlyReason }: { id: string; label: string; entries: LadderEntry[]; onChange: (e: LadderEntry[]) => void; readOnlyReason?: string }) {
   const focusKey = useRef<string | null>(null);
+  // Runs on the render that applied the move/remove (keyed on `entries`), not on an earlier render where the ref was
+  // already set but the parent's state had not changed yet (that cleared the key too early on slower CI runners).
   useEffect(() => {
-    if (focusKey.current) {
-      document.getElementById(`${id}-rung-${focusKey.current}`)?.focus();
+    if (!focusKey.current) return;
+    const el = document.getElementById(`${id}-rung-${focusKey.current}`);
+    if (el) {
+      el.focus();
       focusKey.current = null;
     }
-  });
+  }, [entries, id]);
   const move = (i: number, d: number) => {
     const j = i + d;
     if (j < 0 || j >= entries.length) return;

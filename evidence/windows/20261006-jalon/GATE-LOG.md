@@ -74,3 +74,15 @@ therefore superseded by run 5.
 | Start → honest blocked state | FOUND 2 BUGS: .NET launcher sent to Rizin blocked recovery; blocker text pointed at a non-existent 'Settings → Dependencies'. Fixed in a341d70 (+ test_dotnet_apphost.py) — not yet re-verified in a rebuilt genuine install | Plan tab |
 | Pin to taskbar / relaunch from pin / grouping | PASS earlier on the virtualized binaries (run 5 pre-correction, run5-launched-from-taskbar-pin.png); not repeated on the genuine install | — |
 | GUI uninstall with "Delete the application data" | NOT RUN (cancelled when the virtualization was discovered) | — |
+
+## Run 7 — genuine install, build fc6abf6 (installer sha256 e189663ea67a97be21a3bc7ef5f3b22945917f9c37d3112acf5f69abc11f632d, UNSIGNED), 2026-10-07
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| Update in place via setup double-clicked in Explorer (installer finished and auto-ran the app) | PASS: real `%LOCALAPPDATA%\Rebuild Studio` binaries replaced (controller sha256 matches the build), project data kept | sha256 compare |
+| Cross-drive delivery (data on C:, output on D:, path with spaces) after the fix | PASS: the previously failed delivery job re-queued via the app API completed: 28 files, `manifest.json` outcome `scaffolded`, scaffold exe runs and exits 64 with "no features implemented", project status → delivered, UI "Delivered — scaffold only", no staging folder left behind | manifest, Now doing lines |
+| Start-menu launch | PASS: controller ready in 3.0 s, UI connected, reopened the delivered project | tasklist |
+| Pin to taskbar (jump list) → close → relaunch from the pin | PASS: pin AUMID io.rebuildstudio.desktop = process AUMID, target = genuine exe; relaunch from the pin: Explorer-parented processes, /health ok, grouped under the same button with correct name/thumbnail | run7-genuine-relaunch-from-taskbar-pin.png |
+| GUI uninstall with "Delete the application data" ticked | PASS: program folder, desktop + Start-menu shortcuts, taskbar pin, Apps entry, `%LOCALAPPDATA%\RebuildStudio` and `RebuildStudio:*` Credential Manager entry removed; a sibling folder (`RebuildStudio.keep`) untouched; no processes left | ls/reg/cmdkey |
+| Reinstall after data-removal uninstall | PASS (passive install) | — |
+| Project that failed under the OLD build stayed 'running' with Resume disabled | KNOWN: the status settle is event-driven and only applies to failures under the new build; re-queuing the job via the API worked. New failures settle correctly (regression test) | — |

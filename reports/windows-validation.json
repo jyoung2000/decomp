@@ -1,6 +1,6 @@
 {
   "host": "Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md. IMPORTANT: installs in runs 1–4 were launched from inside the Claude desktop app (MSIX) and were file-system virtualized into its private AppData; run 5 is the genuine install launched from Explorer.",
-  "build": "commit da31c6c: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 dbfd651cc01f439b8a18abfaf0f583f4a781a0c0a4fef070efd3cf1c9b663383 (NSIS .exe, per-user); portable 690632a7…",
+  "build": "commit fc6abf6: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 e189663ea67a97be21a3bc7ef5f3b22945917f9c37d3112acf5f69abc11f632d (NSIS .exe, per-user); portable 88dacb69…",
   "interactive": [
     {
       "gate": "Genuine install: setup double-clicked in Explorer, GUI pages, path with spaces, no admin",
@@ -14,13 +14,13 @@
     },
     {
       "gate": "Start-menu entry / AppUserModelID",
-      "result": "PASS (virtualized run) — not repeated on genuine install",
-      "notes": "shortcut AUMID io.rebuildstudio.desktop = process AUMID"
+      "result": "PASS (genuine install)",
+      "notes": "Start-menu launch: ready in 3.0 s, connected"
     },
     {
       "gate": "Pin to taskbar → close → relaunch from pin; icon and grouping",
-      "result": "PASS on the same binaries in a virtualized install; not repeated on the genuine install",
-      "notes": "jump list showed name/icon; one taskbar button"
+      "result": "PASS (genuine install)",
+      "notes": "jump-list pin carries AUMID io.rebuildstudio.desktop = process AUMID; relaunch from pin healthy and grouped"
     },
     {
       "gate": "Guided tool setup through the GUI",
@@ -34,23 +34,23 @@
     },
     {
       "gate": "Real fixture through the genuine install",
-      "result": "BLOCKED → fixed, not re-verified",
-      "notes": ".NET launcher routed to Rizin blocked recovery; fixed in a341d70"
+      "result": "PASS (honest scaffold)",
+      "notes": ".NET fixture: ILSpy recovery, scaffold built with the private Rust toolchain, delivered to a D: output folder (cross-drive fix verified); outcome scaffolded; no scenarios declared so nothing claimed verified"
     },
     {
       "gate": "Lifecycle: normal close, crash kill, relaunch with stale controller.json",
-      "result": "PASS (virtualized install, same binaries)",
+      "result": "PASS (virtualized install, same binaries); normal close also PASS on the genuine install",
       "notes": "Job Object kills the controller tree"
     },
     {
       "gate": "Update in place; ordinary uninstall keeps data; credential purge",
-      "result": "PASS (virtualized install)",
-      "notes": "repeat on genuine install pending"
+      "result": "PASS (genuine install)",
+      "notes": "update via Explorer-launched setup kept projects; see also data-removal gate"
     },
     {
       "gate": "GUI uninstall with 'Delete the application data'",
-      "result": "NOT RUN",
-      "notes": "cancelled when virtualization was discovered"
+      "result": "PASS (genuine install)",
+      "notes": "program, shortcuts, pin, Apps entry, %LOCALAPPDATA%\\RebuildStudio and RebuildStudio:* credentials removed; unrelated sibling folder untouched"
     },
     {
       "gate": "Installed controller completes fixtures with only app-installed tools (CLI, PATH=System32)",
@@ -66,6 +66,16 @@
       "gate": "Standard user account; clean VM; signed build",
       "result": "NOT RUN",
       "notes": "not available on this machine"
+    },
+    {
+      "gate": "Live rebuild log in the installed app",
+      "result": "PASS",
+      "notes": "Live log tab streamed plain-English stage lines during a real rebuild; 'Now doing' strip on Overview"
+    },
+    {
+      "gate": "Bugs found only on the genuine install",
+      "result": "FIXED + re-verified",
+      "notes": ".NET apphost blocked recovery; stale blocker text; cross-drive delivery (WinError 17); failed project stuck 'running' — all fixed with regression tests; cross-drive and apphost fixes re-verified on the rebuilt genuine install"
     }
   ],
   "measurements": [
@@ -81,9 +91,9 @@
     "Earlier runs found and drove fixes: POSIX sandbox (.NET SIGXFSZ), hosted-runner portability (gcc app.exe, process-limit test)"
   ],
   "unresolved": [
-    "Re-verify the .NET/native fixture flow on a genuine install rebuilt from a341d70+.",
-    "Repeat pin, Start-menu, update and uninstall (incl. 'Delete the application data') on the genuine install.",
-    "Clean Windows 10/11 VM with a standard user; code signing; live cloud AI providers (no keys).",
-    "Windows hosted CI: UI focus test timing fix pushed (a8a0747); result pending at report time."
+    "Clean Windows 10/11 VM with a standard (non-admin) user and no developer tools; Windows Defender first-run timing there.",
+    "Code signing (no certificate): installer and portable zip are UNSIGNED; SmartScreen will warn.",
+    "Live cloud AI providers (no API keys): verified only against a scripted provider and local Ollama.",
+    "Projects that failed under a build older than fc6abf6 keep status 'running' until re-queued (status settle is event-driven)."
   ]
 }

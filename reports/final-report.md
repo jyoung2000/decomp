@@ -1,9 +1,14 @@
 # Rebuild Studio — final report
 
-Generated 2026-10-07T03:13:26.663778+00:00 on Windows-11-10.0.26200-SP0 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
+Generated 2026-10-07T16:04:48.630688+00:00 on Windows-11-10.0.26200-SP0 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
 
 ## Implementation commits
 
+- `fc6abf6 A project whose last job failed or got blocked no longer stays 'running' with Resume disabled`
+- `954a8d3 Fix delivery to an output folder on another drive (WinError 17), found on a genuine Windows install`
+- `ef0968a UI test: 20 s budget for the keyboard ladder test (its 5 s focus wait hit the 5 s default test timeout on Linux CI)`
+- `cd02b1f Live rebuild log: plain-English job.log lines from every main stage, /cases/{id}/log, Live log tab + 'Now doing' strip`
+- `fb7f5ba Correct the Windows evidence: runs 1-4 were MSIX-virtualized installs; record the genuine Explorer install (run 5); regenerate final report`
 - `a8a0747 UI test: allow 5 s for the async focus move on slow CI runners`
 - `a341d70 Found on a genuine (non-virtualized) install: .NET apphost no longer blocks recovery; blocker text points at Tools`
 - `da31c6c Rust tool: test and plain-language text match its optional status`
@@ -29,11 +34,6 @@ Generated 2026-10-07T03:13:26.663778+00:00 on Windows-11-10.0.26200-SP0 (certifi
 - `357e9d0 Tests: portable PE sample (committed fixture, no mingw); diagnostics for Linux sandbox failures seen in CI`
 - `c008034 Build: bundle every controller module explicitly; fail the build if any backend cannot load when frozen`
 - `a0df280 Guided tool setup from the app: hash-verified downloads with progress, retry, cancel, offline install-from-file`
-- `9774d49 Packaged UI could not reach its controller: answer CORS preflight before the token check`
-- `df9cb85 Truthful outcome states: pipeline progress separate from measured behaviour; no 100% unless fully matched`
-- `d663af6 Isolate untrusted runs: Job Object caps + low integrity + scrubbed env; consent before running the original`
-- `a133113 Controller on native Windows: reject Windows protected roots, report zip members as stored; port POSIX-only tests`
-- `d32eb7a Windows shell/installer: AUMID, desktop-shortcut-aware uninstall data removal, orphan reaping, recovery dialog; PS 5.1 build fixes; pin .NET 8.0.31 runtime`
 
 ## Dependency pins
 
@@ -124,23 +124,25 @@ Recommended follow-up (not done here): record a `source` (`mcp` or `controller`)
 
 Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md. IMPORTANT: installs in runs 1–4 were launched from inside the Claude desktop app (MSIX) and were file-system virtualized into its private AppData; run 5 is the genuine install launched from Explorer.
 
-Build under test: commit da31c6c: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 dbfd651cc01f439b8a18abfaf0f583f4a781a0c0a4fef070efd3cf1c9b663383 (NSIS .exe, per-user); portable 690632a7…
+Build under test: commit fc6abf6: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 e189663ea67a97be21a3bc7ef5f3b22945917f9c37d3112acf5f69abc11f632d (NSIS .exe, per-user); portable 88dacb69…
 
 | Gate | Result | Notes |
 |---|---|---|
 | Genuine install: setup double-clicked in Explorer, GUI pages, path with spaces, no admin | PASS | real %LOCALAPPDATA%\Rebuild Studio verified in Explorer |
 | Desktop shortcut offered (default on); app icon; double-click → full UI, no console | PASS | Explorer launched the real exe; UI Connected |
-| Start-menu entry / AppUserModelID | PASS (virtualized run) — not repeated on genuine install | shortcut AUMID io.rebuildstudio.desktop = process AUMID |
-| Pin to taskbar → close → relaunch from pin; icon and grouping | PASS on the same binaries in a virtualized install; not repeated on the genuine install | jump list showed name/icon; one taskbar button |
+| Start-menu entry / AppUserModelID | PASS (genuine install) | Start-menu launch: ready in 3.0 s, connected |
+| Pin to taskbar → close → relaunch from pin; icon and grouping | PASS (genuine install) | jump-list pin carries AUMID io.rebuildstudio.desktop = process AUMID; relaunch from pin healthy and grouped |
 | Guided tool setup through the GUI | PASS | ILSpy + .NET runtime with live progress; explained disabled buttons |
 | New Project with native folder pickers; consent and No AI explanations | PASS | output path with spaces |
-| Real fixture through the genuine install | BLOCKED → fixed, not re-verified | .NET launcher routed to Rizin blocked recovery; fixed in a341d70 |
-| Lifecycle: normal close, crash kill, relaunch with stale controller.json | PASS (virtualized install, same binaries) | Job Object kills the controller tree |
-| Update in place; ordinary uninstall keeps data; credential purge | PASS (virtualized install) | repeat on genuine install pending |
-| GUI uninstall with 'Delete the application data' | NOT RUN | cancelled when virtualization was discovered |
+| Real fixture through the genuine install | PASS (honest scaffold) | .NET fixture: ILSpy recovery, scaffold built with the private Rust toolchain, delivered to a D: output folder (cross-drive fix verified); outcome scaffolded; no scenarios declared so nothing claimed verified |
+| Lifecycle: normal close, crash kill, relaunch with stale controller.json | PASS (virtualized install, same binaries); normal close also PASS on the genuine install | Job Object kills the controller tree |
+| Update in place; ordinary uninstall keeps data; credential purge | PASS (genuine install) | update via Explorer-launched setup kept projects; see also data-removal gate |
+| GUI uninstall with 'Delete the application data' | PASS (genuine install) | program, shortcuts, pin, Apps entry, %LOCALAPPDATA%\RebuildStudio and RebuildStudio:* credentials removed; unrelated sibling folder untouched |
 | Installed controller completes fixtures with only app-installed tools (CLI, PATH=System32) | PASS (virtualized install) | web fully_matched within declared scenario; .NET and native PE honestly scaffolded |
 | AI ladder UI vs real controller + local Ollama (dev build) | PASS | Playwright 3/3; qwen2.5:14b repaired tinycalc, verifier 3/3 |
 | Standard user account; clean VM; signed build | NOT RUN | not available on this machine |
+| Live rebuild log in the installed app | PASS | Live log tab streamed plain-English stage lines during a real rebuild; 'Now doing' strip on Overview |
+| Bugs found only on the genuine install | FIXED + re-verified | .NET apphost blocked recovery; stale blocker text; cross-drive delivery (WinError 17); failed project stuck 'running' — all fixed with regression tests; cross-drive and apphost fixes re-verified on the rebuilt genuine install |
 
 Measurements on this host (not a clean machine):
 
@@ -159,10 +161,10 @@ Workflows trigger on main/PR only; runs were dispatched manually (workflow_dispa
 
 ## Unresolved Windows gates
 
-- Re-verify the .NET/native fixture flow on a genuine install rebuilt from a341d70+.
-- Repeat pin, Start-menu, update and uninstall (incl. 'Delete the application data') on the genuine install.
-- Clean Windows 10/11 VM with a standard user; code signing; live cloud AI providers (no keys).
-- Windows hosted CI: UI focus test timing fix pushed (a8a0747); result pending at report time.
+- Clean Windows 10/11 VM with a standard (non-admin) user and no developer tools; Windows Defender first-run timing there.
+- Code signing (no certificate): installer and portable zip are UNSIGNED; SmartScreen will warn.
+- Live cloud AI providers (no API keys): verified only against a scripted provider and local Ollama.
+- Projects that failed under a build older than fc6abf6 keep status 'running' until re-queued (status settle is event-driven).
 
 ## Windows release gates (not certified here)
 
