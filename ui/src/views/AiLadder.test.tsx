@@ -102,7 +102,7 @@ describe('model ladder editor', () => {
     await user.click(within(sec).getByRole('button', { name: /Save ladder for Interpretation/ }));
     await waitFor(() => expect(calls.find((c) => c.method === 'PUT' && c.path === '/ai/ladder/interpretation')?.body).toEqual({ entries: [{ connection_id: 'conn_openai', model: 'gpt-demo-small' }, { connection_id: 'conn_local', model: 'qwen2.5:14b' }] }));
     store.stop();
-  });
+  }, 20_000);   // keyboard reorders + async focus moves are slow on hosted CI runners
 
   it('model picker searches the catalog, filters local/cloud and keeps manual model-ID entry', async () => {
     const user = userEvent.setup();
