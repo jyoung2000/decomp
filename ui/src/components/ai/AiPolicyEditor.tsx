@@ -49,7 +49,7 @@ export function formToPolicy(f: PolicyForm, base?: AiPolicy | null): AiPolicy {
   const budget = f.budget_usd.trim() === '' ? null : Number(f.budget_usd);
   const p: AiPolicy = { ...(base ?? {}), mode: f.mode, locality: f.locality, budget_usd: budget, approve_unknown_pricing: f.approve_unknown_pricing };
   if (f.mode === 'custom') p.ladder_overrides = Object.fromEntries(Object.entries(f.overrides).filter(([, es]) => es.length).map(([t, es]) => [t, es.map((e) => ({ connection_id: e.connection_id, model: e.model }))]));
-  else delete p.ladder_overrides;
+  else p.ladder_overrides = {}; // the controller merges keys: an empty object clears stale overrides
   return p;
 }
 

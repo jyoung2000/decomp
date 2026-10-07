@@ -199,7 +199,9 @@ def label_low(path: Path) -> None:
         _check(GetSecurityDescriptorSacl(sd, ctypes.byref(present), ctypes.byref(sacl), ctypes.byref(defaulted)), "GetSecurityDescriptorSacl")
         rc = SetNamedSecurityInfoW(str(path), SE_FILE_OBJECT, LABEL_SECURITY_INFORMATION, None, None, None, sacl)
         if rc != 0:
-            raise SandboxError(f"could not set Low integrity label on {path}: [WinError {rc}] {ctypes.FormatError(rc).strip()}")
+            raise SandboxError(f"could not set Low integrity label on {path}: [WinError {rc}] {ctypes.FormatError(rc).strip()}. "
+                               "Some volumes refuse integrity labels (seen on a secondary NTFS volume); keep the Rebuild Studio data folder in "
+                               "the default location (%LOCALAPPDATA%\\RebuildStudio) or on a volume that allows labels. Nothing was run.")
     finally:
         LocalFree(sd)
 

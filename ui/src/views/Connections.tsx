@@ -97,7 +97,7 @@ export function ConnectionsView() {
                         authLabel(c.auth_mode)
                       )}
                     </td>
-                    <td className="small wrap-any">{c.models?.join(', ') || '—'}</td>
+                    <td className="small wrap-any">{(c.models ?? []).map((m) => (typeof m === 'string' ? m : m.id)).join(', ') || '—'}</td>
                     <td>
                       <StatusChip status={c.state} />
                       <div className="xs muted">{c.last_probe ? `probed ${dateTime(c.last_probe)}` : 'never probed'}</div>

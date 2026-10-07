@@ -61,5 +61,41 @@
   "skipped": 0,
   "when": "2026-10-06T12:40:00+00:00",
   "log_tail": "runs 2-4 passed after controller fix 46db2fc; run 1 failed on the pre-fix controller (duplicate recover_web jobs)"
+ },
+ {
+  "name": "windows-11 controller (not e2e/live)",
+  "command": "pytest -m 'not e2e and not live' (REBUILD_STUDIO_TOOLS=app tools dir)",
+  "passed": 802,
+  "failed": 0,
+  "skipped": 9,
+  "when": "2026-10-07T00:15:49+00:00",
+  "log_tail": "ated, use lifespan event handlers instead.\n  \n          Read more about it in the\n          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).\n          \n    return self.router.on_event(event_type)  # ty: ignore[deprecated]\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n802 passed, 9 skipped, 30 deselected, 94 warnings in 359.62s (0:05:59)\n"
+ },
+ {
+  "name": "windows-11 controller e2e",
+  "command": "pytest -m e2e (real rizin+rz-ghidra, ILSpy, GDRE, Edge/Chromium, cargo)",
+  "passed": 20,
+  "failed": 0,
+  "skipped": 1,
+  "when": "2026-10-07T00:15:49+00:00",
+  "log_tail": "st_preview_feedback_retest_cycle\n  D:\\decomp\\controller\\rebuild_controller\\comparators\\images.py:24: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.\n    px = diff.getdata()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n20 passed, 1 skipped, 820 deselected, 1 warning in 128.34s (0:02:08)\n"
+ },
+ {
+  "name": "windows-11 ui vitest",
+  "command": "npx vitest run",
+  "passed": 8,
+  "failed": 0,
+  "skipped": 0,
+  "when": "2026-10-07T00:15:49+00:00",
+  "log_tail": "to No, tells the truth about protection, and sends/confirms the consent choice \u001b[33m763\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m8 passed\u001b[39m\u001b[22m\u001b[90m (8)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m114 passed\u001b[39m\u001b[22m\u001b[90m (114)\u001b[39m\n\u001b[2m   Start at \u001b[22m 18:16:13\n\u001b[2m   Duration \u001b[22m 6.45s\u001b[2m (transform 1.06s, setup 921ms, collect 8.03s, tests 10.48s, environment 7.63s, prepare 1.39s)\u001b[22m\n\n"
+ },
+ {
+  "name": "windows-11 desktop cargo test",
+  "command": "cargo test (desktop/src-tauri)",
+  "passed": 28,
+  "failed": 0,
+  "skipped": 0,
+  "when": "2026-10-07T00:15:49+00:00",
+  "log_tail": "ed; 0 measured; 0 filtered out; finished in 4.08s\n\n     Running unittests src\\main.rs (target\\debug\\deps\\rebuild_studio-4f1fe43f836d67ca.exe)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests rebuild_studio_lib\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
  }
 ]

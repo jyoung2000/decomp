@@ -41,3 +41,14 @@ Driven by Claude Code through Windows UI Automation (real mouse clicks / double-
 | Relaunch after the crash | PASS: stale controller.json replaced (new port/token), exactly one controller (PyInstaller bootloader + child), /health ok | controller.json, tasklist |
 | Normal close (WM_CLOSE to the main window) | PASS: 0 processes, controller.json removed | tasklist |
 | Pin to taskbar → close → relaunch from the pin | NOT RUN: Windows blocks programmatic pinning; needs a person (steps in docs/INSTALL.md) | — |
+
+## Run 4 — commit 1d619ca+ab6494c (installer sha256 206a5a8e088cf90eab1b0ba977b32a86dae8e3b00a30a5df962dd1a0558f1032, portable b6fe6d64…, UNSIGNED)
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| Private Rust toolchain via guided setup (tool `rust`: pinned rustup-init 1.29.1, GNU host 1.97.0) | PASS: installed in 14 s, 849 MB, no admin, no Visual Studio | tool_setup status |
+| Installed controller, PATH = System32 only: fixtures/webapp | PASS: 10/10 jobs, `fully_matched` within the declared scenario, 26 s | manifest.json |
+| Installed controller, PATH = System32 only: fixtures/dotnetapp (No AI) | PASS (honest): ILSpy recovery + scaffold built with the private Rust toolchain; outcome `scaffolded`, `SCAFFOLD_NOT_IMPLEMENTED.txt` in output root and dist/; 133 s (cold cargo cache) | manifest.json, parity-report.md |
+| Installed controller, PATH = System32 only: fixtures/pecli (No AI) | PASS (honest): rizin + rz-ghidra recovery, scaffold built, `scaffolded`; 36 s | manifest.json |
+| Installed controller API: local Ollama connection, probe, `all_local` preset, forecast | PASS: probe 44 s (13 models, context windows from /api/show); ladders: deepseek-coder-v2:16b → qwen2.5:14b → gemma4:12b for implementation/repair, gemma4/llama3.2-vision for visual review; forecast text states local attempts and no metered cost | API responses |
+| Local AI repair through the real implement loop (dev controller, same code as the build) | PASS: missing model → `model_unavailable` with reason → qwen2.5:14b repaired tests/data/tinycalc on attempt 1, verifier 3/3, $0, ~38 s; deepseek-coder-v2:16b also 3/3 | test_live_local.py report |

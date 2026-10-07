@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AI_TASKS, PRESETS, presetLadders, rungKey, taskLabel } from '../../lib/ai';
 import { useApi, useResource } from '../../lib/store';
 import type { Connection, LadderEntry, LadderPresetId, PresetResult } from '../../lib/types';
@@ -14,6 +14,17 @@ export function LadderSection({ connections }: { connections: Connection[] }) {
   const api = useApi();
   const ladder = useResource(() => api.ladder(), [api]);
   const rev = ladder.data?.config_revision;
+  // a probe changes each rung's availability / capabilities: refetch the ladder whenever a connection's probe stamp changes
+  const probeSig = connections.map((c) => `${c.connection_id}:${c.state}:${c.last_probe ?? ''}`).join('|');
+  const { reload } = ladder;
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    reload();
+  }, [probeSig]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section className="card" aria-labelledby="routes-h" data-testid="ladder-section">
       <div className="card-head">

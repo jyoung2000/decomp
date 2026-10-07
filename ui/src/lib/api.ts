@@ -173,8 +173,10 @@ export class Api {
     return Array.isArray(r) ? r : Array.isArray(r?.models) ? r.models : [];
   };
   ladderPreset = (preset: LadderPresetId, apply: boolean) => this.post<PresetResult>('/ai/ladder/preset', { preset, apply });
-  aiPolicy = (id: string) => this.get<AiPolicy>(`/cases/${enc(id)}/ai-policy`);
-  putAiPolicy = (id: string, p: AiPolicy) => this.put<AiPolicy>(`/cases/${enc(id)}/ai-policy`, p);
+  /** The real controller wraps the policy: `{case_id, policy, policy_hash, config_revision, effective}`; the mock returns it flat. */
+  private unwrapPolicy = (r: AiPolicy | { policy?: AiPolicy }): AiPolicy => ((r as { policy?: AiPolicy }).policy && typeof (r as { policy?: AiPolicy }).policy === 'object' ? (r as { policy: AiPolicy }).policy : (r as AiPolicy));
+  aiPolicy = async (id: string) => this.unwrapPolicy(await this.get<AiPolicy | { policy?: AiPolicy }>(`/cases/${enc(id)}/ai-policy`));
+  putAiPolicy = async (id: string, p: AiPolicy) => this.unwrapPolicy(await this.put<AiPolicy | { policy?: AiPolicy }>(`/cases/${enc(id)}/ai-policy`, p));
   aiActivity = async (id: string) => {
     const r = await this.get<AiActivity[] | { activity?: AiActivity[]; items?: AiActivity[] }>(`/cases/${enc(id)}/ai/activity`);
     return Array.isArray(r) ? r : Array.isArray(r?.activity) ? r.activity : Array.isArray(r?.items) ? r.items : [];

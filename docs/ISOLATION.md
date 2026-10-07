@@ -171,3 +171,11 @@ and kernel exploits are out of scope). Use a throwaway virtual machine instead:
    (`launch_profile.baseline_file` format, see `docs/API.md`).
 4. On your machine, create the case with that `baseline_file`; nothing is executed locally and no consent is needed.
 5. Revert the VM to its snapshot (or delete it) afterwards.
+
+### Where the isolated work folders live
+
+Low-integrity runs need their work folders labelled Low. Labelling works in the default data folder
+(`%LOCALAPPDATA%\RebuildStudio`), in `%TEMP%` and on ordinary NTFS folders, but some volumes refuse it (observed on a secondary
+NTFS data volume during the 2026-10-06 Windows run: `icacls /setintegritylevel` → Access is denied, even with Full Control).
+When that happens the run is refused with an explanation — never silently downgraded — and the fix is to keep the data folder in
+its default location (the installed app always does; only the `REBUILD_STUDIO_DATA` developer override can move it).

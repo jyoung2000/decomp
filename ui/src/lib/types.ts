@@ -395,7 +395,8 @@ export interface Connection {
   label: string;
   endpoint: string;
   auth_mode: 'api_key' | 'subscription_handoff' | 'local' | 'none' | string;
-  models: string[];
+  /** the real controller returns discovered model objects (`{id, capabilities, context_window, ...}`); the mock returns plain ids */
+  models: (string | { id: string; [k: string]: unknown })[];
   capabilities?: Record<string, unknown>;
   limits?: { text?: string; [k: string]: unknown };
   state: string;
