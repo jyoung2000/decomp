@@ -208,6 +208,14 @@ def stage_analyze_module(ctx: StageContext) -> dict[str, Any]:
     return out
 
 
+def _fresh_dir(p: Path) -> None:
+    """Recovery output folders live in the app's own case folder. Start each run from an empty one: re-running a project
+    (Start again after a finished run) otherwise failed with "exists and is not empty; refusing to mix outputs"."""
+    if p.exists():
+        shutil.rmtree(p)
+    p.mkdir(parents=True, exist_ok=True)
+
+
 def stage_recover_managed(ctx: StageContext) -> dict[str, Any]:
     st = studio_of(ctx)
     mod = st.cases.get_module(ctx.job.inputs["module_id"])
@@ -215,7 +223,7 @@ def stage_recover_managed(ctx: StageContext) -> dict[str, Any]:
     path = Path(case["source_root"]) / mod["rel_path"]
     b = _backend(ctx, "ilspy", "ILSpy (ilspycmd)")
     out_dir = st.cases.case_root(case["case_id"]) / "recovered" / mod["module_id"]
-    out_dir.mkdir(parents=True, exist_ok=True)
+    _fresh_dir(out_dir)
     il = tool_label(ctx, "ilspy", "ILSpy")
     ctx.log(f"Recovering C# from {mod['rel_path']} with {il}…")
     meta = _result(b.call("metadata", ctx, case_id=case["case_id"], module_id=mod["module_id"], module_path=str(path)), "ilspy metadata")
@@ -263,7 +271,7 @@ def stage_recover_jvm(ctx: StageContext) -> dict[str, Any]:
     except KeyError:
         raise StageError("backend jvm not registered", blocker="install the Java decompiler (Tools page)")
     out_dir = st.cases.case_root(case["case_id"]) / "recovered" / mod["module_id"]
-    out_dir.mkdir(parents=True, exist_ok=True)
+    _fresh_dir(out_dir)
     ctx.log(f"Recovering Java source from {mod['rel_path']}…")
     ins = _result(b.call("inspect", ctx, case_id=case["case_id"], module_id=mod["module_id"], module_path=str(path)), "jvm inspect")
     dec = b.call("decompile", ctx, case_id=case["case_id"], module_id=mod["module_id"], module_path=str(path), out_dir=str(out_dir))
@@ -286,7 +294,7 @@ def stage_recover_engine(ctx: StageContext) -> dict[str, Any]:
     path = Path(case["source_root"]) / mod["rel_path"]
     b = _backend(ctx, "gdre", "GDRE tools")
     out_dir = st.cases.case_root(case["case_id"]) / "recovered" / mod["module_id"]
-    out_dir.mkdir(parents=True, exist_ok=True)
+    _fresh_dir(out_dir)
     ctx.log(f"Recovering the Godot project from {mod['rel_path']}…")
     det = _result(b.call("detect", ctx, case_id=case["case_id"], module_id=mod["module_id"], path=str(path)), "gdre detect")
     rec = _result(b.call("recover", ctx, case_id=case["case_id"], module_id=mod["module_id"], pck=str(path), out_dir=str(out_dir)), "gdre recover")
@@ -304,7 +312,7 @@ def stage_recover_web(ctx: StageContext) -> dict[str, Any]:
     root = Path(case["source_root"])
     b = _backend(ctx, "jsweb", "JS/web extractor")
     out_dir = st.cases.case_root(case["case_id"]) / "recovered" / "web"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    _fresh_dir(out_dir)
     mid = ctx.job.inputs.get("module_id")
     ctx.log(f"Recovering the web app's HTML, CSS and JavaScript from {root}…")
     ins = _result(b.call("inspect", ctx, case_id=case["case_id"], module_id=mid, root=str(root)), "web inspect")

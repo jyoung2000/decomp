@@ -92,3 +92,25 @@ def test_capture_stage_reuses_baseline_recorded_from_user_scenarios(settings, tm
         assert ev["evidence_id"] == frozen["evidence_id"] and [s["id"] for s in kept["scenarios"]] == ["usc_1"]
     finally:
         st.stop()
+
+
+def test_starting_a_finished_project_again_reruns_recovery(settings, tmp_path):
+    """Found on the genuine install: pressing Start again failed recovery with
+    'output directory ... exists and is not empty; refusing to mix outputs'."""
+    from rebuild_controller.services import StudioServices
+    web = Path(__file__).resolve().parents[2] / "fixtures" / "webapp" / "original"
+    settings.limits.max_stage_seconds = 600
+    st = StudioServices(settings)
+    try:
+        cid = st.create_case(name="again", source_root=str(web), output_root=str(tmp_path / "out"), target_language="web",
+                             output_type="web", ai_policy={"mode": "no_ai"})["case_id"]
+        for _ in range(2):
+            st.start_rebuild(cid)
+            for _ in range(400):
+                if st.runner.run_pending() == 0 and not st.jobs.list(None, [JobState.QUEUED, JobState.RUNNING]):
+                    break
+        failed = [(j.stage, j.error) for j in st.jobs.list(cid) if j.state == JobState.FAILED]
+        assert not failed, failed
+        assert len([j for j in st.jobs.list(cid) if j.stage == "deliver" and j.state == JobState.COMPLETED]) == 2
+    finally:
+        st.stop()
