@@ -830,3 +830,34 @@ def test_live_real_small_download_register_and_remove(store, events, settings, t
     assert not Path(rec["path"]).exists()
     after = httpx.get("http://127.0.0.1:11434/api/tags", timeout=5).json()
     assert not any(x["name"].startswith(rec["registered_as"]) for x in after["models"])
+
+
+def test_native_adapter_streams_so_slow_local_generation_is_not_cut_off():
+    """Found on the genuine install: every local model hit a fixed 300 s total timeout while still writing a program.
+    The adapter streams even for non-streaming callers, so the timeout bounds the gap between tokens, not the answer."""
+    seen: list[dict] = []
+
+    class Slow(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            seen.append(json.loads(self.rfile.read(int(self.headers["content-length"]))))
+            self.send_response(200)
+            self.send_header("content-type", "application/x-ndjson")
+            self.end_headers()
+            for word in ("fn ", "main", "() {}"):
+                time.sleep(0.6)            # total 1.8 s > the 1 s timeout below; every gap < 1 s
+                self.wfile.write((json.dumps({"model": "m", "message": {"content": word}, "done": False}) + "\n").encode())
+                self.wfile.flush()
+            self.wfile.write((json.dumps({"model": "m", "message": {"content": ""}, "done": True, "done_reason": "stop",
+                                          "prompt_eval_count": 5, "eval_count": 3}) + "\n").encode())
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), Slow)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        a = OllamaChatAdapter(endpoint=f"http://127.0.0.1:{srv.server_address[1]}", model_context={"m": 8192}, timeout_s=1.0)
+        r = a.complete(Request(model="m", messages=[Message.user("write main")], max_output_tokens=50, stream=False))
+        assert r.text == "fn main() {}" and seen[0]["stream"] is True
+    finally:
+        srv.shutdown(); srv.server_close()

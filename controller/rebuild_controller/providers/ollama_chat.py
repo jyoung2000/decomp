@@ -184,12 +184,16 @@ class OllamaChatAdapter(ProviderAdapter):
 
     def _complete_once(self, request: Request, on_text: OnText | None, num_ctx: int, est: int, mctx: int | None) -> Response:
         body = self._body(request, num_ctx)
-        stream = bool(request.stream)
+        # Always stream from Ollama, even when the caller wants one final answer: the HTTP read timeout then bounds the gap
+        # between tokens instead of the whole generation. A 12-16B model on a consumer GPU can need far longer than any
+        # fixed total timeout to write a program, and cutting it off mid-answer wasted every local attempt.
+        body["stream"] = True
+        stream = True
         prov = self.provider_name
 
         def handler(resp: httpx.Response) -> Response:
             ctype = resp.headers.get("content-type", "")
-            if stream and "ndjson" in ctype or (stream and "json" not in ctype):
+            if "ndjson" in ctype or "json" not in ctype:
                 r = self._parse_stream(resp, on_text)
             else:
                 resp.read()
