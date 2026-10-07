@@ -597,6 +597,15 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         studio.cases.get_case(case_id)
         return activity(studio.events, case_id, since=since, limit=limit)
 
+    @app.get("/cases/{case_id}/log")
+    def case_live_log(case_id: str, since: int = 0, limit: int = 300, level: str | None = None, stage: str | None = None):
+        """Live log: recent plain-English lines (job.log, ai.activity) merged with job state changes. since=0 -> newest `limit`."""
+        from ..livelog import case_log
+        studio.cases.get_case(case_id)
+        if level not in (None, "", "all", "info", "warn", "error"):
+            raise _err("bad_level", "level must be one of info, warn, error")
+        return case_log(studio.events, studio.jobs, case_id, since=since, limit=limit, level=level or None, stage=stage or None)
+
     @app.get("/subscriptions")
     def subscriptions():
         try:

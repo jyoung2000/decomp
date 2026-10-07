@@ -3,7 +3,7 @@ import type {
   AiCall, ApiErrorBody, Budget, Candidate, Capabilities, Case, Comparison, Connection, ControllerEvent, DoctorReport,
   Evidence, Feature, Feedback, Health, HermesStatus, Job, KnowledgeEntry, Module, NewCaseBody, NewFeedbackBody, Plan,
   PlanRevision, Preview, PreviewOpenResult, TaskRoute, ToolSetupEntry, ToolSetupSnapshot,
-  AiActivity, AiPolicy, Ladder, LadderPresetId, ModelCatalogItem, PresetResult,
+  CaseLog, AiActivity, AiPolicy, Ladder, LadderPresetId, ModelCatalogItem, PresetResult,
   IsolationInfo, OriginalConsent, RecordResult, ScenarioList, UserScenario, UserScenarioBody,
 } from './types';
 
@@ -181,6 +181,7 @@ export class Api {
     const r = await this.get<AiActivity[] | { activity?: AiActivity[]; items?: AiActivity[] }>(`/cases/${enc(id)}/ai/activity`);
     return Array.isArray(r) ? r : Array.isArray(r?.activity) ? r.activity : Array.isArray(r?.items) ? r.items : [];
   };
+  caseLog = (id: string, q: { since?: number; limit?: number; level?: string; stage?: string } = {}) => this.get<CaseLog>(`/cases/${enc(id)}/log${qs({ since: q.since ? String(q.since) : undefined, limit: q.limit ? String(q.limit) : undefined, level: q.level, stage: q.stage })}`);
   aiCalls = (caseId?: string) => this.get<AiCall[]>(`/ai/calls${qs({ case_id: caseId })}`);
   knowledge = () => this.get<KnowledgeEntry[]>('/knowledge');
   knowledgeItem = (id: string) => this.get<KnowledgeEntry>(`/knowledge/${enc(id)}`);

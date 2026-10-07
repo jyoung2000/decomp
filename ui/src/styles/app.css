@@ -356,3 +356,30 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 .activity-row { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: var(--s-3); }
 .activity-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .activity-fallback { color: var(--warn); }
+
+/* ---- Live log ------------------------------------------------------------------------------------------------------ */
+.live-log { display: flex; flex-direction: column; gap: var(--s-3); }
+.live-log-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); }
+.live-log-bar .spacer, .live-log .row .spacer { flex: 1; }
+.live-log-bar select { width: auto; min-width: 120px; height: 26px; padding: 0 var(--s-2); font-size: var(--fs-sm); }
+.live-log-feed { max-height: min(60vh, 560px); min-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r-1); background: var(--bg-sunken); }
+.live-log-feed:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.live-log-list { list-style: none; margin: 0; padding: 0; }
+.live-log-row { display: grid; grid-template-columns: 62px 16px minmax(0, auto) minmax(0, 1fr); align-items: baseline; gap: var(--s-2); padding: 5px var(--s-3); border-bottom: 1px solid var(--border); font-size: var(--fs-sm); }
+.live-log-row:last-child { border-bottom: 0; }
+.live-log-row.warn { background: var(--warn-bg); }
+.live-log-row.error { background: var(--bad-bg); }
+.live-log-row.ai { border-left: 3px solid var(--info); }
+.live-log-icon.warn { color: var(--warn); }
+.live-log-icon.error { color: var(--bad); }
+.live-log-icon.info { color: var(--muted); }
+.live-log-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.live-log-text { min-width: 0; overflow-wrap: anywhere; }
+.live-log-detail summary { cursor: pointer; color: var(--fg-2); font-size: var(--fs-xs); }
+.live-log-detail pre { margin: 4px 0 0; padding: var(--s-2); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-1); max-height: 160px; overflow: auto; }
+.live-log-list.compact .live-log-row { padding: 4px 0; background: transparent; }
+@media (max-width: 1100px) {
+  .live-log-row { grid-template-columns: 58px 14px minmax(0, 1fr); }
+  .live-log-chips { grid-column: 3; }
+  .live-log-text { grid-column: 3; }
+}

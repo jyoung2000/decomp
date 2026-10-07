@@ -3,8 +3,9 @@
 // newer state. Nothing here reads a clock: progress only moves when the controller reports it.
 import type {
   Budget, Candidate, Case, ControllerEvent, Eta, Feature, Feedback, Job, JobState, Phase, Plan, PlanItem, PhaseProgress,
-  Outcome, Preview, UnknownScopeEntry, AiActivity,
+  Outcome, Preview, UnknownScopeEntry, AiActivity, LogEntry,
 } from './types';
+import { LIVE_LOG_LIMIT, logEntryFromEvent } from './log';
 
 export interface Tracked<T> {
   value: T;
@@ -44,6 +45,8 @@ export interface CaseState {
   budget: Budget | null;
   /** live `ai.activity` lines (newest last), capped */
   aiActivity: AiActivity[];
+  /** live log rows derived from job.log / job.* / ai.activity events (oldest first), capped */
+  liveLog: LogEntry[];
   latestEvent: ControllerEvent | null;
   latestMeaningful: ControllerEvent | null;
   /** last N non-heartbeat events for this case (raw log view) */
@@ -88,6 +91,7 @@ export function emptyCase(caseId: string): CaseState {
     feedback: {},
     budget: null,
     aiActivity: [],
+    liveLog: [],
     latestEvent: null,
     latestMeaningful: null,
     log: [],
@@ -326,6 +330,9 @@ export function applyEvent(state: StudioState, ev: ControllerEvent): ApplyResult
     latestMeaningful: NOT_MEANINGFUL.has(ev.kind) ? cs.latestMeaningful : ev,
     log: ev.kind === 'job.progress' ? cs.log : [...cs.log, ev].slice(-LOG_LIMIT),
   };
+
+  const le = logEntryFromEvent(ev, (id) => cs.jobs[id]?.value);
+  if (le && !cs.liveLog.some((x) => x.seq === le.seq)) cs = { ...cs, liveLog: [...cs.liveLog, le].slice(-LIVE_LOG_LIMIT) };
 
   const k = ev.kind;
   if (k === 'case.created' && obj(p.case)) {

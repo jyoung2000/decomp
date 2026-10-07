@@ -773,3 +773,29 @@ export interface AiActivity {
   /** controller event seq when it arrived live */
   seq?: number;
 }
+
+// ---- live log (GET /cases/{id}/log and `job.log` / job.* / `ai.activity` events) -----------------------------------------
+export type LogLevel = 'info' | 'warn' | 'error';
+
+/** One plain-English line of the live log. `kind`: stage line (`log`), job state change (`job`) or AI activity (`ai`). */
+export interface LogEntry {
+  seq: number;
+  at: string;
+  kind: 'log' | 'job' | 'ai';
+  level: LogLevel;
+  text: string;
+  detail?: string | null;
+  job_id?: string | null;
+  stage?: string | null;
+  milestone?: string | null;
+  plan_item_id?: string | null;
+  provider?: string | null;
+  model?: string | null;
+  outcome?: string | null;
+}
+
+export interface CaseLog {
+  entries: LogEntry[];
+  latest_seq: number;
+  limit?: number;
+}

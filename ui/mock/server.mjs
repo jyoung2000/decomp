@@ -267,8 +267,40 @@ function revise(cid, reason, patch, changes = []) {
   plan.revisions.push({ revision: plan.revision, reason, created_at: now(), changes });
   emit('plan.revised', { revision: plan.revision, reason, progress: plan.progress, eta: plan.eta, unknown_scope: plan.unknown_scope, items: [...plan.items.values()] }, cid);
 }
-function log(j, message) {
-  emit('job.log', { job_id: j.job_id, message }, j.case_id, j.job_id);
+function log(j, text, level = 'info', detail = null) {
+  // same shape as the controller's ctx.log(): {job_id, stage, milestone, plan_item_id, level, text, detail, at} (+ legacy `message`)
+  emit('job.log', { job_id: j.job_id, stage: j.stage, milestone: j.milestone_id ?? null, plan_item_id: null, level, text, detail, at: now(), message: text }, j.case_id, j.job_id);
+}
+// GET /cases/{id}/log: job.log / ai.activity rows merged with job state transitions, rendered as text (mirrors controller livelog.py)
+const LOG_KINDS = new Set(['job.log', 'job.started', 'job.completed', 'job.failed', 'job.blocked', 'job.cancelled', 'job.retry', 'ai.activity']);
+const first = (x) => String(x ?? '').split('\n').find((l) => l.trim())?.trim().slice(0, 300) ?? '';
+function logRow(e) {
+  const p = e.payload ?? {};
+  const jid = p.job_id ?? e.job_id ?? null;
+  const job = jid ? S.jobs.get(jid) : null;
+  const stage = p.stage ?? job?.stage ?? null;
+  const title = p.title ?? job?.title ?? stage ?? 'job';
+  const base = { seq: e.seq, at: p.at ?? e.ts, job_id: jid, stage, milestone: p.milestone ?? job?.milestone_id ?? null, plan_item_id: p.plan_item_id ?? null, detail: null };
+  switch (e.kind) {
+    case 'job.log': return (p.text ?? p.message) ? { ...base, kind: 'log', level: ['warn', 'error'].includes(p.level) ? p.level : 'info', text: String(p.text ?? p.message), detail: p.detail ?? null } : null;
+    case 'ai.activity': return p.text ? { ...base, kind: 'ai', level: ['failed', 'error', 'refused', 'timeout'].includes(p.outcome) ? 'warn' : 'info', text: String(p.text), provider: p.provider ?? null, model: p.model ?? null, outcome: p.outcome ?? null } : null;
+    case 'job.started': return { ...base, kind: 'job', level: 'info', text: `Started: ${title}${p.attempt > 1 ? ` (attempt ${p.attempt})` : ''}` };
+    case 'job.completed': return { ...base, kind: 'job', level: 'info', text: `Finished: ${title}` };
+    case 'job.failed': return { ...base, kind: 'job', level: 'error', text: `Failed: ${title}${p.error ? ` — ${first(p.error)}` : ''}` };
+    case 'job.cancelled': return { ...base, kind: 'job', level: 'info', text: `Cancelled: ${title}` };
+    case 'job.blocked': return { ...base, kind: 'job', level: 'warn', text: `Waiting: ${title} — ${first(p.blocker ?? p.error ?? 'blocked')}` };
+    case 'job.retry': return { ...base, kind: 'job', level: 'warn', text: `Retrying ${title}: ${first(p.error)}` };
+    default: return null;
+  }
+}
+function caseLog(cid, q) {
+  const since = Number(q.get('since') ?? 0) || 0;
+  const limit = Math.min(Math.max(Number(q.get('limit') ?? 300) || 300, 1), 2000);
+  const rank = { info: 0, warn: 1, error: 2 }[q.get('level') ?? ''] ?? 0;
+  const stage = q.get('stage') || null;
+  const rows = S.events.filter((e) => e.case_id === cid && e.seq > since && LOG_KINDS.has(e.kind)).map(logRow)
+    .filter((r) => r && ({ info: 0, warn: 1, error: 2 }[r.level] >= rank) && (!stage || r.stage === stage));
+  return { entries: since > 0 ? rows.slice(0, limit) : rows.slice(-limit), latest_seq: S.seq, limit };
 }
 function setFeature(fid, patch) {
   const f = S.features.get(fid);
@@ -334,12 +366,14 @@ const STEPS = [
     startJob(j);
     setItem(DEMO, 'M1', { status: 'running', job_ids: [j.job_id] });
     progressJob(j, { done: 12, total: null, unit: 'files', current: 'Scanning InventoryTool.exe' });
-    log(j, 'inventory: walking source tree (bounded to 500000 files)');
+    log(j, 'Scanning the installation folder C:\\Demo\\InventoryTool…');
   },
   // 2: more discovery, evidence
   () => {
     const j = jobsOf('inventory');
     progressJob(j, { done: 48, total: null, unit: 'files', current: 'Scanning data/plugins' });
+    log(j, 'Scanning the installation folder… 48 files so far');
+    log(j, 'Not analysed: data/plugins/a.plg — unknown binary format (kept as evidence only)', 'warn');
     for (const [rel, fmt, prof, size] of [['InventoryTool.exe', 'pe', 'native', 1843200], ['core.dll', 'pe', 'native', 512000], ['data/items.ini', 'ini', 'data', 2048]]) {
       const m = { module_id: 'mod_' + sha(rel).slice(0, 12), case_id: DEMO, rel_path: rel, sha256: sha(rel), size, format: fmt, profile: prof, arch: fmt === 'pe' ? 'x86_64' : null };
       S.modules.set(m.module_id, m);
@@ -353,6 +387,7 @@ const STEPS = [
   () => {
     const j = jobsOf('inventory');
     progressJob(j, { done: 52, total: 52, unit: 'files' });
+    log(j, 'Scanned the installation folder: 52 files, 3 modules (native_pe)');
     finishJob(j);
     setItem(DEMO, 'M1', { status: 'completed' });
     setItem(DEMO, 'M1.1', { status: 'completed', files: ['reports/inventory.json'] });
@@ -361,6 +396,7 @@ const STEPS = [
     setItem(DEMO, 'M2', { status: 'running', job_ids: [r.job_id] });
     revise(DEMO, 'Discovery finished: 3 modules, 8 functions to recover', { progress: { analysis: { done: 52, total: 52, unit: 'files' }, recovery: { done: 0, total: 8, unit: 'functions' }, implementation: { done: 0, total: null }, build: { done: 0, total: null }, verification: { done: 0, total: null } } }, ['M1 completed', 'Recovery scope set to 8 functions']);
     progressJob(r, { done: 0, total: 8, unit: 'functions', current: 'sub_401000' });
+    log(r, 'Analysing InventoryTool.exe with Rizin 0.7 + Ghidra: 0 of 8 functions');
   },
   // 4: recovery progress
   () => {
@@ -370,12 +406,13 @@ const STEPS = [
     plan.progress = { ...plan.progress, recovery: { done: 4, total: 8, unit: 'functions' } };
     emit('plan.item', { item: plan.items.get('M2.1'), progress: plan.progress }, DEMO);
     setItem(DEMO, 'M2.1', { status: 'running' });
-    log(r, 'decompiled list_items (142 instructions)');
+    log(r, 'Analysing InventoryTool.exe with Rizin 0.7 + Ghidra: 4 of 8 functions');
   },
   // 5: scope grows (denominator change) + ETA
   () => {
     const r = jobsOf('recover');
     progressJob(r, { done: 6, total: 11, unit: 'functions', current: 'plugin_load @ 0x402300' });
+    log(r, 'Found 3 more functions referenced from data/plugins; now 6 of 11', 'warn');
     revise(DEMO, 'Found 3 more functions referenced from data/plugins', {
       progress: { ...S.plans.get(DEMO).progress, recovery: { done: 6, total: 11, unit: 'functions' } },
       eta: { seconds: 1800, uncertainty: 900, updated_at: now() },
@@ -392,9 +429,13 @@ const STEPS = [
     setItem(DEMO, 'M3', { status: 'completed', files: ['source/index.html', 'source/app.js', 'source/styles.css'] });
     const b = newJob(DEMO, 'build', 'Build PWA', { milestone_id: 'M4' });
     startJob(b);
+    log(b, 'Building the web candidate…');
     const c = makeCandidate(DEMO, 1);
     buildCandidate(c);
     progressJob(b, { done: 1, total: 1, unit: 'builds' });
+    log(b, 'Built the web candidate: 6 files copied');
+    log(b, 'Running the original in an isolated process: scenario 3 of 8');
+    log(b, 'Comparing: 6 of 8 scenarios match', 'warn', 'screens: 1.9% of pixels differ (limit 1%)\nfiles: skipped, saving is not implemented in this candidate');
     finishJob(b);
     setItem(DEMO, 'M4', { status: 'completed', files: ['dist/v1/index.html', 'dist/v1/manifest.webmanifest'] });
     const real = publishPreview(c, 'real', 'Inventory Tool — web build v1');
@@ -661,6 +702,7 @@ async function handle(req, res) {
         return send(res, 200, c.ai_policy);
       }
     }
+    if (sub === 'log' && m === 'GET') return send(res, 200, caseLog(cid, url.searchParams));
     if (sub === 'ai/activity' && m === 'GET') return send(res, 200, S.activity.get(cid) ?? []);
     if (sub === 'pause' && m === 'POST') {
       setCase(cid, 'paused');

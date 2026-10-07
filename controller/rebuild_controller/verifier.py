@@ -57,7 +57,7 @@ class Verifier:
         return ev, self.cases.evidence_body(ev["evidence_id"])
 
     # -- verification ---------------------------------------------------
-    def verify_candidate(self, case_id: str, candidate_id: str, *, feature_ids: list[str] | None = None, progress=None) -> dict[str, Any]:
+    def verify_candidate(self, case_id: str, candidate_id: str, *, feature_ids: list[str] | None = None, progress=None, log=None) -> dict[str, Any]:
         cand = self.candidates.get(candidate_id)
         if cand["build_status"] != "built" or not cand["dist_dir"]:
             raise ValueError("candidate is not built; nothing to verify")
@@ -74,10 +74,14 @@ class Verifier:
         artifacts_root.mkdir(parents=True)
         scenarios = baseline.get("scenarios", [])
         wanted = set(feature_ids or [])
+        todo = [sc for sc in scenarios if not wanted or sc.get("feature_id") in wanted]
+        say = log or (lambda *a, **k: None)
+        say(f"Comparing the rebuilt program with the original: {len(todo)} scenario(s) to run")
         for i, sc in enumerate(scenarios):
             fid = sc.get("feature_id")
             if wanted and fid not in wanted:
                 continue
+            say(f"Running the rebuilt program: scenario {len(scenario_results) + 1} of {len(todo)} ({sc.get('title') or sc['id']})", key="verify")
             work = artifacts_root / f"scenario-{sc['id']}"
             try:
                 if baseline.get("kind") == "web":
@@ -90,6 +94,12 @@ class Verifier:
             scenario_results.append({"scenario": sc["id"], "feature_id": fid, "comparisons": recorded,
                                      "verdict": "pass" if all(c.verdict == "pass" for c in comps) else ("error" if any(c.verdict == "error" for c in comps) else "fail")})
             results_by_feature.setdefault(fid or f"scenario:{sc['id']}", []).extend(comps)
+            ok_n = sum(1 for r in scenario_results if r["verdict"] == "pass")
+            say(f"Comparing: {ok_n} of {len(scenario_results)} scenarios match so far", "warn" if scenario_results[-1]["verdict"] != "pass" else "info", key="compare")
+            if scenario_results[-1]["verdict"] != "pass":
+                bad = [c for c in comps if c.verdict != "pass"][:1]
+                if bad:
+                    say(f"Scenario '{sc.get('title') or sc['id']}' differs in {bad[0].channel} ({bad[0].verdict})", "warn")
             if progress:
                 progress({"scenarios_done": i + 1, "scenarios_total": len(scenarios), "unit": "scenarios"})
         # per-feature verdicts (only this module writes them)

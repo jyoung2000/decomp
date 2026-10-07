@@ -17,6 +17,7 @@ import { FeedbackTab } from './workspace/Feedback';
 import { ComparisonsTab } from './workspace/Comparisons';
 import { AdvancedTab } from './workspace/Advanced';
 import { AiTab } from './workspace/AiTab';
+import { LiveLogTab } from './workspace/LiveLog';
 import { ScenariosTab } from './workspace/Scenarios';
 import { ConsentCard, PERMISSION_RE } from '../components/ConsentCard';
 
@@ -132,6 +133,7 @@ export function WorkspaceView() {
             { to: `${base}/feedback`, label: 'Feedback', badge: openFeedback || null, testId: 'tab-feedback' },
             { to: `${base}/scenarios`, label: 'Scenarios', testId: 'tab-scenarios' },
             { to: `${base}/comparisons`, label: 'Comparisons', testId: 'tab-comparisons' },
+            { to: `${base}/live-log`, label: 'Live log', testId: 'tab-live-log' },
             { to: `${base}/ai`, label: 'AI', testId: 'tab-ai' },
             { to: `${base}/advanced`, label: 'Advanced', testId: 'tab-advanced' },
           ]}
@@ -147,6 +149,7 @@ export function WorkspaceView() {
           <Route path="feedback" element={<FeedbackTab caseId={caseId} />} />
           <Route path="scenarios" element={<ScenariosTab caseId={caseId} />} />
           <Route path="comparisons" element={<ComparisonsTab caseId={caseId} />} />
+          <Route path="live-log" element={<LiveLogTab caseId={caseId} />} />
           <Route path="ai" element={<AiTab caseId={caseId} />} />
           <Route path="advanced" element={<AdvancedTab caseId={caseId} />} />
           <Route path="*" element={<Navigate to={`${base}/overview`} replace />} />

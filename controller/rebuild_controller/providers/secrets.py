@@ -51,6 +51,7 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"sk-[A-Za-z0-9_\-]{16,}"), REDACTED),
     (re.compile(r"AIza[0-9A-Za-z_\-]{20,}"), REDACTED),
     (re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=\-]{8,}"), "Bearer " + REDACTED),
+    (re.compile(r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?)(?:basic|digest|token|negotiate|ntlm)\s+[^\s\"',;}]{6,}"), r"\1" + REDACTED),
     (re.compile(r"(?i)([?&](?:key|api_key|apikey|access_token)=)[^&\s\"']+"), r"\1" + REDACTED),
     (re.compile(r"(?i)((?:x-api-key|x-goog-api-key|api[_-]?key|authorization)[\"']?\s*[:=]\s*[\"']?)(?!\[REDACTED\])[^\s\"',;}]{6,}"),
      r"\1" + REDACTED),

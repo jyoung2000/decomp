@@ -61,3 +61,17 @@ Implemented in `controller/rebuild_controller/api/scenario_routes.py` (+ `user_s
 | POST | `/cases/{id}/scenarios/record` | `{scenario_ids?, program?}`: runs the ORIGINAL through the isolated runner and freezes a NEW baseline revision that carries earlier scenarios over. 409 `original_execution_not_permitted` ("Original execution needs your permission: ...") without recorded consent |
 
 `{work}` in an argument is replaced by the run's private scratch folder; the folder path is masked as `{work}` in recorded and compared output. Recording a new revision marks earlier verification results stale.
+
+## Live log
+
+Stages write plain-English lines with `ctx.log(text, level="info"|"warn"|"error", detail=None, key=None)`. Each becomes a persisted `job.log` event
+`{job_id, stage, milestone, plan_item_id, level, text, detail, at, message}` (`message` repeats `text` for older clients). Text is capped at 400 chars,
+`detail` (for example the last few stderr lines of a failed tool) at 1500; both go through the providers' `redact()` and prompts are never accepted.
+Rate limit: at most 5 info lines per second per job (extra progress lines coalesce to the latest per `key`, released on the next window or when the job
+ends); warnings and errors have their own 5/s budget so problems are never starved.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/cases/{id}/log?since=&limit=&level=&stage=` | `{entries:[{seq, at, kind:"log"\|"job"\|"ai", level, text, detail, job_id, stage, milestone, plan_item_id, (provider, model, outcome)}], latest_seq, limit}` oldest first. `since=0` returns the newest `limit` (default 300, max 2000); `since>0` returns entries after that seq. `level=warn` keeps warnings and errors, `level=error` errors only. Merges `job.log`, `ai.activity` and job state changes (`job.started/completed/failed/blocked/cancelled/retry`) rendered as text. |
+
+The UI's Live log tab loads this once, then appends live events and dedupes by `seq`.

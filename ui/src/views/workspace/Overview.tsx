@@ -10,6 +10,7 @@ import { describeEvent, describeScopeNote, jobCounts, phaseViews, values } from 
 import { clockTime, duration, itemLabel, parseTime, timeAgo, usd } from '../../lib/format';
 import { useApi, useCaseState, useResource, useStore, useStoreSelector } from '../../lib/store';
 import { openPath } from '../../lib/tauri';
+import { NowDoingStrip } from './LiveLog';
 import type { Job } from '../../lib/types';
 
 export function OverviewTab({ caseId }: { caseId: string }) {
@@ -93,6 +94,8 @@ export function OverviewTab({ caseId }: { caseId: string }) {
           <span className="small muted">{workersActive != null ? `${workersActive} worker${workersActive === 1 ? '' : 's'} active` : 'worker count not reported yet'}</span>
         </div>
       </section>
+
+      <NowDoingStrip caseId={caseId} />
 
       {outcome && <OutcomePanel outcome={outcome} />}
       <ConsentCard caseId={caseId} onlyWhenGranted />

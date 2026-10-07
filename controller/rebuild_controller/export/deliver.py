@@ -23,6 +23,7 @@ def deliver(ctx: StageContext) -> dict[str, Any]:
         raise StageError("no candidate to deliver", blocker="the implementation step produced no candidate")
     cand = st.candidates.get(cid)
     out_root = Path(case["output_root"])
+    ctx.log(f"Delivering the rebuilt project to {out_root}…")
     assert_output_not_in_source(out_root, Path(case["source_root"]))
     staging = st.cases.case_root(case["case_id"]) / "publish.staging"
     if staging.exists():
@@ -82,11 +83,13 @@ def deliver(ctx: StageContext) -> dict[str, Any]:
     if conflicts:
         st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-DELIVER"), status="blocked",
                             blockers=[f"output conflict: {', '.join(conflicts)} exist and were not written by Rebuild Studio; choose an empty output folder or remove them"])
+        ctx.log(f"Cannot write to {out_root}: existing files were not made by Rebuild Studio ({', '.join(Path(c).name for c in conflicts)})", "error")
         raise StageError(f"output conflicts: {conflicts}", blocker="existing non-Rebuild-Studio files in output; pick another folder", )
     st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-DELIVER"), status="completed", files=[str(out_root)])
     st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-PACKAGE"), status="completed" if cand["build_status"] == "built" else "failed", files=[str(out_root / "dist")])
     st.cases.set_case_status(case["case_id"], "delivered")
     st.plan.revise(case["case_id"], "delivered output")
+    ctx.log(f"Delivered to {out_root}: {len(files)} files" + (" (placeholder only, not a working remake)" if scaffold else ""), "warn" if scaffold else "info")
     return {"output_root": str(out_root), "files": len(files), "report": report.get("summary"), "verification": manifest["verification"], "candidate_id": cid,
             "scaffold_only": scaffold, "outcome": manifest["outcome"]}
 

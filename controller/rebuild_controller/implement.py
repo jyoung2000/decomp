@@ -503,7 +503,8 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
     stop: tuple[str, str] | None = None            # (code, message)
     prev_id, feedback, history = scaffold_id, None, []
     verified = False
-    ctx.log(f"implement loop: up to {pol.max_attempts} attempts, budget ${pol.budget_usd:.2f}, resuming with {len(records)} recorded attempt(s)")
+    ctx.log(f"AI implementation: up to {pol.max_attempts} attempts, budget ${pol.budget_usd:.2f}"
+            + (f"; resuming after {len(records)} recorded attempt(s)" if records else ""))
     n = 0
     while n < pol.max_attempts:
         n += 1
@@ -511,6 +512,7 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
         rec = records.get(n)
         try:
             if rec is None:
+                ctx.log(f"AI attempt {n} of {pol.max_attempts}: asking the model for the code" + (" (fixing what the last attempt got wrong)" if n > 1 else "") + "…")
                 rec = _run_attempt(st, ctx, case, pol, n=n, loop_id=loop_id, prev_id=prev_id, scaffold_id=scaffold_id, packet=packet,
                                    feedback=feedback, history=history, has_baseline=has_baseline)
                 records[n] = rec
@@ -543,6 +545,7 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
             _act(st, ctx, case, f"Next: repair attempt {n + 1} of {pol.max_attempts}", "next", origin="deterministic", outcome="repair",
                  plan_item_id=st.plan.milestone_id(case_id, "M-FIX"), candidate_id=rec.get("candidate_id"))
     stop = stop or ("attempts_exhausted", f"Stopped after {pol.max_attempts} attempts without a verified match.")
+    ctx.log(f"AI implementation finished: {stop[1]}", "info" if stop[0] == "verified" else "warn")
     return _finish(st, ctx, case, pol, records, stop, scaffold_id, has_baseline, verified)
 
 
@@ -713,7 +716,7 @@ def _finish(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, r
         except Cancelled:
             raise
         except Exception as e:  # noqa: BLE001
-            ctx.log(f"scaffold could not be built: {redact(str(e))[:300]}")
+            ctx.log(f"The placeholder project could not be built: {redact(str(e))[:300]}", "warn")
     for c in st.candidates.list(case_id):
         meta = dict(c["meta"])
         if bool(meta.get("final")) != (c["candidate_id"] == final_id):

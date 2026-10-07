@@ -40,6 +40,8 @@ def build_web(ctx: StageContext, source_dir: Path, dist_dir: Path) -> dict[str, 
     else:
         pwa["issues"].append("no service worker registration found")
     pwa["installable_static_checks"] = not pwa["issues"]
+    ctx.log(f"Built the web candidate: {sum(1 for p in dist_dir.rglob('*') if p.is_file())} files copied"
+            + (f"; {len(pwa['issues'])} installability note(s)" if pwa["issues"] else ""))
     return {"launch": {"type": "web", "root": ".", "entry": "index.html"}, "pwa": pwa, "files": sum(1 for p in dist_dir.rglob("*") if p.is_file()),
             "note": "static checks only; installability/offline/cache-upgrade are verified by the browser comparator"}
 

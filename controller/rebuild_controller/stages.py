@@ -25,6 +25,18 @@ def studio_of(ctx: StageContext):
     return ctx.services["studio"]
 
 
+def tool_label(ctx: StageContext, backend_id: str, fallback: str) -> str:
+    """'ILSpy 9.1' style label for the live log, from the already-probed backend info (never triggers a new probe)."""
+    try:
+        info = ctx.services["studio"].registry._cache.get(backend_id)      # noqa: SLF001 - cached probe only
+        for t in (info.tools if info else []):
+            if t.version and t.availability != Availability.MISSING:
+                return f"{fallback} {str(t.version).lstrip('v')[:20]}"
+    except Exception:  # noqa: BLE001
+        pass
+    return fallback
+
+
 def register_stages(reg: StageRegistry) -> None:
     reg.add("inventory", stage_inventory)
     reg.add("dependency_graph", stage_dependency_graph)
@@ -50,7 +62,14 @@ def stage_inventory(ctx: StageContext) -> dict[str, Any]:
     st = studio_of(ctx)
     case = st.cases.get_case(ctx.job.case_id)
     root = Path(case["source_root"])
-    inv = inventory_root(root, ctx.limits, progress=lambda p: ctx.progress(**p))
+    ctx.log(f"Scanning the installation folder {root}…")
+
+    def _scan_progress(p: dict[str, Any]) -> None:
+        ctx.progress(**p)
+        ctx.log(f"Scanning the installation folder… {p.get('files_scanned', 0)} files so far", key="scan")
+    inv = inventory_root(root, ctx.limits, progress=_scan_progress)
+    ctx.log(f"Scanned the installation folder: {inv['file_count']} files, {inv['module_count']} modules ({inv['profile']['primary']})"
+            + (" — stopped at the scan limit" if inv["truncated"] else ""), "warn" if inv["truncated"] else "info")
     ev = st.cases.add_evidence(case["case_id"], "inventory", "Installation inventory", body=inv, inputs={"root": str(root), "limit": ctx.limits.max_inventory_files},
                                meta={"file_count": inv["file_count"], "module_count": inv["module_count"], "truncated": inv["truncated"], "profile": inv["profile"]["primary"]})
     st.plan.add_evidence(st.plan.milestone_id(case["case_id"], "M-ANALYSIS"), ev["evidence_id"])
@@ -91,8 +110,10 @@ def stage_inventory(ctx: StageContext) -> dict[str, Any]:
             for jid in created:
                 st.jobs.add_dependency(bj.job_id, jid)
     for u in unsupported:
+        ctx.log(f"Not analysed: {u['module']} — {u['reason']}", "warn")
         st.plan.add_item(case["case_id"], title=f"Unsupported: {u['module']}", outcome=u["reason"], kind="unsupported", reason="detected unsupported profile")
     ctx.progress(files_scanned=inv["file_count"], modules=inv["module_count"], recovery_jobs=len(created), unsupported=len(unsupported))
+    ctx.log(f"Planned {len(created)} recovery job(s)" + (f"; {len(unsupported)} module(s) cannot be analysed" if unsupported else ""))
     return {"evidence_id": ev["evidence_id"], "profile": inv["profile"], "modules": len(modules), "recovery_jobs": created, "unsupported": unsupported,
             "truncated": inv["truncated"], "unknown_scope": inv["unknown_scope"]}
 
@@ -116,6 +137,7 @@ def stage_dependency_graph(ctx: StageContext) -> dict[str, Any]:
                 pass
     ev = st.cases.add_evidence(ctx.job.case_id, "dependency_graph", "Dependency graph", body=g, inputs={"inventory": evs[-1]["evidence_id"]})
     st.plan.add_evidence(st.plan.milestone_id(ctx.job.case_id, "M-ASSETS"), ev["evidence_id"])
+    ctx.log(f"Mapped dependencies: {len(g['edges'])} links between files, {sum(len(v) for v in g['external'].values())} external references")
     return {"evidence_id": ev["evidence_id"], "edges": len(g["edges"]), "external": sum(len(v) for v in g["external"].values())}
 
 
@@ -128,6 +150,7 @@ def _backend(ctx: StageContext, backend_id: str, what: str):
     info = st.registry.info(backend_id)
     if info.availability == Availability.MISSING:
         detail = "; ".join(t.detail for t in info.tools if t.availability == Availability.MISSING)
+        ctx.log(f"{what} is not installed, so this step is waiting", "warn", detail)
         raise StageError(f"{what} is not available: {detail}", blocker=f"open Tools (left sidebar) and install {what}, then press Resume")
     return b
 
@@ -138,6 +161,9 @@ def _result(res, what: str) -> dict[str, Any]:
     return {"data": res.data, "evidence_ids": res.evidence_ids, "truncated": res.truncated}
 
 
+_OP_TEXT = {"info": "file header", "imports": "imports", "exports": "exports", "strings": "strings", "analyze": "code analysis", "functions": "function list"}
+
+
 def stage_analyze_module(ctx: StageContext) -> dict[str, Any]:
     st = studio_of(ctx)
     mod = st.cases.get_module(ctx.job.inputs["module_id"])
@@ -145,18 +171,22 @@ def stage_analyze_module(ctx: StageContext) -> dict[str, Any]:
     path = Path(case["source_root"]) / mod["rel_path"]
     b = _backend(ctx, "rizin", "Rizin")
     out: dict[str, Any] = {"module_id": mod["module_id"], "evidence_ids": []}
+    rz = tool_label(ctx, "rizin", "Rizin")
+    ctx.log(f"Analysing {mod['rel_path']} with {rz}…")
     for op in ("info", "imports", "exports", "strings", "analyze", "functions"):
         res = b.call(op, ctx, case_id=case["case_id"], module_id=mod["module_id"])
         r = _result(res, f"rizin {op}")
         out["evidence_ids"] += r["evidence_ids"]
         out[op] = {k: v for k, v in r["data"].items() if k in ("count", "functions", "decompiler", "rizin_version", "truncated", "arch", "bits")}
         ctx.progress(module=mod["rel_path"], op=op)
+        ctx.log(f"{mod['rel_path']}: {_OP_TEXT[op]} done", key=f"op-{op}")
     funcs = res.data.get("functions") or []
     out["function_count"] = len(funcs) if isinstance(funcs, list) else res.data.get("count")
     # decompile a bounded set of functions as evidence (all functions are available on demand via briefing)
     decompiled, errors = 0, 0
     names = [f.get("name") for f in funcs if isinstance(f, dict) and f.get("name")] if isinstance(funcs, list) else []
     limit = int(case.get("settings", {}).get("decompile_limit", 200))
+    ctx.log(f"Found {len(names)} functions in {mod['rel_path']}; decompiling up to {min(limit, len(names))} of them")
     for i, name in enumerate(names[:limit]):
         try:
             r = b.call("decompile", ctx, case_id=case["case_id"], module_id=mod["module_id"], function=name)
@@ -168,6 +198,9 @@ def stage_analyze_module(ctx: StageContext) -> dict[str, Any]:
             errors += 1
         if i % 10 == 0:
             ctx.progress(module=mod["rel_path"], functions_decompiled=decompiled, functions_total=len(names), decompile_errors=errors)
+            ctx.log(f"Analysing {mod['rel_path']} with {rz}: {decompiled} of {min(limit, len(names))} functions", key="decomp")
+    ctx.log(f"Analysed {mod['rel_path']}: {decompiled} of {min(limit, len(names))} functions decompiled"
+            + (f", {errors} could not be" if errors else ""), "warn" if errors else "info")
     out.update({"decompiled": decompiled, "decompile_errors": errors, "decompile_limit": limit, "functions_total": len(names)})
     ev = st.cases.add_evidence(case["case_id"], "module_report", f"Native analysis: {mod['rel_path']}", body=out, module_id=mod["module_id"],
                                inputs={"module_sha": mod["sha256"], "ops": "info,imports,exports,strings,analyze,functions,decompile", "limit": limit}, producer="rizin")
@@ -183,13 +216,23 @@ def stage_recover_managed(ctx: StageContext) -> dict[str, Any]:
     b = _backend(ctx, "ilspy", "ILSpy (ilspycmd)")
     out_dir = st.cases.case_root(case["case_id"]) / "recovered" / mod["module_id"]
     out_dir.mkdir(parents=True, exist_ok=True)
+    il = tool_label(ctx, "ilspy", "ILSpy")
+    ctx.log(f"Recovering C# from {mod['rel_path']} with {il}…")
     meta = _result(b.call("metadata", ctx, case_id=case["case_id"], module_id=mod["module_id"], module_path=str(path)), "ilspy metadata")
     dec = _result(b.call("decompile", ctx, case_id=case["case_id"], module_id=mod["module_id"], module_path=str(path), out_dir=str(out_dir)), "ilspy decompile")
+    ctx.log(f"Recovered C# from {mod['rel_path']} with {il}" + (f": {n_files} source files" if (n_files := _count_files(out_dir)) else ""))
     out = {"module_id": mod["module_id"], "out_dir": str(out_dir), "metadata": meta["data"], "decompile": dec["data"], "evidence_ids": meta["evidence_ids"] + dec["evidence_ids"]}
     ev = st.cases.add_evidence(case["case_id"], "module_report", f"Managed recovery: {mod['rel_path']}", body=out, module_id=mod["module_id"],
                                inputs={"module_sha": mod["sha256"], "backend": "ilspy"}, producer="ilspy")
     st.plan.add_evidence(st.plan.milestone_id(case["case_id"], "M-RECOVERY"), ev["evidence_id"])
     return out
+
+
+def _count_files(d: Path) -> int:
+    try:
+        return sum(1 for p in d.rglob("*") if p.is_file())
+    except OSError:
+        return 0
 
 
 def _registers_service_worker(root: Path, max_files: int = 200, max_bytes: int = 2_000_000) -> bool:
@@ -221,6 +264,7 @@ def stage_recover_jvm(ctx: StageContext) -> dict[str, Any]:
         raise StageError("backend jvm not registered", blocker="install the Java decompiler (Tools page)")
     out_dir = st.cases.case_root(case["case_id"]) / "recovered" / mod["module_id"]
     out_dir.mkdir(parents=True, exist_ok=True)
+    ctx.log(f"Recovering Java source from {mod['rel_path']}…")
     ins = _result(b.call("inspect", ctx, case_id=case["case_id"], module_id=mod["module_id"], module_path=str(path)), "jvm inspect")
     dec = b.call("decompile", ctx, case_id=case["case_id"], module_id=mod["module_id"], module_path=str(path), out_dir=str(out_dir))
     out = {"module_id": mod["module_id"], "out_dir": str(out_dir), "inspect": ins["data"], "decompile": dec.data if dec.ok else None,
@@ -228,6 +272,7 @@ def stage_recover_jvm(ctx: StageContext) -> dict[str, Any]:
     ev = st.cases.add_evidence(case["case_id"], "module_report", f"JVM recovery: {mod['rel_path']}", body=out, module_id=mod["module_id"],
                                inputs={"module_sha": mod["sha256"], "backend": "jvm"}, producer="jvm")
     st.plan.add_evidence(st.plan.milestone_id(case["case_id"], "M-RECOVERY"), ev["evidence_id"])
+    ctx.log(f"Recovered Java source from {mod['rel_path']}" if dec.ok else f"Java decompiling of {mod['rel_path']} did not finish: {dec.error}", "info" if dec.ok else "error")
     if not dec.ok:
         data = dec.data or {}
         raise StageError(f"jvm decompile: {dec.error}", blocker=f"{data.get('blocker') or dec.error}. Next: {data.get('next_action') or 'install the Java decompiler on the Tools page'}")
@@ -242,8 +287,10 @@ def stage_recover_engine(ctx: StageContext) -> dict[str, Any]:
     b = _backend(ctx, "gdre", "GDRE tools")
     out_dir = st.cases.case_root(case["case_id"]) / "recovered" / mod["module_id"]
     out_dir.mkdir(parents=True, exist_ok=True)
+    ctx.log(f"Recovering the Godot project from {mod['rel_path']}…")
     det = _result(b.call("detect", ctx, case_id=case["case_id"], module_id=mod["module_id"], path=str(path)), "gdre detect")
     rec = _result(b.call("recover", ctx, case_id=case["case_id"], module_id=mod["module_id"], pck=str(path), out_dir=str(out_dir)), "gdre recover")
+    ctx.log(f"Recovered the Godot project: {_count_files(out_dir)} files")
     out = {"module_id": mod["module_id"], "out_dir": str(out_dir), "detect": det["data"], "recover": rec["data"], "evidence_ids": det["evidence_ids"] + rec["evidence_ids"]}
     ev = st.cases.add_evidence(case["case_id"], "module_report", f"Engine recovery: {mod['rel_path']}", body=out, module_id=mod["module_id"],
                                inputs={"module_sha": mod["sha256"], "backend": "gdre"}, producer="gdre")
@@ -259,8 +306,10 @@ def stage_recover_web(ctx: StageContext) -> dict[str, Any]:
     out_dir = st.cases.case_root(case["case_id"]) / "recovered" / "web"
     out_dir.mkdir(parents=True, exist_ok=True)
     mid = ctx.job.inputs.get("module_id")
+    ctx.log(f"Recovering the web app's HTML, CSS and JavaScript from {root}…")
     ins = _result(b.call("inspect", ctx, case_id=case["case_id"], module_id=mid, root=str(root)), "web inspect")
     ext = _result(b.call("extract", ctx, case_id=case["case_id"], module_id=mid, root=str(root), out_dir=str(out_dir)), "web extract")
+    ctx.log(f"Recovered the web app: {_count_files(out_dir)} files extracted")
     out = {"out_dir": str(out_dir), "inspect": ins["data"], "extract": ext["data"], "evidence_ids": ins["evidence_ids"] + ext["evidence_ids"]}
     ev = st.cases.add_evidence(case["case_id"], "module_report", "Web/JS recovery", body=out, module_id=mid, inputs={"root": str(root), "backend": "jsweb"}, producer="jsweb")
     st.plan.add_evidence(st.plan.milestone_id(case["case_id"], "M-RECOVERY"), ev["evidence_id"])
@@ -282,7 +331,7 @@ def stage_discover_features(ctx: StageContext) -> dict[str, Any]:
                 if sc.get("feature_id") and sc["feature_id"] not in {x.get("feature_id") for x in scenarios}:
                     scenarios.append({"id": sc["id"], "feature_id": sc["feature_id"], "title": sc.get("title", sc["id"]), "description": "declared by frozen oracle"})
         except Exception as e:
-            ctx.log(f"baseline file could not be read for feature discovery: {e}")
+            ctx.log(f"The baseline file could not be read for feature discovery: {e}", "warn")
     for sc in scenarios:
         fid = sc.get("feature_id") or f"scenario.{sc['id']}"
         f = st.ledger.add(case["case_id"], sc.get("title", fid), description=sc.get("description", ""), origin="user", critical=bool(sc.get("critical")),
@@ -315,6 +364,7 @@ def stage_discover_features(ctx: StageContext) -> dict[str, Any]:
         st.plan.update_item(unknown, status="blocked", blockers=["runtime observation not authorized: enable 'execute original' in the launch configuration"])
     st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-FEATURES"), status="completed")
     st.plan.revise(case["case_id"], f"feature discovery: {len(added)} declared features, {hyps} static hypotheses")
+    ctx.log(f"Listed {len(added)} behaviours to check and {hyps} further guesses from the code (guesses stay unverified until measured)")
     return {"declared": added, "static_hypotheses": hyps, "pwa": bool(pwa)}
 
 
@@ -328,6 +378,7 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
         bl = load_baseline_file(Path(lp["baseline_file"]), Path(case["source_root"]))
         bl = _import_screenshots(st, case["case_id"], bl, Path(lp["baseline_file"]).parent)
         ev = st.verifier.freeze_baseline(case["case_id"], bl, producer="fixture_oracle", title="Fixture oracle baseline")
+        ctx.log(f"Loaded the expected behaviour for {len(bl.get('scenarios', []))} scenarios from the supplied baseline file")
         return {"evidence_id": ev["evidence_id"], "source": "fixture_oracle", "scenarios": len(bl.get("scenarios", []))}
     if not lp.get("execute_original"):
         raise StageError("original execution not authorized", blocker="enable 'execute original' in launch configuration to capture a baseline")
@@ -346,6 +397,7 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
     if not launch:
         raise StageError("launch profile has no launch spec", blocker="configure how the original is started")
     root = Path(case["source_root"])
+    ctx.log("Running the original in an isolated process to record how it behaves (you allowed this for this project)")
     work_root = st.cases.case_root(case["case_id"]) / "capture"
     if work_root.exists():
         shutil.rmtree(work_root)
@@ -376,6 +428,7 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
                     rec["screenshot_sha"] = st.cases.blobs.put_file(Path(rec["screenshot"]))
                 bl["scenarios"].append({**sc, "expected": rec})
                 ctx.progress(scenarios_done=i + 1, scenarios_total=len(scenarios))
+                ctx.log(f"Running the original in an isolated process: scenario {i + 1} of {len(scenarios)} ({sc.get('title') or sc['id']})", key="capture")
         finally:
             srv.shutdown(); srv.server_close()
     else:
@@ -386,6 +439,7 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
                              role="original", consent=consent, isolation=sc.get("isolation"), poll=ctx.heartbeat)
             bl["scenarios"].append({**sc, "expected": {"steps": runs, "files": snapshot_work(w)}})
             ctx.progress(scenarios_done=i + 1, scenarios_total=len(scenarios))
+            ctx.log(f"Running the original in an isolated process: scenario {i + 1} of {len(scenarios)} ({sc.get('title') or sc['id']})", key="capture")
     ev = st.verifier.freeze_baseline(case["case_id"], bl, producer="capture_original", title="Captured original baseline")
     for sc in scenarios:
         fid = sc.get("feature_id") or f"scenario.{sc['id']}"
@@ -395,6 +449,7 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
             st.db.update("features", "feature_id", fid, {"origin": "runtime"})
         except KeyError:
             pass
+    ctx.log(f"Recorded the original's behaviour for {len(scenarios)} scenario(s); it is now the reference to compare against")
     return {"evidence_id": ev["evidence_id"], "source": "capture_original", "scenarios": len(scenarios)}
 
 
@@ -437,6 +492,7 @@ def build_candidate_impl(ctx: StageContext, cid: str) -> dict[str, Any]:
         info = build(ctx, cand["target_language"], src, staging)
     except StageError as e:
         st.candidates.mark_failed(cid, str(e))
+        ctx.log(f"Candidate {cid} could not be built", "error")
         raise
     if final.exists():
         shutil.rmtree(final)
@@ -460,6 +516,7 @@ def build_candidate_impl(ctx: StageContext, cid: str) -> dict[str, Any]:
                         steps=[f"Try: {f['title']}" for f in feats[:5]], plan_revision=st.plan.current_revision(case["case_id"]))
     st.feedback.mark_stale_for_candidate(case["case_id"], cid)
     st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-BUILD"), status="completed", files=[str(final)])
+    ctx.log(f"Candidate {cid} is built and ready to try in Preview & Test")
     return {"candidate_id": cid, "dist": str(final), "build_hash": c["build_hash"], "launch": launch, "pwa": info.get("pwa")}
 
 
@@ -467,7 +524,7 @@ def compare_candidate_impl(ctx: StageContext, cid: str, feature_ids: list[str] |
     """Run the verifier against the frozen baseline and mirror the verdicts into plan items. Returns the verification report."""
     st = studio_of(ctx)
     case = st.cases.get_case(ctx.job.case_id)
-    rep = st.verifier.verify_candidate(case["case_id"], cid, feature_ids=feature_ids or None, progress=lambda p: ctx.progress(**p))
+    rep = st.verifier.verify_candidate(case["case_id"], cid, feature_ids=feature_ids or None, progress=lambda p: ctx.progress(**p), log=ctx.log)
     st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-COMPARE"), status="completed" if rep["summary"]["errors"] == 0 else "failed",
                         evidence_ids=[rep["evidence_id"]])
     for fid, verdict in rep["feature_verdicts"].items():
@@ -485,6 +542,8 @@ def stage_compare_candidate(ctx: StageContext) -> dict[str, Any]:
     cid = ctx.job.inputs["candidate_id"]
     rep = compare_candidate_impl(ctx, cid, ctx.job.inputs.get("feature_ids") or None)
     failed = rep["summary"]["failed"] + rep["summary"]["errors"]
+    ctx.log(f"Comparison finished: {rep['summary']['passed']} of {rep['summary']['scenarios']} scenarios match" + (f", {failed} differ" if failed else ""),
+            "warn" if failed else "info")
     if failed:
         policy = case.get("ai_policy", {})
         attempts = int(ctx.job.inputs.get("repair_attempt", 0))

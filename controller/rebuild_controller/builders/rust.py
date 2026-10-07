@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 import tomllib
 from pathlib import Path
 from typing import Any
 
-from .. import sandbox
+from .. import livelog, sandbox
 from ..jobs.runner import StageContext, StageError
 
 
@@ -51,6 +52,13 @@ def toolchain_available(tools_dir: Path | str | None = None) -> bool:
     return private_rust(tools_dir) is not None or cargo() is not None
 
 
+def _first_cargo_error(log: str) -> str:
+    for ln in log.splitlines():
+        if ln.startswith("error"):
+            return livelog.clean(ln, 200)
+    return "see the details below"
+
+
 def build_rust(ctx: StageContext, source_dir: Path, dist_dir: Path, *, bevy: bool = False, target_triple: str | None = None) -> dict[str, Any]:
     private = private_rust(_tools_dir(ctx))
     cg = private["cargo"] if private else cargo()
@@ -69,13 +77,19 @@ def build_rust(ctx: StageContext, source_dir: Path, dist_dir: Path, *, bevy: boo
     args = [cg, "build", "--release", "--locked"] if (source_dir / "Cargo.lock").exists() else [cg, "build", "--release"]
     if target_triple:
         args += ["--target", target_triple]
-    ctx.log(f"cargo build in {source_dir} (isolated: build scripts and proc-macros are untrusted code)")
+    where = "private toolchain" if private else "system toolchain"
+    ctx.log(f"Building the Rust candidate (cargo, {where})… build scripts run in an isolated process")
+    t0 = time.monotonic()
     res = _isolated_cargo(ctx, args, source_dir, dist_dir, private=private)
+    took = time.monotonic() - t0
     log = (res.stdout + b"\n" + res.stderr).decode("utf-8", "replace")
     if res.timed_out:
+        ctx.log(f"Build timed out after {ctx.limits.max_stage_seconds}s", "error")
         raise StageError(f"timeout after {ctx.limits.max_stage_seconds}s running cargo build", retry=False)
     if res.returncode != 0:
+        ctx.log(f"Build failed after {took:.1f} s: {_first_cargo_error(log)}", "error", livelog.tail_lines(res.stderr or log, 5))
         raise StageError(f"cargo build failed:\n{log[-6000:]}")
+    ctx.log(f"Build passed in {took:.1f} s")
     tdir = source_dir / "target" / (target_triple if target_triple else "") / "release"
     bin_name = name.replace("-", "_") if False else name
     exe = None

@@ -246,7 +246,7 @@ def test_case_consent_default_false_grant_revoke_and_stage_blocked(studio, src_o
     # runtime observation switched on but no consent recorded (e.g. consent revoked): the stage is blocked, nothing runs
     lp = {**studio.cases.get_case(cid)["launch_profile"], "execute_original": True}
     studio.db.update("cases", "case_id", cid, {"launch_profile": lp})
-    ctx = SimpleNamespace(job=SimpleNamespace(case_id=cid, inputs={}), services={"studio": studio}, progress=lambda **k: None, heartbeat=lambda *a, **k: None)
+    ctx = SimpleNamespace(job=SimpleNamespace(case_id=cid, inputs={}), services={"studio": studio}, progress=lambda **k: None, heartbeat=lambda *a, **k: None, log=lambda *a, **k: None)
     with pytest.raises(StageError) as ei:
         stage_capture_original(ctx)
     assert str(ei.value).startswith("Original execution needs your permission") and ei.value.blocker

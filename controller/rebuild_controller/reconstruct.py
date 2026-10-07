@@ -48,22 +48,26 @@ def reconstruct(ctx: StageContext) -> dict[str, Any]:
     inv = st.cases.evidence_body(inv_ev[-1]["evidence_id"]) if inv_ev else {"profile": {"primary": "unknown"}}
     profile = inv["profile"]["primary"]
     target, reasons = choose_target(case, profile, inv)
+    ctx.log(f"Choosing how to rebuild this {profile} program: target {target} ({reasons[0]})")
     if case["target_language"] == "auto":
         st.cases.db.update("cases", "case_id", cid_case, {"target_language": target})
         st.plan.revise(cid_case, f"auto target ranking chose {target}: {'; '.join(reasons)}")
     unsupported = _unsupported_combo(profile, target, case["output_type"])
     if unsupported:
         st.plan.update_item(st.plan.milestone_id(cid_case, "M-IMPL"), status="blocked", blockers=[unsupported])
+        ctx.log(f"Cannot rebuild this combination: {unsupported}", "warn")
         raise StageError(unsupported, blocker=unsupported)
     plan_rev = st.plan.current_revision(cid_case)
     feats = st.ledger.list(cid_case)
     if target == "web" and profile in ("web", "electron"):
+        ctx.log("Porting the recovered web site to a web candidate (no AI needed)…")
         cand = _port_web(st, case, plan_rev)
         for f in feats:
             if f["impl_status"] in ("planned", "unplanned") and f["origin"] in ("user", "runtime", "static"):
                 st.ledger.set_impl(f["feature_id"], "runnable")
         source = "deterministic port of recovered site"
     else:
+        ctx.log(f"Preparing a {target} project skeleton…")
         cand = _scaffold(st, case, target, plan_rev, profile)
         from .implement import LoopPolicy, route_status
         policy = LoopPolicy.from_case(case)
@@ -73,7 +77,12 @@ def reconstruct(ctx: StageContext) -> dict[str, Any]:
             rs = route_status(st, policy)
             if not rs["ok"]:
                 ai_on, ai_block = False, rs["message"]
+        if ai_block:
+            ctx.log(f"AI is on but cannot be used: {ai_block}", "warn")
+        elif not ai_on:
+            ctx.log("No AI step: the project will be built from what was recovered, and unfinished parts are reported honestly")
         if ai_on:
+            ctx.log("Gathering function briefings for the AI (disassembly, decompiler text, strings)…")
             _ensure_briefings(st, ctx, case, policy.briefing_limit)
         packet = _task_packet(st, case, target, profile)
         pev = st.cases.add_evidence(cid_case, "ai_task_packet", f"Reconstruction packet ({target})", body=packet, inputs={"candidate": cand["candidate_id"], "target": target},
@@ -85,6 +94,7 @@ def reconstruct(ctx: StageContext) -> dict[str, Any]:
             st.plan.link_job(st.plan.milestone_id(cid_case, "M-IMPL"), loop.job_id)
             d = st.jobs.create(cid_case, "deliver", "Publish source/dist/evidence/reports", {"candidate_from_job": loop.job_id}, depends_on=[loop.job_id], milestone_id="M-DELIVER", max_attempts=1)
             st.plan.link_job(st.plan.milestone_id(cid_case, "M-DELIVER"), d.job_id)
+            ctx.log(f"Scheduled the AI implementation loop (up to {policy.max_attempts} attempts); each attempt is built and verified before it counts")
             return {"candidate_id": cand["candidate_id"], "target": target, "source": f"AI implement loop scheduled (job {loop.job_id}, packet {pev['evidence_id']})",
                     "reasons": reasons, "implement_job": loop.job_id, "max_attempts": policy.max_attempts}
         for f in feats:
@@ -99,6 +109,7 @@ def reconstruct(ctx: StageContext) -> dict[str, Any]:
                                       f"Next: connect a model (Connections) and set AI policy to 'AI-assisted' with a budget, "
                                       f"or (optional) open the task packet {pev['evidence_id']} in an external client (Claude Code / Codex / Gemini via the Rebuild Studio MCP) and call propose_candidate."])
         source = f"scaffold only (packet {pev['evidence_id']})"
+    ctx.log(f"Candidate {cand['candidate_id']} prepared ({source}); build and comparison are queued")
     b = st.jobs.create(cid_case, "build_candidate", f"Build candidate {cand['candidate_id']}", {"candidate_id": cand["candidate_id"]}, depends_on=[ctx.job.job_id], milestone_id="M-BUILD")
     st.plan.link_job(st.plan.milestone_id(cid_case, "M-BUILD"), b.job_id)
     has_baseline = bool(st.cases.list_evidence(cid_case, kind="baseline"))
@@ -295,9 +306,9 @@ def _ensure_briefings(st, ctx: StageContext, case: dict[str, Any], limit: int) -
                 if r.get("ok"):
                     made += 1
                 else:
-                    ctx.log(f"briefing for {f['name']} skipped: {str(r.get('error'))[:200]}")
+                    ctx.log(f"Briefing for {f['name']} skipped: {str(r.get('error'))[:200]}", "warn")
             except Exception as e:  # noqa: BLE001
-                ctx.log(f"briefing for {f['name']} failed: {type(e).__name__}: {str(e)[:200]}")
+                ctx.log(f"Briefing for {f['name']} failed: {type(e).__name__}: {str(e)[:200]}", "warn")
     return made
 
 
@@ -313,7 +324,7 @@ def _ask_model_for_files(st, ctx: StageContext, case: dict[str, Any], packet: di
         raise StageError(e.message, blocker=e.message) from e
     files, problem = parse_file_map(resp["text"])
     if not files:
-        ctx.log(f"model response unusable: {problem}")
+        ctx.log(f"The model's answer could not be used: {problem}", "warn")
         return None
     return files
 

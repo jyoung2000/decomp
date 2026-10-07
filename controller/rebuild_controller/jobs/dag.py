@@ -15,6 +15,7 @@ from enum import Enum
 from typing import Any
 
 from ..events import EventLog
+from ..providers.secrets import redact
 from ..ids import new_id, now_iso, now_ts, stable_json_hash
 from ..store.db import Database, loads
 
@@ -209,6 +210,8 @@ class JobStore:
         self._finish(job_id, worker, JobState.COMPLETED, result=result)
 
     def fail(self, job_id: str, worker: str, error: str, *, retry: bool = True, blocker: str | None = None) -> JobState:
+        error = redact(error)       # tool stderr can echo keys/Authorization headers: never persist or broadcast them
+        blocker = redact(blocker) if blocker else blocker
         with self.db.transaction():
             r = self.db.query_one("SELECT attempt, max_attempts, cancel_requested FROM jobs WHERE job_id=?", (job_id,))
             if r is None:

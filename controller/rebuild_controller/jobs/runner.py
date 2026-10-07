@@ -61,6 +61,7 @@ class StageContext:
     _procs: list[subprocess.Popen] = field(default_factory=list)
     _cancelled: bool = False
     _last_hb: float = 0.0
+    _limiter: Any = None
 
     # -- liveness -------------------------------------------------------
     def heartbeat(self, progress: dict[str, Any] | None = None, *, force: bool = False) -> None:
@@ -78,9 +79,24 @@ class StageContext:
         """Report measured progress. Callers must supply real counts; never synthesize percentages here."""
         self.heartbeat(fields, force=True)
 
-    def log(self, message: str, **extra: Any) -> None:
-        self.events.emit("job.log", {"job_id": self.job.job_id, "message": message[:4000], **extra},
-                         case_id=self.job.case_id, job_id=self.job.job_id)
+    def log(self, text: str, level: str = "info", detail: str | None = None, *, plan_item_id: str | None = None,
+            key: str | None = None, **extra: Any) -> None:
+        """One plain-English line for the live log (persisted ``job.log`` event). Redacted, bounded and rate limited (<= 5 info
+        lines/s per job); pass ``key`` so repeated progress lines coalesce to the latest. Never pass prompts or tool credentials."""
+        from .. import livelog
+        if self._limiter is None:
+            self._limiter = livelog.LogLimiter()
+        livelog.emit_job_log(self.events, self.job, self._limiter, text, level, detail, plan_item_id=plan_item_id, key=key, extra=extra)
+
+    def log_failure(self, what: str, stderr: str | bytes | None, *, detail_lines: int = 5) -> None:
+        """Error line plus the last few (redacted, bounded) lines of the tool's stderr."""
+        from .. import livelog
+        self.log(what, "error", livelog.tail_lines(stderr, detail_lines) or None)
+
+    def flush_log(self) -> None:
+        if self._limiter is not None:
+            from .. import livelog
+            livelog.flush_job_log(self.events, self.job, self._limiter)
 
     # -- subprocesses ---------------------------------------------------
     def run(self, command: list[str], *, cwd: str | os.PathLike | None = None, env: dict[str, str] | None = None,
@@ -270,6 +286,7 @@ class JobRunner:
                 return
             ctx.heartbeat(force=True)
             result = fn(ctx)
+            ctx.flush_log()
             ctx.heartbeat(force=True)
             self.jobs.complete(job.job_id, worker, result or {})
         except Cancelled:
@@ -282,5 +299,9 @@ class JobRunner:
             ctx.kill_all()
             self.jobs.fail(job.job_id, worker, f"{type(e).__name__}: {e}\n{traceback.format_exc()[-3000:]}", retry=True)
         finally:
+            try:
+                ctx.flush_log()
+            except Exception:  # noqa: BLE001 - the log must never break job bookkeeping
+                pass
             with self._lock:
                 self._active.pop(job.job_id, None)
