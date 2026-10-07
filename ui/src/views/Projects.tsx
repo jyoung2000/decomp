@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Empty, Loading } from '../components/Empty';
 import { ErrorCallout } from '../components/ErrorCallout';
+import { LocalAiHint } from '../components/ai/LocalAiSection';
 import { CaseStatusChip } from '../components/Outcome';
 import { dateTime } from '../lib/format';
 import { setSelectedCase, useSelectedCase } from '../lib/selection';
@@ -34,6 +35,8 @@ export function ProjectsView() {
         <div className="card">
           <Empty title="No projects yet" action={<Link className="btn primary" to="/new">Create your first project</Link>}>
             Choose the folder that contains the original program, where the rebuilt output should go, and the target language. The plan appears as soon as discovery starts.
+            {' '}
+            <LocalAiHint />
             {noTools && (
               <>
                 {' '}

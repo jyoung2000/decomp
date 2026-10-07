@@ -5,6 +5,7 @@ import type {
   PlanRevision, Preview, PreviewOpenResult, TaskRoute, ToolSetupEntry, ToolSetupSnapshot,
   CaseLog, AiActivity, AiPolicy, Ladder, LadderPresetId, ModelCatalogItem, PresetResult,
   IsolationInfo, OriginalConsent, RecordResult, ScenarioList, UserScenario, UserScenarioBody,
+  DownloadedModel, HfRepoFiles, HfSearchResult, LocalAiConfig, LocalAiSnapshot, LocalJob,
 } from './types';
 
 /** Error with the controller's three-part explanation: what happened, what is affected, what to do next. */
@@ -183,6 +184,21 @@ export class Api {
   };
   caseLog = (id: string, q: { since?: number; limit?: number; level?: string; stage?: string } = {}) => this.get<CaseLog>(`/cases/${enc(id)}/log${qs({ since: q.since ? String(q.since) : undefined, limit: q.limit ? String(q.limit) : undefined, level: q.level, stage: q.stage })}`);
   aiCalls = (caseId?: string) => this.get<AiCall[]>(`/ai/calls${qs({ case_id: caseId })}`);
+  localAi = (maxAge?: number) => this.get<LocalAiSnapshot>(`/ai/local${qs({ max_age: maxAge != null ? String(maxAge) : undefined })}`);
+  detectLocalAi = () => this.post<LocalAiSnapshot>('/ai/local/detect');
+  useLocalModels = (apply: boolean, preset?: 'all_local' | 'local_first') => this.post<PresetResult & { replaces_user_ladder?: boolean }>('/ai/local/use', { apply, ...(preset ? { preset } : {}) });
+  localAiConfig = () => this.get<LocalAiConfig>('/ai/local/settings');
+  putLocalAiConfig = (b: { models_dir?: string; num_ctx_cap?: number }) => this.put<LocalAiConfig>('/ai/local/settings', b);
+  putHfToken = (token: string | null) => this.put<LocalAiConfig>('/ai/local/hf-token', { token });
+  searchModels = (q: string) => this.get<{ query: string; results: HfSearchResult[]; source?: string }>(`/ai/local/search${qs({ q })}`);
+  modelFiles = (repo: string) => this.get<HfRepoFiles>(`/ai/local/files${qs({ repo })}`);
+  startModelDownload = (b: { repo: string; path: string; dest_dir?: string; accept_license: boolean }) => this.post<LocalJob>('/ai/local/downloads', b);
+  localJobs = () => this.get<LocalJob[]>('/ai/local/jobs');
+  cancelLocalJob = (id: string) => this.post<LocalJob>(`/ai/local/jobs/${enc(id)}/cancel`);
+  downloadedModels = () => this.get<DownloadedModel[]>('/ai/local/models');
+  registerModel = (id: string) => this.post<DownloadedModel>(`/ai/local/models/${enc(id)}/register`);
+  removeModel = (id: string, unregister: boolean) => this.del<{ removed: string; unregistered: string | null }>(`/ai/local/models/${enc(id)}${unregister ? '?unregister=1' : ''}`);
+  pullOllamaModel = (name: string) => this.post<LocalJob>('/ai/local/ollama/pull', { name });
   knowledge = () => this.get<KnowledgeEntry[]>('/knowledge');
   knowledgeItem = (id: string) => this.get<KnowledgeEntry>(`/knowledge/${enc(id)}`);
   validateKnowledge = (id: string) => this.post<KnowledgeEntry>(`/knowledge/${enc(id)}/validate`);

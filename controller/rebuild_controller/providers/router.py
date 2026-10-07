@@ -97,7 +97,7 @@ class CallResult:
 
 
 DETAIL_KEYS = ("connection_id", "reason", "position", "locality", "config_revision", "policy_hash", "took_over_from", "prompt_sha256",
-               "attempt", "error_kind")
+               "attempt", "error_kind", "effective_context", "prompt_tokens", "notes")
 
 
 def record_ai_call(db: Database, events: EventLog, *, call_id: str, task: str, provider: str, model: str, outcome: str,
@@ -525,10 +525,14 @@ class AIClient:
                 record_ai_call(self.db, self.events, call_id=aic, task=task, provider=provider, model=model, outcome="ok",
                                usage=resp.usage, cost_usd=cost, cost_known=known, latency_ms=latency, case_id=case_id,
                                job_id=job_id, extra={**base_extra, "attempt": tries, "stop_reason": resp.stop_reason,
-                                                     "price_known": price.known, "reason": why, "took_over_from": took})
+                                                     "price_known": price.known, "reason": why, "took_over_from": took,
+                                                     **({"effective_context": resp.meta["num_ctx"]} if resp.meta.get("num_ctx") else {}),
+                                                     **({"prompt_tokens": resp.meta["prompt_tokens"]} if resp.meta.get("prompt_tokens") else {}),
+                                                     **({"notes": "; ".join(resp.notes)[:300]} if resp.notes else {})})
                 u = resp.usage
+                ctx_txt = f", context {resp.meta['num_ctx']} tokens" if resp.meta.get("num_ctx") else ""
                 say(f"{model} answered ({u.input_tokens} tokens in, {u.output_tokens} out, {money(cost, known, free)}, "
-                    f"{latency / 1000:.1f}s)", "answer", provider=provider, model=model, locality=loc, outcome="ok",
+                    f"{latency / 1000:.1f}s{ctx_txt})", "answer", provider=provider, model=model, locality=loc, outcome="ok",
                     tokens_in=u.input_tokens, tokens_out=u.output_tokens, cost_usd=cost, cost_known=known, position=cand["position"],
                     took_over_from=took, call_id=aic)
                 if conn["state"] != "ok":

@@ -665,6 +665,7 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
 
     from .tools_routes import mount_tools_routes; mount_tools_routes(app, studio)  # guided tool setup
     from .scenario_routes import mount_scenario_routes; mount_scenario_routes(app, studio)  # user-declared scenarios
+    from .local_ai_routes import mount_local_ai_routes; mount_local_ai_routes(app, studio)  # local AI detection + model downloads
     return app
 
 
@@ -694,6 +695,8 @@ def serve(port: int = 0, data_dir: str | None = None, token: str | None = None, 
     studio = StudioServices(settings, start_runner=True)
     app = create_app(studio, token)
     write_controller_info(settings.data_dir, port, token)
+    if os.environ.get("REBUILD_NO_LOCAL_DETECT") != "1" and studio.connections is not None:
+        app.state.local_ai.detect_async()      # loopback-only probe of Ollama / LM Studio / llama.cpp; never blocks startup
     print(json.dumps({"port": port, "controller_json": str(settings.data_dir / "controller.json")}), flush=True)
     try:
         uvicorn.run(app, host=host, port=port, log_level="warning", ws_ping_interval=10, ws_ping_timeout=20)

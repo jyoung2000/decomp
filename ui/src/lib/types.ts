@@ -799,3 +799,131 @@ export interface CaseLog {
   latest_seq: number;
   limit?: number;
 }
+
+// ---------------------------------------------------------------- local AI on this PC (controller: /ai/local*)
+export interface LocalTaskFit {
+  ok: boolean;
+  note: string;
+}
+export interface LocalModel {
+  id: string;
+  server: string;
+  size_bytes?: number | null;
+  family?: string | null;
+  parameter_size?: string | null;
+  parameter_b?: number | null;
+  quantization?: string | null;
+  context_window?: number | null;
+  effective_context?: number | null;
+  capabilities?: { completion?: boolean | null; vision?: boolean | null; tools?: boolean | null; thinking?: boolean | null; embedding?: boolean | null; source?: string };
+  tasks?: Record<string, LocalTaskFit>;
+  quick_only?: boolean;
+  excluded?: boolean;
+  suitable?: boolean;
+  summary?: string;
+}
+export interface LocalServer {
+  kind: 'ollama' | 'lmstudio' | 'llamacpp' | string;
+  name: string;
+  label: string;
+  endpoint: string;
+  found: boolean;
+  version?: string | null;
+  probe_ms?: number;
+  install_page?: string | null;
+  models: LocalModel[];
+  connection_id?: string | null;
+  connection_state?: string | null;
+  models_folder?: string;
+}
+export interface LocalAiSnapshot {
+  detected_at?: string;
+  servers: LocalServer[];
+  num_ctx_cap?: number;
+  suitable_models?: number;
+  ladder?: { state: 'empty' | 'preset' | 'user' | 'unavailable' | string };
+  recommend_use?: boolean;
+  recommended_preset?: 'all_local' | 'local_first';
+  advice?: string | null;
+}
+export interface LocalAiConfig {
+  models_dir: string;
+  default_models_dir: string;
+  hf_host?: string;
+  has_hf_token: boolean;
+  ollama_models_folder: string;
+  num_ctx_cap?: number;
+  install_pages?: Record<string, string>;
+}
+export interface HfSearchResult {
+  repo: string;
+  downloads?: number | null;
+  likes?: number | null;
+  license?: string | null;
+  license_permissive?: boolean;
+  gated?: boolean | null;
+  pipeline_tag?: string | null;
+  updated?: string | null;
+  page?: string;
+}
+export interface HfFile {
+  path: string;
+  size_bytes: number;
+  sha256: string | null;
+  quant: string | null;
+  kind: 'model' | 'vision_projector' | string;
+  split: boolean;
+  ram_hint_gb: number | null;
+  downloadable: boolean;
+  note: string | null;
+}
+export interface HfRepoFiles {
+  repo: string;
+  revision: string;
+  license: string | null;
+  license_permissive: boolean;
+  license_ack_required: boolean;
+  license_note: string | null;
+  gated: boolean;
+  needs_token: boolean;
+  has_token: boolean;
+  page: string;
+  files: HfFile[];
+}
+export interface LocalJob {
+  job_id: string;
+  kind: 'download' | 'pull' | string;
+  title: string;
+  phase: string;
+  bytes_done: number;
+  bytes_total: number;
+  percent: number | null;
+  resumed_from?: number;
+  speed_bps: number | null;
+  eta_s: number | null;
+  message: string;
+  error: { code: string; message: string; next_action?: string | null; retryable?: boolean; url?: string | null } | null;
+  finished: boolean;
+  cancelled: boolean;
+  result?: DownloadedModel | { model: string; server: string; folder: string } | null;
+  repo?: string | null;
+  file?: string | null;
+  dest?: string | null;
+}
+export interface DownloadedModel {
+  id: string;
+  repo: string;
+  file: string;
+  path: string;
+  folder?: string;
+  size_bytes: number;
+  sha256: string;
+  quant?: string | null;
+  license?: string | null;
+  registered_as?: string | null;
+  server?: string | null;
+  status: 'downloaded' | 'registered' | 'needs_server' | 'needs_import' | string;
+  status_text?: string;
+  exists?: boolean;
+  install_pages?: Record<string, string>;
+}

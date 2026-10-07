@@ -196,6 +196,19 @@ class ConnectionStore:
         self._overrides.pop(connection_id, None)
         return self.get(connection_id)
 
+    def set_limits(self, connection_id: str, **values: Any) -> dict[str, Any]:
+        """Merge keys into ``limits`` (``None`` removes a key). Used by local-server detection and the num_ctx cap setting."""
+        row = self._row(connection_id)
+        lim = loads(row["limits"], {})
+        for k, v in values.items():
+            if v is None:
+                lim.pop(k, None)
+            else:
+                lim[k] = v
+        self.db.update("connections", "connection_id", connection_id, {"limits": lim, "updated_at": now_iso()})
+        self._overrides.pop(connection_id, None)
+        return self.get(connection_id)
+
     def delete(self, connection_id: str) -> bool:
         row = self.db.query_one("SELECT * FROM connections WHERE connection_id=?", (connection_id,))
         if row is None:
@@ -257,6 +270,12 @@ class ConnectionStore:
             return AnthropicAdapter(endpoint=ep, api_key=key, transport=self.transport, betas=lim.get("betas"))
         if p == "gemini":
             return GeminiAdapter(endpoint=ep, api_key=key, transport=self.transport)
+        if lim.get("server") == "ollama" and dialect is None and locality_of(conn) == "local":
+            # native /api/chat: the OpenAI-compatible endpoint cannot set num_ctx and silently truncates long prompts
+            from .ollama_chat import OllamaChatAdapter
+            mctx = {m["id"]: m.get("context_window") for m in conn["models"] if isinstance(m, Mapping) and m.get("id")}
+            return OllamaChatAdapter(endpoint=ep or "", provider_name=p, transport=self.transport, model_context=mctx,
+                                     num_ctx_cap=lim.get("num_ctx_cap"), api_key=key)
         d = dialect or lim.get("dialect") or "responses"
         if d == "auto":
             d = "chat"  # until a probe has chosen, the widely supported dialect

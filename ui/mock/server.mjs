@@ -105,6 +105,139 @@ function findModel(connection_id, model) {
 function ladderEntries(pairs) {
   return pairs.map((p, i) => catalogEntry(findModel(p.connection_id, p.model), i + 1));
 }
+// ---------------------------------------------------------------- local AI on this PC (mock: one Ollama with 3 models, fake HF hub)
+const LOCAL_TASKS = ['interpretation', 'repair', 'visual_review', 'verification_assist', 'knowledge'];
+const lfit = (ok, note = '') => Object.fromEntries(LOCAL_TASKS.map((t) => [t, { ok: ok.includes(t), note: ok.includes(t) ? note : 'not suited' }]));
+const WIN_HOME = 'C:\\Users\\demo';
+const LOCAL = {
+  cap: 32768,
+  modelsDir: `${WIN_HOME}\\AppData\\Local\\RebuildStudio\\models`,
+  token: false,
+  jobs: new Map(),
+  downloads: [],
+  models: [
+    { id: 'qwen2.5-coder:14b', server: 'ollama', size_bytes: 8990000000, parameter_size: '14.8B', parameter_b: 14.8, quantization: 'Q4_K_M', context_window: 131072, capabilities: { completion: true, tools: true, source: 'ollama /api/show' }, tasks: lfit(['interpretation', 'repair', 'verification_assist', 'knowledge'], 'coding model'), quick_only: false, excluded: false, suitable: true, summary: 'Good for interpreting code, repairing builds, suggesting test scenarios, extracting reusable knowledge.' },
+    { id: 'llava:13b', server: 'ollama', size_bytes: 8000000000, parameter_size: '13B', parameter_b: 13, quantization: 'Q4_0', context_window: 4096, capabilities: { completion: true, vision: true, source: 'ollama /api/show' }, tasks: lfit(['visual_review'], 'can read screenshots'), quick_only: false, excluded: false, suitable: true, summary: 'Good for reviewing screenshots.' },
+    { id: 'nomic-embed-text:latest', server: 'ollama', size_bytes: 274000000, parameter_size: '137M', parameter_b: 0.137, capabilities: { completion: false, embedding: true, source: 'ollama /api/show' }, tasks: lfit([]), quick_only: false, excluded: true, suitable: false, summary: 'Not suitable: embedding-only model (cannot write text).' },
+  ],
+};
+function localSnapshot() {
+  const ms = LOCAL.models.map((x) => ({ ...x, effective_context: x.context_window ? Math.min(x.context_window, LOCAL.cap) : null }));
+  const userLadder = AI_TASK_IDS.some((t) => (S.ladder[t]?.entries ?? []).length && S.ladder[t].rationale === 'user');
+  const anyLadder = AI_TASK_IDS.some((t) => (S.ladder[t]?.entries ?? []).length);
+  const state = !anyLadder ? 'empty' : userLadder ? 'user' : 'preset';
+  return {
+    detected_at: now(), num_ctx_cap: LOCAL.cap,
+    servers: [
+      { kind: 'ollama', name: 'Ollama', label: 'Ollama (this PC)', endpoint: 'http://127.0.0.1:11434/v1', found: true, version: '0.35.0 (mock)', probe_ms: 12, models: ms, connection_id: 'conn_local', connection_state: 'ok', models_folder: `${WIN_HOME}\\.ollama\\models`, install_page: 'https://ollama.com/download' },
+      { kind: 'lmstudio', name: 'LM Studio', label: 'LM Studio (this PC)', endpoint: 'http://127.0.0.1:1234/v1', found: false, models: [], install_page: 'https://lmstudio.ai/download' },
+      { kind: 'llamacpp', name: 'llama.cpp server', label: 'llama.cpp server (this PC)', endpoint: 'http://127.0.0.1:8080/v1', found: false, models: [], install_page: 'https://github.com/ggml-org/llama.cpp/releases' },
+    ],
+    suitable_models: ms.filter((x) => x.suitable).length, ladder: { state }, recommend_use: state !== 'user', recommended_preset: 'local_first',
+    advice: state === 'user' ? 'You edited your ladder yourself; it is left alone. Use detected local models replaces it only if you confirm.' : 'Use the detected local models (runs on this PC, free).',
+  };
+}
+function localJobTick(j) {
+  if (j.finished) return j;
+  if (j.cancelRequested) return Object.assign(j, { finished: true, cancelled: true, phase: 'cancelled', message: 'Cancelled. The partial download was deleted.' });
+  const speed = 25_000_000;
+  j.bytes_done = Math.min(j.bytes_total, Math.floor(((Date.now() - j.t0) / 1000) * speed));
+  j.percent = Math.round((1000 * j.bytes_done) / j.bytes_total) / 10;
+  j.speed_bps = speed;
+  j.eta_s = Math.max(0, (j.bytes_total - j.bytes_done) / speed);
+  j.phase = 'downloading';
+  if (j.bytes_done >= j.bytes_total) {
+    const name = `rs-${j.repo.split('/')[1].toLowerCase().replace(/-gguf$/, '')}-${(j.quant || 'q').toLowerCase()}`;
+    const folder = `${LOCAL.modelsDir}\\${j.repo.replace('/', '__')}`;
+    const rec = { id: j.job_id, repo: j.repo, file: j.file, path: `${folder}\\${j.file}`, folder, size_bytes: j.bytes_total, sha256: j.sha256, quant: j.quant, license: 'apache-2.0', registered_as: name, server: 'ollama', status: 'registered', status_text: `Ready: added to Ollama as ${name}.`, exists: true };
+    LOCAL.downloads.push(rec);
+    LOCAL.models.push({ id: `${name}:latest`, server: 'ollama', size_bytes: j.bytes_total, parameter_size: '135M', parameter_b: 0.135, quantization: j.quant, context_window: 8192, capabilities: { completion: true, source: 'ollama /api/show' }, tasks: lfit(['knowledge'], 'quick tasks only'), quick_only: true, excluded: false, suitable: true, summary: 'Good for extracting reusable knowledge. Quick tasks only.' });
+    Object.assign(j, { phase: 'done', finished: true, message: rec.status_text, result: rec, eta_s: null });
+  }
+  return j;
+}
+const HF_FILES = [
+  { path: 'SmolLM2-135M-Instruct-Q4_K_M.gguf', size_bytes: 105_000_000, sha256: 'b'.repeat(64), quant: 'Q4_K_M', kind: 'model', split: false, ram_hint_gb: 0.7, downloadable: true, note: null },
+  { path: 'SmolLM2-135M-Instruct-Q8_0.gguf', size_bytes: 144_811_008, sha256: 'e8a0e942fe93529b7601a7620c8aa1bdc1bede40ff668ed9d6339686384392d7', quant: 'Q8_0', kind: 'model', split: false, ram_hint_gb: 0.8, downloadable: true, note: null },
+  { path: 'mmproj-f16.gguf', size_bytes: 190_000_000, sha256: null, quant: 'F16', kind: 'vision_projector', split: false, ram_hint_gb: null, downloadable: false, note: 'Vision add-on file, not a model on its own.' },
+];
+function mockLocalAi(rest, m, body, url) {
+  const key = `${m} /${rest.join('/')}`;
+  const fail = (status, code, message, next_action) => [status, { error: { code, message, affected: null, next_action } }];
+  if (key === 'GET /' || key === 'POST /detect') return [200, localSnapshot()];
+  if (key === 'POST /use') {
+    const name = body.preset || 'local_first';
+    const { out, warnings } = presetPairs(name);
+    const replaces = localSnapshot().ladder.state === 'user';
+    if (body.apply) {
+      for (const t of AI_TASK_IDS) S.ladder[t] = { entries: out[t], rationale: `preset:${name}` };
+      S.ladderRev += 1;
+      emit('settings.updated', { ladder: S.ladderRev });
+    }
+    return [200, { preset: name, applied: !!body.apply, replaces_user_ladder: replaces, config_revision: S.ladderRev, tasks: Object.fromEntries(AI_TASK_IDS.map((t) => [t, { entries: ladderEntries(out[t]) }])), warnings }];
+  }
+  const cfg = () => ({ models_dir: LOCAL.modelsDir, default_models_dir: `${WIN_HOME}\\AppData\\Local\\RebuildStudio\\models`, hf_host: 'huggingface.co', has_hf_token: LOCAL.token, ollama_models_folder: `${WIN_HOME}\\.ollama\\models`, num_ctx_cap: LOCAL.cap, install_pages: { ollama: 'https://ollama.com/download', lmstudio: 'https://lmstudio.ai/download' } });
+  if (key === 'GET /settings') return [200, cfg()];
+  if (key === 'PUT /settings') {
+    if (typeof body.num_ctx_cap === 'number') LOCAL.cap = body.num_ctx_cap;
+    if (typeof body.models_dir === 'string') {
+      if (!/^([A-Za-z]:[\\/]|\/)/.test(body.models_dir)) return fail(400, 'bad_folder', `'${body.models_dir}' is not a full path.`, 'Choose a folder with Browse or type a full path.');
+      LOCAL.modelsDir = body.models_dir;
+    }
+    return [200, cfg()];
+  }
+  if (key === 'PUT /hf-token') {
+    LOCAL.token = !!body.token;
+    return [200, cfg()];
+  }
+  if (key === 'GET /search') {
+    const q = (url.searchParams.get('q') || '').toLowerCase();
+    const all = [
+      { repo: 'bartowski/SmolLM2-135M-Instruct-GGUF', downloads: 41279, likes: 16, license: 'apache-2.0', license_permissive: true, gated: false, page: 'https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF' },
+      { repo: 'bartowski/Qwen2.5-Coder-7B-Instruct-GGUF', downloads: 120000, likes: 80, license: 'apache-2.0', license_permissive: true, gated: false },
+      { repo: 'meta-llama/Llama-3.2-1B-Instruct-GGUF', downloads: 9000, likes: 40, license: 'llama3.2', license_permissive: false, gated: true },
+    ];
+    const words = q.split(/\s+/).filter(Boolean);
+    return [200, { query: q, results: all.filter((r) => words.every((w) => r.repo.toLowerCase().includes(w))), source: 'huggingface.co' }];
+  }
+  if (key === 'GET /files') {
+    const repo = url.searchParams.get('repo') || '';
+    const gated = repo.startsWith('meta-llama/');
+    return [200, { repo, revision: 'mock', license: gated ? 'llama3.2' : 'apache-2.0', license_permissive: !gated, license_ack_required: gated, license_note: gated ? `This model is gated: accept its terms on https://huggingface.co/${repo} first.` : null, gated, needs_token: gated && !LOCAL.token, has_token: LOCAL.token, page: `https://huggingface.co/${repo}`, files: HF_FILES }];
+  }
+  if (key === 'POST /downloads') {
+    const f = HF_FILES.find((x) => x.path === body.path && x.downloadable);
+    if (!f) return fail(404, 'not_found', `${body.path} is not a downloadable GGUF file in ${body.repo}.`, 'Pick a listed file.');
+    if (String(body.repo).startsWith('meta-llama/') && !LOCAL.token) return fail(409, 'gated_needs_token', `${body.repo} is gated.`, 'Accept the terms on the model page, then add a Hugging Face token.');
+    if (String(body.repo).startsWith('meta-llama/') && !body.accept_license) return fail(409, 'license_ack_required', 'Please confirm the model license.', 'Tick I accept the license.');
+    const j = { job_id: `dl${LOCAL.jobs.size + 1}`, kind: 'download', title: `${body.repo}/${f.path}`, repo: body.repo, file: f.path, quant: f.quant, sha256: f.sha256, dest: body.dest_dir || LOCAL.modelsDir, phase: 'queued', bytes_done: 0, bytes_total: f.size_bytes, percent: 0, speed_bps: null, eta_s: null, message: 'Downloading', error: null, finished: false, cancelled: false, t0: Date.now() };
+    LOCAL.jobs.set(j.job_id, j);
+    return [200, j];
+  }
+  if (key === 'POST /ollama/pull') {
+    const j = { job_id: `pull${LOCAL.jobs.size + 1}`, kind: 'pull', title: body.name, phase: 'done', bytes_done: 1, bytes_total: 1, percent: 100, finished: true, cancelled: false, message: `Pulled ${body.name} into Ollama's model folder (mock).`, error: null, result: { model: body.name, server: 'ollama', folder: `${WIN_HOME}\\.ollama\\models` } };
+    LOCAL.jobs.set(j.job_id, j);
+    return [200, j];
+  }
+  if (key === 'GET /jobs') return [200, [...LOCAL.jobs.values()].map(localJobTick).reverse()];
+  if (rest[0] === 'jobs' && rest[1]) {
+    const j = LOCAL.jobs.get(rest[1]);
+    if (!j) return fail(404, 'unknown_job', 'No such download.', null);
+    if (rest[2] === 'cancel' && m === 'POST') j.cancelRequested = true;
+    return [200, localJobTick(j)];
+  }
+  if (key === 'GET /models') return [200, LOCAL.downloads];
+  if (rest[0] === 'models' && rest[1] && m === 'DELETE') {
+    const rec = LOCAL.downloads.find((d) => d.id === rest[1]);
+    LOCAL.downloads = LOCAL.downloads.filter((d) => d.id !== rest[1]);
+    const unreg = url.searchParams.get('unregister') === '1' && rec ? rec.registered_as : null;
+    if (unreg) LOCAL.models = LOCAL.models.filter((x) => !x.id.startsWith(unreg));
+    return [200, { removed: rest[1], unregistered: unreg }];
+  }
+  if (rest[0] === 'models' && rest[2] === 'register' && m === 'POST') return [200, LOCAL.downloads.find((d) => d.id === rest[1]) ?? {}];
+  return null;
+}
+
 function currentLadder() {
   return { config_revision: S.ladderRev, tasks: Object.fromEntries(AI_TASK_IDS.map((t) => [t, { entries: ladderEntries(S.ladder[t]?.entries ?? []), rationale: S.ladder[t]?.rationale ?? 'auto' }])) };
 }
@@ -886,6 +1019,10 @@ async function handle(req, res) {
       if (!c.models.length) c.models = ['demo-model'];
       return send(res, 200, { ...c, probe: { latency_ms: 120 } });
     }
+  }
+  if (seg[0] === 'ai' && seg[1] === 'local') {
+    const r = mockLocalAi(seg.slice(2), m, body, url);
+    if (r) return send(res, r[0], r[1]);
   }
   if (p === '/ai/ladder' && m === 'GET') return send(res, 200, currentLadder());
   if (seg[0] === 'ai' && seg[1] === 'ladder' && seg[2] === 'preset' && m === 'POST') {

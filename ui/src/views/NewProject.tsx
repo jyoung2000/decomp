@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { OriginalRunExplainer, useIsolation } from '../components/ConsentCard';
 import { ErrorCallout } from '../components/ErrorCallout';
 import { AiPolicyEditor, formToPolicy } from '../components/ai/AiPolicyEditor';
+import { LocalAiHint } from '../components/ai/LocalAiSection';
 import { PathField } from '../components/PathField';
 import { useToast } from '../components/Toasts';
 import { setSelectedCase } from '../lib/selection';
@@ -304,6 +305,7 @@ export function NewProjectView() {
         <fieldset>
           <legend>AI policy</legend>
           <div className="stack-lg">
+            <LocalAiHint testId="np-local-ai-hint" onUse={() => setF((p) => ({ ...p, ai_mode: 'inherit', ai_locality: 'local_only' }))} />
             <AiPolicyEditor
               idp="np-ai"
               connections={conns.data ?? []}

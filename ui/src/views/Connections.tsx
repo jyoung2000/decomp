@@ -3,6 +3,7 @@ import { ConfirmDialog } from '../components/Dialog';
 import { Empty, Loading } from '../components/Empty';
 import { ErrorCallout } from '../components/ErrorCallout';
 import { LadderSection } from '../components/ai/LadderSection';
+import { LocalAiSection } from '../components/ai/LocalAiSection';
 import { StatusChip } from '../components/StatusChip';
 import { useToast } from '../components/Toasts';
 import { dateTime, humanize, usd } from '../lib/format';
@@ -35,6 +36,7 @@ export function ConnectionsView() {
   const conns = useResource(() => api.connections(), [api], version);
   const [del, setDel] = useState<Connection | null>(null);
   const [probing, setProbing] = useState<string | null>(null);
+  const [ladderTick, setLadderTick] = useState(0);
 
   const probe = async (c: Connection) => {
     setProbing(c.connection_id);
@@ -57,6 +59,13 @@ export function ConnectionsView() {
           <p className="lead">AI providers are optional. They only propose changes; the verifier decides what passes. Keys are stored by the desktop app’s credential store, never shown again.</p>
         </div>
       </div>
+
+      <LocalAiSection
+        onLadderChanged={() => {
+          setLadderTick((t) => t + 1);
+          conns.reload();
+        }}
+      />
 
       <section className="card" aria-labelledby="conn-list-h">
         <h3 id="conn-list-h">Providers</h3>
@@ -121,7 +130,7 @@ export function ConnectionsView() {
       </section>
 
       <AddConnection onAdded={conns.reload} />
-      <LadderSection connections={conns.data ?? []} />
+      <LadderSection connections={conns.data ?? []} version={ladderTick} />
       <Costs />
       <Hermes />
 

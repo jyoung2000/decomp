@@ -284,6 +284,7 @@ class Response:
     thinking: str = ""
     notes: list[str] = field(default_factory=list)
     provider_key: str | None = None
+    meta: dict = field(default_factory=dict)     # adapter facts about the call, e.g. Ollama ``num_ctx`` actually used
 
     def assistant_message(self) -> Message:
         parts: list[ContentPart] = []

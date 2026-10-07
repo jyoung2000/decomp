@@ -108,3 +108,41 @@ No field above was renamed. Extra fields the controller returns:
 - **Activity**: `GET /cases/{id}/ai/activity?since=<seq>&limit=` returns the `ai.activity` event payloads plus `seq`; extra keys
   `kind` (`start|retry|fallback|answer|stopped|refused|proposal|build|verify|next`), `position, policy_hash, prompt_sha256,
   took_over_from, call_id`.
+
+## 8. Local AI on this PC (detection, model downloads, Ollama context)
+
+- **Detection** (`providers/local_ai.py`): probes ONLY loopback well-known endpoints, in parallel with short timeouts: Ollama
+  `127.0.0.1:11434` (`/api/version`, `/api/tags`, `/api/show`), LM Studio `127.0.0.1:1234` (`/v1/models`, `/api/v0/models`),
+  llama.cpp `127.0.0.1:8080` (`/v1/models`, `/props`). Runs on controller start (background thread; `REBUILD_NO_LOCAL_DETECT=1`
+  disables), on `POST /ai/local/detect`, when the Connections page opens and at most every 60 s while it is visible.
+  For each server found one `provider=local` connection "<Name> (this PC)" is created or reused (matched by loopback port, never
+  duplicated, never renamed) and re-discovered; `limits.detected`, and for Ollama `limits.server="ollama"`, `num_ctx_cap`. A server
+  that disappears keeps its connection with state `unreachable`.
+- `GET /ai/local[?max_age=s]` / `POST /ai/local/detect` -> `{detected_at, num_ctx_cap, servers:[{kind, name, label, endpoint, found,
+  version, probe_ms, install_page, models_folder?, connection_id, connection_state, models:[{id, server, size_bytes, family,
+  parameter_size, parameter_b, quantization, context_window, effective_context, capabilities:{completion, vision, tools, thinking,
+  embedding?, source}, tasks:{<task>:{ok, note}}, quick_only, excluded, suitable, summary}]}], suitable_models,
+  ladder:{state:"empty"|"preset"|"user"}, recommend_use, recommended_preset:"all_local"|"local_first", advice}`.
+  Rules: embedding-only models are excluded; interpretation/repair need code ability (coder model, or a general model >= 7B that is
+  not an image-description model) and >= 16k context; visual_review needs vision; < 4B parameters = "quick tasks only".
+- `POST /ai/local/use {apply, preset?}` -> the preset result (section 7) plus `replaces_user_ladder`. Detection never changes a
+  ladder; only this explicit call (previewed first in the UI) does.
+- **Ollama context (correctness fix)**: Ollama's OpenAI-compatible `/v1/chat/completions` cannot set the context and silently cuts
+  long prompts to the server default (measured here, Ollama 0.35 / qwen2.5:3b: a 28,947-token prompt became 8,194 tokens, wrong
+  answer, HTTP 200). Connections with `limits.server="ollama"` therefore use the native `/api/chat` adapter
+  (`providers/ollama_chat.py`): `options.num_ctx` = request estimate (chars/2, power-of-two bucket >= 8192) bounded by
+  min(model context, `num_ctx_cap` default 32768, settable via `PUT /ai/local/settings {num_ctx_cap}`), and `truncate:false` so an
+  oversize prompt is refused (HTTP 400) instead of cut; a server-reported exact size is retried once with a bigger `num_ctx`; a
+  request that cannot fit raises `ContextWindowExceeded` before sending. `ai_calls.detail` records `effective_context`, `prompt_tokens`.
+- **Models** (`local_models.py`): `GET /ai/local/search?q=` (HF `/api/models?search=&filter=gguf&sort=downloads`),
+  `GET /ai/local/files?repo=` (HF model info + `tree/<commit>`: per-file quant, size, LFS sha256, RAM hint, license, gated),
+  `POST /ai/local/downloads {repo, path, dest_dir?, accept_license, register?}` -> job; `GET /ai/local/jobs[/id]`,
+  `POST /ai/local/jobs/{id}/cancel`; `GET /ai/local/models`, `POST /ai/local/models/{id}/register`,
+  `DELETE /ai/local/models/{id}?unregister=1`; `POST /ai/local/ollama/pull {name}`; `GET|PUT /ai/local/settings {models_dir,
+  num_ctx_cap}`; `PUT /ai/local/hf-token {token|null}` (credential store; never returned or logged).
+  Downloads: https only, huggingface.co then redirects only to `*.huggingface.co` / `*.hf.co`; token only on the first hop; `.part`
+  + `Range` resume after an interruption; cancel deletes the partial; sha256 checked against the LFS oid before the file is renamed
+  into place (mismatch deletes it); free space and writability checked first; non-permissive or gated licenses need
+  `accept_license`; gated repos without a token fail with `gated_needs_token`. Registration: `POST /api/blobs/sha256:<d>` +
+  `POST /api/create {model:"rs-<repo>-<quant>", files:{<file>:"sha256:<d>"}}`, then re-detection. Without Ollama the file is kept
+  with status `needs_server` and the official install pages.

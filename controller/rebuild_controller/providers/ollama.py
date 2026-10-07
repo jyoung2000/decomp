@@ -37,7 +37,8 @@ def _caps(show: dict[str, Any]) -> dict[str, Any]:
     caps = show.get("capabilities")
     if isinstance(caps, list):
         names = {str(c).lower() for c in caps}
-        return {"completion": "completion" in names, "vision": "vision" in names, "tools": "tools" in names, "source": "ollama /api/show"}
+        return {"completion": "completion" in names, "vision": "vision" in names, "tools": "tools" in names,
+                "thinking": "thinking" in names, "embedding": "embedding" in names, "source": "ollama /api/show"}
     # older servers: no capabilities list; a vision projector is still visible in projector_info / model_info
     info = show.get("model_info") if isinstance(show.get("model_info"), dict) else {}
     vision = True if (show.get("projector_info") or any(".vision." in str(k) for k in info)) else None
@@ -74,12 +75,14 @@ def enrich(endpoint: str, model_ids: Iterable[str], *, transport: httpx.BaseTran
                 d = details.get(mid)
                 if isinstance(d, dict) and d:
                     entry["details"] = {k: d.get(k) for k in ("family", "parameter_size", "quantization_level", "format") if d.get(k)}
+                    if isinstance(d.get("context_length"), int) and d["context_length"] > 0:
+                        entry["context_window"] = d["context_length"]      # Ollama >= 0.12 lists it in /api/tags
                 try:
                     s = c.post(f"{root}/api/show", json={"model": mid})
                     if s.status_code == 200 and isinstance(s.json(), dict):
                         show = s.json()
                         entry["capabilities"] = _caps(show)
-                        entry["context_window"] = _context_length(show.get("model_info"))
+                        entry["context_window"] = _context_length(show.get("model_info")) or entry.get("context_window")
                 except Exception:  # noqa: BLE001 - one model's metadata never fails the probe
                     pass
                 out["models"][mid] = entry

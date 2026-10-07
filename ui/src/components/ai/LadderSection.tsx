@@ -10,9 +10,9 @@ import { LadderList } from './LadderList';
 import { ModelPicker } from './ModelPicker';
 
 /** The app-wide model ladder: "Models per task" with presets, picker, reorder and a version number. */
-export function LadderSection({ connections }: { connections: Connection[] }) {
+export function LadderSection({ connections, version = 0 }: { connections: Connection[]; version?: number }) {
   const api = useApi();
-  const ladder = useResource(() => api.ladder(), [api]);
+  const ladder = useResource(() => api.ladder(), [api], version);
   const rev = ladder.data?.config_revision;
   // a probe changes each rung's availability / capabilities: refetch the ladder whenever a connection's probe stamp changes
   const probeSig = connections.map((c) => `${c.connection_id}:${c.state}:${c.last_probe ?? ''}`).join('|');
