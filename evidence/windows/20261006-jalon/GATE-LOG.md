@@ -52,3 +52,25 @@ Driven by Claude Code through Windows UI Automation (real mouse clicks / double-
 | Installed controller, PATH = System32 only: fixtures/pecli (No AI) | PASS (honest): rizin + rz-ghidra recovery, scaffold built, `scaffolded`; 36 s | manifest.json |
 | Installed controller API: local Ollama connection, probe, `all_local` preset, forecast | PASS: probe 44 s (13 models, context windows from /api/show); ladders: deepseek-coder-v2:16b → qwen2.5:14b → gemma4:12b for implementation/repair, gemma4/llama3.2-vision for visual review; forecast text states local attempts and no metered cost | API responses |
 | Local AI repair through the real implement loop (dev controller, same code as the build) | PASS: missing model → `model_unavailable` with reason → qwen2.5:14b repaired tests/data/tinycalc on attempt 1, verifier 3/3, $0, ~38 s; deepseek-coder-v2:16b also 3/3 | test_live_local.py report |
+
+## IMPORTANT CORRECTION — runs 1–4 were virtualized installs
+
+Every installer in runs 1–4 was started from processes inside the Claude desktop app (an MSIX-packaged app). Windows redirected their
+`%LOCALAPPDATA%` writes into `C:\Users\jalon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\` (same file ID seen at
+both paths from inside; Explorer reported the real `C:\Users\jalon\AppData\Local\Rebuild Studio` "unavailable" —
+run5-real-localappdata-has-no-install.png). Shortcuts still launched the app via link tracking, so launches/lifecycle/pinning results
+are real behaviour of the app binaries, but they were NOT a genuine user install. Runs 1–4 install/uninstall/data-location rows are
+therefore superseded by run 5.
+
+## Run 5 — genuine install via Explorer (commit da31c6c build, installer sha256 dbfd651cc01f439b8a18abfaf0f583f4a781a0c0a4fef070efd3cf1c9b663383, UNSIGNED)
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| Remove the virtualized copy (`uninstall.exe /S`) | PASS: virtual store emptied; desktop shortcut and pin removed | — |
+| Double-click the setup file in an Explorer window (installer parent = explorer.exe) | PASS: GUI pages, destination `C:\Users\jalon\AppData\Local\Rebuild Studio`, nothing written to the Claude package store | run5-real-install-folder-via-explorer.png |
+| Desktop shortcut (finish page, default on) shows the app icon; double-click → real exe launched by Explorer | PASS: process path `C:\Users\jalon\AppData\Local\Rebuild Studio\rebuild-studio.exe`, UI Connected, first-run empty state points to Tools | run5-real-first-run-desktop-icon.png |
+| Guided tool setup through the GUI (ILSpy + private .NET runtime) | PASS: live progress (15.0 of 31.8 MB · 47%), dependent tool queued, disabled buttons explained, both Installed | run5-real-gui-tool-install-progress.png |
+| New Project with native folder pickers (output path with spaces), consent + No AI explanations | PASS | run5-real-new-project-consent-and-no-ai.png |
+| Start → honest blocked state | FOUND 2 BUGS: .NET launcher sent to Rizin blocked recovery; blocker text pointed at a non-existent 'Settings → Dependencies'. Fixed in a341d70 (+ test_dotnet_apphost.py) — not yet re-verified in a rebuilt genuine install | Plan tab |
+| Pin to taskbar / relaunch from pin / grouping | PASS earlier on the virtualized binaries (run 5 pre-correction, run5-launched-from-taskbar-pin.png); not repeated on the genuine install | — |
+| GUI uninstall with "Delete the application data" | NOT RUN (cancelled when the virtualization was discovered) | — |

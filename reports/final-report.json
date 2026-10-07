@@ -1,11 +1,21 @@
 {
- "generated_at": "2026-10-06T18:37:15.013826+00:00",
+ "generated_at": "2026-10-07T03:13:26.663778+00:00",
  "host": {
   "os": "Windows-11-10.0.26200-SP0",
   "certifies_windows": false,
   "note": "report generated on the build host; see the Windows sections for what ran where"
  },
  "commits": [
+  "a8a0747 UI test: allow 5 s for the async focus move on slow CI runners",
+  "a341d70 Found on a genuine (non-virtualized) install: .NET apphost no longer blocks recovery; blocker text points at Tools",
+  "da31c6c Rust tool: test and plain-language text match its optional status",
+  "2444694 CI fixes: ladder keyboard-focus test waits for the async focus move; Rust toolchain marked optional (only Rust remakes need it); recorder counts vitest tests, not files",
+  "903a0f0 AI UI verified against the real controller and a local model; contract fixes; actionable integrity-label error",
+  "ab6494c AI ladder controller: credits/model-unavailable/context failures, ladder+preset+model APIs with config revisions, project AI policy (no_ai never touches the network), plan AI ownership, activity feed; live Ollama proof",
+  "1d619ca UI: editable AI model ladder (numbered rungs, local/cloud, availability, capabilities, price), searchable picker with manual IDs, presets with preview, project AI policy incl. No AI, plan AI chips + origin badges, AI activity tab",
+  "0e7704a AI ladder contract (failure taxonomy, ladder/preset/model APIs, project policy, plan AI ownership, activity feed); plan P13",
+  "c1f28c3 Guided setup installs a private Rust toolchain (rustup-init 1.29.1 pinned, GNU host 1.97.0, no admin/Visual Studio)",
+  "f3b0988 Final report: Windows sections from recorded validation (interactive desktop vs hosted CI), live doctor, current limits; plan r4",
   "c42355b Windows gate log run 3: installed-app fixtures, guided tools, uninstall/data-keep, crash/relaunch/close drills",
   "80ff419 Tests: isolate the per-user tools dir in the jsweb no-node probe test",
   "d94b546 Web capture: automatic start-page check waits for a registering service worker and skips the racy pre-load snapshot",
@@ -25,17 +35,7 @@
   "df9cb85 Truthful outcome states: pipeline progress separate from measured behaviour; no 100% unless fully matched",
   "d663af6 Isolate untrusted runs: Job Object caps + low integrity + scrubbed env; consent before running the original",
   "a133113 Controller on native Windows: reject Windows protected roots, report zip members as stored; port POSIX-only tests",
-  "d32eb7a Windows shell/installer: AUMID, desktop-shortcut-aware uninstall data removal, orphan reaping, recovery dialog; PS 5.1 build fixes; pin .NET 8.0.31 runtime",
-  "ce602d7 Plan: production-readiness P-series on a real Windows host; drop stray duplicate file",
-  "e33b4aa Final report; cutter test expects documented validation status",
-  "93e323a Record UI e2e and desktop test runs",
-  "8e3b532 Support matrix rows for UI, Cutter, packaging; DR-4 note",
-  "e27e3c6 Plan/checkpoint: workers integrated",
-  "593c32e UI e2e/polish (worker); validation error shape; /capabilities; API doc corrections; screenshot settle wait; refreshed Godot example evidence",
-  "61a9e73 Cutter plugin + client tests (worker); HTTP briefing endpoint; feedback requires an existing case",
-  "03bbf80 Windows packaging/CI handoff (worker); package data for schema/harness; untrack build artifacts; OS-aware test skips",
-  "52aa8a8 Checkpoint: in-progress worker output (UI e2e screens/specs, desktop shell fixes, packaging scripts)",
-  "739b7bd Checkpoint"
+  "d32eb7a Windows shell/installer: AUMID, desktop-shortcut-aware uninstall data removal, orphan reaping, recovery dialog; PS 5.1 build fixes; pin .NET 8.0.31 runtime"
  ],
  "branch": "ccr-4dbe9b92-nyzsa8",
  "pins": {
@@ -297,9 +297,9 @@
     },
     "rust": {
      "version": "1.97.0",
-     "role": "Rust compiler for building rebuilt programs as Windows .exe files (cargo + rustc, stable 1.97.0, host/target x86_64-pc-windows-gnu). Installed privately under tools\\rust by the official rustup-init 1.29.1 (sha256-pinned below) run as a lock-declared post_install step with RUSTUP_HOME/CARGO_HOME inside the tools folder: no administrator rights, no PATH changes, no Visual Studio Build Tools (the GNU toolchain ships its own self-contained mingw linker). Without it the app falls back to a cargo already on PATH.",
+     "role": "Rust compiler for building rebuilt programs as Windows .exe files (cargo + rustc, stable 1.97.0, host/target x86_64-pc-windows-gnu). Installed privately under tools\\rust by the official rustup-init 1.29.1 (sha256-pinned below) run as a lock-declared post_install step with RUSTUP_HOME/CARGO_HOME inside the tools folder: no administrator rights, no PATH changes, no Visual Studio Build Tools (the GNU toolchain ships its own self-contained mingw linker). Without it the app falls back to a cargo already on PATH. Optional: needed only to build Rust remakes (not for recovery, web ports or comparisons).",
      "license": "MIT OR Apache-2.0 (rustup, Rust toolchain); the bundled mingw-w64 linker files carry their own permissive/GPL-with-exception licenses",
-     "optional": false,
+     "optional": true,
      "source": {
       "repo": "https://github.com/rust-lang/rustup",
       "docs": "https://rust-lang.github.io/rustup/installation/other.html",
@@ -320,9 +320,9 @@
       "sha256_official_url": "https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe.sha256"
      },
      "footprint": {
-      "installer_download_bytes": 150000000,
-      "disk_bytes": 320000000,
-      "note": "rustup-init (12.7 MB, pinned above) downloads the toolchain components itself (about 150 MB) and unpacks to about 320 MB. rustup verifies every component's hash against Rust's signed release manifests (channel-rust-1.97.0.toml); that check is rustup's, the lock pins only the installer and the toolchain version."
+      "installer_download_bytes": 147000000,
+      "disk_bytes": 840000000,
+      "note": "rustup-init (12.7 MB, pinned above) downloads the toolchain components itself (about 147 MB) and unpacks to about 840 MB. rustup verifies every component's hash against Rust's signed release manifests (channel-rust-1.97.0.toml); that check is rustup's, the lock pins only the installer and the toolchain version."
      },
      "layout": {
       "archive_root": "",
@@ -555,10 +555,10 @@
     "tools": [
      {
       "name": "gdre_tools",
-      "availability": "installed",
-      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\gdre\\gdre_tools.exe",
-      "version": "2.7.0",
-      "detail": "no release archive found next to the tools to verify",
+      "availability": "missing",
+      "path": null,
+      "version": null,
+      "detail": "gdre_tools not found in tools dir or PATH",
       "prerequisites": [],
       "license": "MIT",
       "source": "https://github.com/GDRETools/gdsdecomp",
@@ -566,18 +566,18 @@
       "integrity": "",
       "integration": "cli",
       "optional": false,
-      "next_action": "",
+      "next_action": "Download GDRE tools 2.7.0 from https://github.com/GDRETools/gdsdecomp/releases/tag/v2.7.0, verify the zip sha256 abb4c197fe517d6a46b67faf41fc76d9890c882661a55ca2d49ba605955dfacc, and unpack it to <tools_dir>/gdre/",
       "extra": {}
      }
     ],
     "resources": {
      "typical_seconds": "4-600",
      "ram_mb": 500,
-     "next_action": ""
+     "next_action": "Download GDRE tools 2.7.0 from https://github.com/GDRETools/gdsdecomp/releases/tag/v2.7.0, verify the zip sha256 abb4c197fe517d6a46b67faf41fc76d9890c882661a55ca2d49ba605955dfacc, and unpack it to <tools_dir>/gdre/"
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "installed"
+    "availability": "missing"
    },
    {
     "backend_id": "ghidra",
@@ -694,32 +694,32 @@
     "tools": [
      {
       "name": "ilspycmd",
-      "availability": "installed",
-      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\ilspycmd\\ilspycmd.dll",
-      "version": "9.1.0.7988",
-      "detail": "",
+      "availability": "missing",
+      "path": null,
+      "version": null,
+      "detail": "ilspycmd not found in tools dir, PATH or ~/.dotnet/tools",
       "prerequisites": [
        ".NET 8 runtime"
       ],
       "license": "MIT",
       "source": "https://github.com/icsharpcode/ILSpy",
       "pinned": "9.1.0.7988",
-      "integrity": "58ef1a86bea09f2e5a114720b607dd0bdaaf91cfe498c6b7a3412bd960d0f57d",
+      "integrity": "",
       "integration": "cli",
       "optional": false,
-      "next_action": "",
+      "next_action": "dotnet tool install ilspycmd --version 9.1.0.7988 --tool-path ~/.dotnet/tools   (requires the .NET 8 SDK/runtime)",
       "extra": {}
      }
     ],
     "resources": {
      "typical_seconds_per_assembly": "1-30",
      "ram_mb": 300,
-     "next_action": "",
+     "next_action": "dotnet tool install ilspycmd --version 9.1.0.7988 --tool-path ~/.dotnet/tools   (requires the .NET 8 SDK/runtime)",
      "il2cpp": "unsupported (reported, never faked)"
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "installed"
+    "availability": "missing"
    },
    {
     "backend_id": "jsweb",
@@ -783,8 +783,8 @@
      {
       "name": "node",
       "availability": "installed",
-      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\node\\node.exe",
-      "version": "22.22.0",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\hermes\\node\\node.EXE",
+      "version": "22.23.2",
       "detail": "",
       "prerequisites": [],
       "license": "MIT",
@@ -1148,7 +1148,7 @@
      {
       "name": "rizin",
       "availability": "installed",
-      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\rizin\\rizin.exe",
+      "path": "D:\\rs-test-tools\\rizin\\rizin.exe",
       "version": "0.9.1",
       "detail": "commit c3a90e9226d977f58f4e9c75f78fa6b07afe13c7; shared source build",
       "prerequisites": [],
@@ -1168,9 +1168,9 @@
       {
        "name": "rz-ghidra",
        "availability": "installed",
-       "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\rizin\\lib\\rizin\\plugins\\core_ghidra.dll",
+       "path": "D:\\rs-test-tools\\rizin\\lib\\rizin\\plugins\\core_ghidra.dll",
        "version": null,
-       "detail": "plugin for rizin 0.9.1 at C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\rizin\\rizin.exe; build provenance unknown (no build manifest)",
+       "detail": "plugin for rizin 0.9.1 at D:\\rs-test-tools\\rizin\\rizin.exe; build provenance unknown (no build manifest)",
        "prerequisites": [
         "rizin shared build with headers (not the static release)",
         "cmake",
@@ -1264,9 +1264,9 @@
    }
   ],
   "summary": {
-   "missing": 2,
+   "missing": 4,
    "detected": 0,
-   "installed": 5,
+   "installed": 3,
    "usable": 0,
    "verified": 0
   },
@@ -1335,6 +1335,42 @@
    "skipped": 0,
    "when": "2026-10-06T12:40:00+00:00",
    "log_tail": "runs 2-4 passed after controller fix 46db2fc; run 1 failed on the pre-fix controller (duplicate recover_web jobs)"
+  },
+  {
+   "name": "windows-11 controller (not e2e/live)",
+   "command": "pytest -m 'not e2e and not live' (REBUILD_STUDIO_TOOLS=app tools dir)",
+   "passed": 802,
+   "failed": 0,
+   "skipped": 9,
+   "when": "2026-10-07T00:15:49+00:00",
+   "log_tail": "ated, use lifespan event handlers instead.\n  \n          Read more about it in the\n          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).\n          \n    return self.router.on_event(event_type)  # ty: ignore[deprecated]\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n802 passed, 9 skipped, 30 deselected, 94 warnings in 359.62s (0:05:59)\n"
+  },
+  {
+   "name": "windows-11 desktop cargo test",
+   "command": "cargo test (desktop/src-tauri)",
+   "passed": 28,
+   "failed": 0,
+   "skipped": 0,
+   "when": "2026-10-07T00:15:49+00:00",
+   "log_tail": "ed; 0 measured; 0 filtered out; finished in 4.08s\n\n     Running unittests src\\main.rs (target\\debug\\deps\\rebuild_studio-4f1fe43f836d67ca.exe)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests rebuild_studio_lib\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+  },
+  {
+   "name": "windows-11 ui vitest",
+   "command": "npx vitest run",
+   "passed": 114,
+   "failed": 0,
+   "skipped": 0,
+   "when": "2026-10-07T02:42:05+00:00",
+   "log_tail": " validation errors instead of saving, then saves a valid scenario 1215ms\n   \u00e2\u0153\u201c New project: run the original? > defaults to No, tells the truth about protection, and sends/confirms the consent choice 763ms\n\n Test Files  8 passed (8)\n      Tests  114 passed (114)\n   Start at  18:16:13\n   Duration  6.45s (transform 1.06s, setup 921ms, collect 8.03s, tests 10.48s, environment 7.63s, prepare 1.39s)\n\n"
+  },
+  {
+   "name": "windows-11 controller e2e",
+   "command": "pytest -m e2e (real rizin+rz-ghidra, ILSpy, GDRE, Edge/Chromium, cargo)",
+   "passed": 20,
+   "failed": 0,
+   "skipped": 1,
+   "when": "2026-10-07T02:42:05+00:00",
+   "log_tail": "st_preview_feedback_retest_cycle\n  D:\\decomp\\controller\\rebuild_controller\\comparators\\images.py:24: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.\n    px = diff.getdata()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n20 passed, 1 skipped, 820 deselected, 1 warning in 128.34s (0:02:08)\n"
   }
  ],
  "fixtures": {
@@ -1988,98 +2024,73 @@
  ],
  "hermes_gates": [],
  "windows": {
-  "host": "Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md.",
-  "build": "commit 80ff419: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 b1c15bba9b17a0063eda218385e2f1cfe6a2d5adf3d1e31cb1bad929cef614c4 (NSIS .exe, per-user), portable zip sha256 21830bae2e122f4253ebb2001a3b8d13bcfa372c14856ba7441a399b86bfaedd",
+  "host": "Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md. IMPORTANT: installs in runs 1\u20134 were launched from inside the Claude desktop app (MSIX) and were file-system virtualized into its private AppData; run 5 is the genuine install launched from Explorer.",
+  "build": "commit da31c6c: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 dbfd651cc01f439b8a18abfaf0f583f4a781a0c0a4fef070efd3cf1c9b663383 (NSIS .exe, per-user); portable 690632a7\u2026",
   "interactive": [
    {
-    "gate": "Windows build (Build-RebuildStudio.ps1 under PowerShell 5.1)",
-    "result": "PASS after fixes",
-    "notes": "PS 5.1 array-unrolling and quote-stripping bugs fixed; build fails if any backend cannot load in the frozen controller"
-   },
-   {
-    "gate": "GUI install from a path with spaces, no admin",
+    "gate": "Genuine install: setup double-clicked in Explorer, GUI pages, path with spaces, no admin",
     "result": "PASS",
-    "notes": "default %LOCALAPPDATA%\\Rebuild Studio; no UAC prompt"
+    "notes": "real %LOCALAPPDATA%\\Rebuild Studio verified in Explorer"
    },
    {
-    "gate": "Desktop shortcut offered during install",
+    "gate": "Desktop shortcut offered (default on); app icon; double-click \u2192 full UI, no console",
     "result": "PASS",
-    "notes": "finish-page checkbox 'Create desktop shortcut', ticked by default; also created by silent/passive installs"
+    "notes": "Explorer launched the real exe; UI Connected"
    },
    {
-    "gate": "Start-menu entry, Apps entry, icon, AppUserModelID",
+    "gate": "Start-menu entry / AppUserModelID",
+    "result": "PASS (virtualized run) \u2014 not repeated on genuine install",
+    "notes": "shortcut AUMID io.rebuildstudio.desktop = process AUMID"
+   },
+   {
+    "gate": "Pin to taskbar \u2192 close \u2192 relaunch from pin; icon and grouping",
+    "result": "PASS on the same binaries in a virtualized install; not repeated on the genuine install",
+    "notes": "jump list showed name/icon; one taskbar button"
+   },
+   {
+    "gate": "Guided tool setup through the GUI",
     "result": "PASS",
-    "notes": "shortcuts carry System.AppUserModel.ID io.rebuildstudio.desktop; the process sets the same ID"
+    "notes": "ILSpy + .NET runtime with live progress; explained disabled buttons"
    },
    {
-    "gate": "Double-click desktop icon \u2192 full UI, no console",
-    "result": "PASS (after fix)",
-    "notes": "first run showed 'Disconnected' (CORS preflight 401); fixed and re-verified 'Connected'"
-   },
-   {
-    "gate": "Start-menu shortcut launch",
+    "gate": "New Project with native folder pickers; consent and No AI explanations",
     "result": "PASS",
-    "notes": "controller ready in 1.9 s, UI connected, one taskbar button"
+    "notes": "output path with spaces"
    },
    {
-    "gate": "Pin to taskbar and relaunch from pin",
+    "gate": "Real fixture through the genuine install",
+    "result": "BLOCKED \u2192 fixed, not re-verified",
+    "notes": ".NET launcher routed to Rizin blocked recovery; fixed in a341d70"
+   },
+   {
+    "gate": "Lifecycle: normal close, crash kill, relaunch with stale controller.json",
+    "result": "PASS (virtualized install, same binaries)",
+    "notes": "Job Object kills the controller tree"
+   },
+   {
+    "gate": "Update in place; ordinary uninstall keeps data; credential purge",
+    "result": "PASS (virtualized install)",
+    "notes": "repeat on genuine install pending"
+   },
+   {
+    "gate": "GUI uninstall with 'Delete the application data'",
     "result": "NOT RUN",
-    "notes": "Windows blocks programmatic pinning; needs a person"
+    "notes": "cancelled when virtualization was discovered"
    },
    {
-    "gate": "Normal close",
+    "gate": "Installed controller completes fixtures with only app-installed tools (CLI, PATH=System32)",
+    "result": "PASS (virtualized install)",
+    "notes": "web fully_matched within declared scenario; .NET and native PE honestly scaffolded"
+   },
+   {
+    "gate": "AI ladder UI vs real controller + local Ollama (dev build)",
     "result": "PASS",
-    "notes": "all rebuild-* processes exit, controller.json removed"
+    "notes": "Playwright 3/3; qwen2.5:14b repaired tinycalc, verifier 3/3"
    },
    {
-    "gate": "Forced termination of the shell (crash)",
-    "result": "PASS",
-    "notes": "controller tree killed by the Job Object within 2 s"
-   },
-   {
-    "gate": "Relaunch after crash (stale controller.json)",
-    "result": "PASS",
-    "notes": "new port/token, exactly one controller, /health ok"
-   },
-   {
-    "gate": "Update over an existing install",
-    "result": "PASS",
-    "notes": "binaries replaced; projects, tools, keys and shortcuts kept"
-   },
-   {
-    "gate": "Guided dependency setup without PowerShell",
-    "result": "PASS",
-    "notes": "rizin+rz-ghidra (Cutter v2.5.0 build), GDRE, .NET 8.0.31, ILSpy, Node, playwright-core installed and hash-verified by the app; install-from-file path exercised"
-   },
-   {
-    "gate": "Real fixture through the installed controller using only guided-setup components",
-    "result": "PASS (web) / BLOCKED (Rust targets)",
-    "notes": "fixtures/webapp 3/3 fully matched within the declared scenario with system Edge, PATH=System32 only; .NET\u2192Rust blocked: no Rust toolchain in guided setup (see unresolved)"
-   },
-   {
-    "gate": "Ordinary uninstall keeps data",
-    "result": "PASS",
-    "notes": "program, shortcuts and Apps entry removed; %LOCALAPPDATA%\\RebuildStudio and Credential Manager entries kept"
-   },
-   {
-    "gate": "Data-removal credential purge",
-    "result": "PASS",
-    "notes": "rebuild-studio.exe --remove-stored-credentials removed RebuildStudio:* entries headlessly"
-   },
-   {
-    "gate": "Uninstall with 'Delete the application data' ticked (GUI)",
+    "gate": "Standard user account; clean VM; signed build",
     "result": "NOT RUN",
-    "notes": "needs the uninstaller GUI"
-   },
-   {
-    "gate": "Full UI walk (New Project \u2192 plan \u2192 preview \u2192 feedback \u2192 scenarios \u2192 results \u2192 reopen), keyboard, DPI, narrow widths",
-    "result": "NOT RUN",
-    "notes": "the owner was using the desktop; component tests cover the screens (UI vitest 104)"
-   },
-   {
-    "gate": "Standard (non-admin) user account; clean VM",
-    "result": "NOT RUN",
-    "notes": "creating accounts/VMs was out of scope on this machine"
+    "notes": "not available on this machine"
    }
   ],
   "measurements": [
@@ -2095,10 +2106,10 @@
    "Earlier runs found and drove fixes: POSIX sandbox (.NET SIGXFSZ), hosted-runner portability (gcc app.exe, process-limit test)"
   ],
   "unresolved": [
-   "Rust toolchain for Rust remakes is not yet part of guided setup on a clean machine (in progress at report time).",
-   "Taskbar pin + relaunch from pin, GUI uninstall with data deletion, full packaged UI walk, high-DPI/narrow-width checks: need a person at the desktop.",
-   "Clean Windows 10/11 VM with a standard user and no developer tools; Windows Defender first-run timing on such a machine.",
-   "Code signing (no certificate); live AI provider runs (no keys)."
+   "Re-verify the .NET/native fixture flow on a genuine install rebuilt from a341d70+.",
+   "Repeat pin, Start-menu, update and uninstall (incl. 'Delete the application data') on the genuine install.",
+   "Clean Windows 10/11 VM with a standard user; code signing; live cloud AI providers (no keys).",
+   "Windows hosted CI: UI focus test timing fix pushed (a8a0747); result pending at report time."
   ]
  },
  "limits": [

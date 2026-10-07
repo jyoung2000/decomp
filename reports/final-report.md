@@ -1,9 +1,19 @@
 # Rebuild Studio — final report
 
-Generated 2026-10-06T18:37:15.013826+00:00 on Windows-11-10.0.26200-SP0 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
+Generated 2026-10-07T03:13:26.663778+00:00 on Windows-11-10.0.26200-SP0 (certifies Windows: False). Branch `ccr-4dbe9b92-nyzsa8`.
 
 ## Implementation commits
 
+- `a8a0747 UI test: allow 5 s for the async focus move on slow CI runners`
+- `a341d70 Found on a genuine (non-virtualized) install: .NET apphost no longer blocks recovery; blocker text points at Tools`
+- `da31c6c Rust tool: test and plain-language text match its optional status`
+- `2444694 CI fixes: ladder keyboard-focus test waits for the async focus move; Rust toolchain marked optional (only Rust remakes need it); recorder counts vitest tests, not files`
+- `903a0f0 AI UI verified against the real controller and a local model; contract fixes; actionable integrity-label error`
+- `ab6494c AI ladder controller: credits/model-unavailable/context failures, ladder+preset+model APIs with config revisions, project AI policy (no_ai never touches the network), plan AI ownership, activity feed; live Ollama proof`
+- `1d619ca UI: editable AI model ladder (numbered rungs, local/cloud, availability, capabilities, price), searchable picker with manual IDs, presets with preview, project AI policy incl. No AI, plan AI chips + origin badges, AI activity tab`
+- `0e7704a AI ladder contract (failure taxonomy, ladder/preset/model APIs, project policy, plan AI ownership, activity feed); plan P13`
+- `c1f28c3 Guided setup installs a private Rust toolchain (rustup-init 1.29.1 pinned, GNU host 1.97.0, no admin/Visual Studio)`
+- `f3b0988 Final report: Windows sections from recorded validation (interactive desktop vs hosted CI), live doctor, current limits; plan r4`
 - `c42355b Windows gate log run 3: installed-app fixtures, guided tools, uninstall/data-keep, crash/relaunch/close drills`
 - `80ff419 Tests: isolate the per-user tools dir in the jsweb no-node probe test`
 - `d94b546 Web capture: automatic start-page check waits for a registering service worker and skips the racy pre-load snapshot`
@@ -24,16 +34,6 @@ Generated 2026-10-06T18:37:15.013826+00:00 on Windows-11-10.0.26200-SP0 (certifi
 - `d663af6 Isolate untrusted runs: Job Object caps + low integrity + scrubbed env; consent before running the original`
 - `a133113 Controller on native Windows: reject Windows protected roots, report zip members as stored; port POSIX-only tests`
 - `d32eb7a Windows shell/installer: AUMID, desktop-shortcut-aware uninstall data removal, orphan reaping, recovery dialog; PS 5.1 build fixes; pin .NET 8.0.31 runtime`
-- `ce602d7 Plan: production-readiness P-series on a real Windows host; drop stray duplicate file`
-- `e33b4aa Final report; cutter test expects documented validation status`
-- `93e323a Record UI e2e and desktop test runs`
-- `8e3b532 Support matrix rows for UI, Cutter, packaging; DR-4 note`
-- `e27e3c6 Plan/checkpoint: workers integrated`
-- `593c32e UI e2e/polish (worker); validation error shape; /capabilities; API doc corrections; screenshot settle wait; refreshed Godot example evidence`
-- `61a9e73 Cutter plugin + client tests (worker); HTTP briefing endpoint; feedback requires an existing case`
-- `03bbf80 Windows packaging/CI handoff (worker); package data for schema/harness; untrack build artifacts; OS-aware test skips`
-- `52aa8a8 Checkpoint: in-progress worker output (UI e2e screens/specs, desktop shell fixes, packaging scripts)`
-- `739b7bd Checkpoint`
 
 ## Dependency pins
 
@@ -47,10 +47,10 @@ Generated 2026-10-06T18:37:15.013826+00:00 on Windows-11-10.0.26200-SP0 (certifi
 
 | Backend | Availability | Tools |
 |---|---|---|
-| gdre | installed | gdre_tools installed 2.7.0 |
+| gdre | missing | gdre_tools missing  |
 | ghidra | missing | ghidra missing  |
-| ilspy | installed | ilspycmd installed 9.1.0.7988 |
-| jsweb | installed | jsweb-native installed 1; node installed 22.22.0; asar missing  |
+| ilspy | missing | ilspycmd missing  |
+| jsweb | installed | jsweb-native installed 1; node installed 22.23.2; asar missing  |
 | jvm | missing | java installed 17.0.20.1; cfr missing ; jadx missing  |
 | rizin | installed | rizin installed 0.9.1 |
 | triage | installed | builtin-parsers installed 1 |
@@ -66,6 +66,10 @@ Generated 2026-10-06T18:37:15.013826+00:00 on Windows-11-10.0.26200-SP0 (certifi
 | ui playwright e2e vs mock controller | `cd ui && npm run e2e` | 18 | 0 | 4 | 2026-10-06T12:29:00+00:00 |
 | ui vitest | `cd ui && npm test` | 68 | 0 | 0 | 2026-10-06T12:29:00+00:00 |
 | ui playwright real-controller spec (worker run, web fixture end to end) | `cd ui && REAL_CONTROLLER=1 REAL_CONTROLLER_DATA=<data> npx playwright test real-controller` | 4 | 0 | 0 | 2026-10-06T12:40:00+00:00 |
+| windows-11 controller (not e2e/live) | `pytest -m 'not e2e and not live' (REBUILD_STUDIO_TOOLS=app tools dir)` | 802 | 0 | 9 | 2026-10-07T00:15:49+00:00 |
+| windows-11 desktop cargo test | `cargo test (desktop/src-tauri)` | 28 | 0 | 0 | 2026-10-07T00:15:49+00:00 |
+| windows-11 ui vitest | `npx vitest run` | 114 | 0 | 0 | 2026-10-07T02:42:05+00:00 |
+| windows-11 controller e2e | `pytest -m e2e (real rizin+rz-ghidra, ILSpy, GDRE, Edge/Chromium, cargo)` | 20 | 0 | 1 | 2026-10-07T02:42:05+00:00 |
 
 ## Fixtures
 
@@ -118,30 +122,25 @@ Recommended follow-up (not done here): record a `source` (`mcp` or `controller`)
 
 ## Windows (interactive desktop)
 
-Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md.
+Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md. IMPORTANT: installs in runs 1–4 were launched from inside the Claude desktop app (MSIX) and were file-system virtualized into its private AppData; run 5 is the genuine install launched from Explorer.
 
-Build under test: commit 80ff419: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 b1c15bba9b17a0063eda218385e2f1cfe6a2d5adf3d1e31cb1bad929cef614c4 (NSIS .exe, per-user), portable zip sha256 21830bae2e122f4253ebb2001a3b8d13bcfa372c14856ba7441a399b86bfaedd
+Build under test: commit da31c6c: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 dbfd651cc01f439b8a18abfaf0f583f4a781a0c0a4fef070efd3cf1c9b663383 (NSIS .exe, per-user); portable 690632a7…
 
 | Gate | Result | Notes |
 |---|---|---|
-| Windows build (Build-RebuildStudio.ps1 under PowerShell 5.1) | PASS after fixes | PS 5.1 array-unrolling and quote-stripping bugs fixed; build fails if any backend cannot load in the frozen controller |
-| GUI install from a path with spaces, no admin | PASS | default %LOCALAPPDATA%\Rebuild Studio; no UAC prompt |
-| Desktop shortcut offered during install | PASS | finish-page checkbox 'Create desktop shortcut', ticked by default; also created by silent/passive installs |
-| Start-menu entry, Apps entry, icon, AppUserModelID | PASS | shortcuts carry System.AppUserModel.ID io.rebuildstudio.desktop; the process sets the same ID |
-| Double-click desktop icon → full UI, no console | PASS (after fix) | first run showed 'Disconnected' (CORS preflight 401); fixed and re-verified 'Connected' |
-| Start-menu shortcut launch | PASS | controller ready in 1.9 s, UI connected, one taskbar button |
-| Pin to taskbar and relaunch from pin | NOT RUN | Windows blocks programmatic pinning; needs a person |
-| Normal close | PASS | all rebuild-* processes exit, controller.json removed |
-| Forced termination of the shell (crash) | PASS | controller tree killed by the Job Object within 2 s |
-| Relaunch after crash (stale controller.json) | PASS | new port/token, exactly one controller, /health ok |
-| Update over an existing install | PASS | binaries replaced; projects, tools, keys and shortcuts kept |
-| Guided dependency setup without PowerShell | PASS | rizin+rz-ghidra (Cutter v2.5.0 build), GDRE, .NET 8.0.31, ILSpy, Node, playwright-core installed and hash-verified by the app; install-from-file path exercised |
-| Real fixture through the installed controller using only guided-setup components | PASS (web) / BLOCKED (Rust targets) | fixtures/webapp 3/3 fully matched within the declared scenario with system Edge, PATH=System32 only; .NET→Rust blocked: no Rust toolchain in guided setup (see unresolved) |
-| Ordinary uninstall keeps data | PASS | program, shortcuts and Apps entry removed; %LOCALAPPDATA%\RebuildStudio and Credential Manager entries kept |
-| Data-removal credential purge | PASS | rebuild-studio.exe --remove-stored-credentials removed RebuildStudio:* entries headlessly |
-| Uninstall with 'Delete the application data' ticked (GUI) | NOT RUN | needs the uninstaller GUI |
-| Full UI walk (New Project → plan → preview → feedback → scenarios → results → reopen), keyboard, DPI, narrow widths | NOT RUN | the owner was using the desktop; component tests cover the screens (UI vitest 104) |
-| Standard (non-admin) user account; clean VM | NOT RUN | creating accounts/VMs was out of scope on this machine |
+| Genuine install: setup double-clicked in Explorer, GUI pages, path with spaces, no admin | PASS | real %LOCALAPPDATA%\Rebuild Studio verified in Explorer |
+| Desktop shortcut offered (default on); app icon; double-click → full UI, no console | PASS | Explorer launched the real exe; UI Connected |
+| Start-menu entry / AppUserModelID | PASS (virtualized run) — not repeated on genuine install | shortcut AUMID io.rebuildstudio.desktop = process AUMID |
+| Pin to taskbar → close → relaunch from pin; icon and grouping | PASS on the same binaries in a virtualized install; not repeated on the genuine install | jump list showed name/icon; one taskbar button |
+| Guided tool setup through the GUI | PASS | ILSpy + .NET runtime with live progress; explained disabled buttons |
+| New Project with native folder pickers; consent and No AI explanations | PASS | output path with spaces |
+| Real fixture through the genuine install | BLOCKED → fixed, not re-verified | .NET launcher routed to Rizin blocked recovery; fixed in a341d70 |
+| Lifecycle: normal close, crash kill, relaunch with stale controller.json | PASS (virtualized install, same binaries) | Job Object kills the controller tree |
+| Update in place; ordinary uninstall keeps data; credential purge | PASS (virtualized install) | repeat on genuine install pending |
+| GUI uninstall with 'Delete the application data' | NOT RUN | cancelled when virtualization was discovered |
+| Installed controller completes fixtures with only app-installed tools (CLI, PATH=System32) | PASS (virtualized install) | web fully_matched within declared scenario; .NET and native PE honestly scaffolded |
+| AI ladder UI vs real controller + local Ollama (dev build) | PASS | Playwright 3/3; qwen2.5:14b repaired tinycalc, verifier 3/3 |
+| Standard user account; clean VM; signed build | NOT RUN | not available on this machine |
 
 Measurements on this host (not a clean machine):
 
@@ -160,10 +159,10 @@ Workflows trigger on main/PR only; runs were dispatched manually (workflow_dispa
 
 ## Unresolved Windows gates
 
-- Rust toolchain for Rust remakes is not yet part of guided setup on a clean machine (in progress at report time).
-- Taskbar pin + relaunch from pin, GUI uninstall with data deletion, full packaged UI walk, high-DPI/narrow-width checks: need a person at the desktop.
-- Clean Windows 10/11 VM with a standard user and no developer tools; Windows Defender first-run timing on such a machine.
-- Code signing (no certificate); live AI provider runs (no keys).
+- Re-verify the .NET/native fixture flow on a genuine install rebuilt from a341d70+.
+- Repeat pin, Start-menu, update and uninstall (incl. 'Delete the application data') on the genuine install.
+- Clean Windows 10/11 VM with a standard user; code signing; live cloud AI providers (no keys).
+- Windows hosted CI: UI focus test timing fix pushed (a8a0747); result pending at report time.
 
 ## Windows release gates (not certified here)
 
