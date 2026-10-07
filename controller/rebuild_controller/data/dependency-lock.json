@@ -229,9 +229,9 @@
     },
     "rust": {
       "version": "1.97.0",
-      "role": "Rust compiler for building rebuilt programs as Windows .exe files (cargo + rustc, stable 1.97.0, host/target x86_64-pc-windows-gnu). Installed privately under tools\\rust by the official rustup-init 1.29.1 (sha256-pinned below) run as a lock-declared post_install step with RUSTUP_HOME/CARGO_HOME inside the tools folder: no administrator rights, no PATH changes, no Visual Studio Build Tools (the GNU toolchain ships its own self-contained mingw linker). Without it the app falls back to a cargo already on PATH.",
+      "role": "Rust compiler for building rebuilt programs as Windows .exe files (cargo + rustc, stable 1.97.0, host/target x86_64-pc-windows-gnu). Installed privately under tools\\rust by the official rustup-init 1.29.1 (sha256-pinned below) run as a lock-declared post_install step with RUSTUP_HOME/CARGO_HOME inside the tools folder: no administrator rights, no PATH changes, no Visual Studio Build Tools (the GNU toolchain ships its own self-contained mingw linker). Without it the app falls back to a cargo already on PATH. Optional: needed only to build Rust remakes (not for recovery, web ports or comparisons).",
       "license": "MIT OR Apache-2.0 (rustup, Rust toolchain); the bundled mingw-w64 linker files carry their own permissive/GPL-with-exception licenses",
-      "optional": false,
+      "optional": true,
       "source": {
         "repo": "https://github.com/rust-lang/rustup",
         "docs": "https://rust-lang.github.io/rustup/installation/other.html",

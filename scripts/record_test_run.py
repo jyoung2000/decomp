@@ -4,9 +4,12 @@ import json, re, sys
 from datetime import datetime, timezone
 from pathlib import Path
 name, command, log = sys.argv[1], sys.argv[2], Path(sys.argv[3]).read_text(errors="replace")
-m = re.search(r"(\d+) passed", log); f = re.search(r"(\d+) failed", log); s = re.search(r"(\d+) skipped", log)
-if not m and "Tests" in log:  # vitest
-    m = re.search(r"Tests\s+(\d+) passed", log); f = re.search(r"(\d+) failed", log)
+log = re.sub(r"\[[0-9;]*m", "", log)   # vitest colours its summary
+vt = re.search(r"^\s*Tests\s+(?:(\d+) failed \| )?(\d+) passed", log, re.M)   # vitest: count tests, not test files
+if vt:
+    m = re.match(r"(\d+)", vt.group(2)); f = re.match(r"(\d+)", vt.group(1) or "0"); s = re.search(r"(\d+) skipped", log)
+else:
+    m = re.search(r"(\d+) passed", log); f = re.search(r"(\d+) failed", log); s = re.search(r"(\d+) skipped", log)
 p = Path(__file__).resolve().parents[1] / "reports" / "test-runs.json"
 runs = json.loads(p.read_text()) if p.exists() else []
 runs = [r for r in runs if r["name"] != name]
