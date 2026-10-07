@@ -177,13 +177,14 @@ def forecast(st: Any, **kw: Any) -> dict[str, Any]:
 
 
 def _forecast(st: Any, *, target_language: str, output_type: str, ai_policy: dict[str, Any] | None, launch_profile: dict[str, Any] | None,
-             profile: str | None = None) -> dict[str, Any]:
+             profile: str | None = None, has_baseline: bool = False) -> dict[str, Any]:
     """State in plain language whether an implementation can be produced for the selected profile/target/AI mode."""
     from .reconstruct import _unsupported_combo
     pol = LoopPolicy.from_case({"ai_policy": ai_policy or {"mode": "no_ai"}})
     lp = launch_profile or {}
     scaffold = {"rust": "Rust", "rust_bevy": "Rust (Bevy)", "auto": "Rust"}.get(target_language, "Rust")
-    can_verify = bool(lp.get("baseline_file") or (lp.get("execute_original") and lp.get("scenarios")))
+    # A frozen baseline (e.g. user scenarios recorded from the original) is what the implement loop verifies against.
+    can_verify = bool(has_baseline or lp.get("baseline_file") or (lp.get("execute_original") and lp.get("scenarios")))
     res: dict[str, Any] = {"state": None, "can_produce_implementation": False, "will_use_ai": False, "verifiable": can_verify, "summary": "", "details": [], "blockers": [],
                            "next_actions": [], "route": None, "max_attempts": pol.max_attempts if pol.ai_enabled else 0,
                            "budget_usd": pol.budget_usd if pol.ai_enabled else None, "pricing": None, "profile": profile, "target_language": target_language}
@@ -238,8 +239,12 @@ def forecast_for_case(st: Any, case: dict[str, Any]) -> dict[str, Any]:
             profile = ((st.cases.evidence_body(evs[-1]["evidence_id"]) or {}).get("profile") or {}).get("primary")
     except Exception:
         profile = None
+    try:
+        has_baseline = bool(st.cases.list_evidence(case["case_id"], kind="baseline"))
+    except Exception:
+        has_baseline = False
     return forecast(st, target_language=case["target_language"], output_type=case["output_type"], ai_policy=case.get("ai_policy"),
-                    launch_profile=case.get("launch_profile"), profile=profile)
+                    launch_profile=case.get("launch_profile"), profile=profile, has_baseline=has_baseline)
 
 
 def global_forecast(st: Any) -> dict[str, Any]:

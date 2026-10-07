@@ -380,6 +380,17 @@ def stage_capture_original(ctx: StageContext) -> dict[str, Any]:
         ev = st.verifier.freeze_baseline(case["case_id"], bl, producer="fixture_oracle", title="Fixture oracle baseline")
         ctx.log(f"Loaded the expected behaviour for {len(bl.get('scenarios', []))} scenarios from the supplied baseline file")
         return {"evidence_id": ev["evidence_id"], "source": "fixture_oracle", "scenarios": len(bl.get("scenarios", []))}
+    if not lp.get("scenarios"):
+        # Scenarios recorded from the original in the Scenarios tab already froze a baseline. Reuse it: blocking here
+        # ("configure how the original is started") stalled such projects, and freezing a new empty baseline would supersede it.
+        try:
+            prev_ev, prev_bl = st.verifier.load_baseline(case["case_id"])
+        except Exception:
+            prev_ev, prev_bl = None, None
+        if prev_ev and (prev_bl or {}).get("scenarios"):
+            n = len(prev_bl["scenarios"])
+            ctx.log(f"Using the behaviour already recorded from the original for {n} scenario(s); it is the reference to compare against")
+            return {"evidence_id": prev_ev["evidence_id"], "source": "recorded_scenarios", "scenarios": n}
     if not lp.get("execute_original"):
         raise StageError("original execution not authorized", blocker="enable 'execute original' in launch configuration to capture a baseline")
     from .cases import require_original_execution_consent
