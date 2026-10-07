@@ -13,6 +13,9 @@ from ..paths import PathPolicyError, assert_output_not_in_source, resolve_final
 from .report import write_reports
 
 
+STAGING_NAME = ".rebuild-studio-publishing"   # removed after each delivery; never listed in the manifest
+
+
 def deliver(ctx: StageContext) -> dict[str, Any]:
     st = ctx.services["studio"]
     case = st.cases.get_case(ctx.job.case_id)
@@ -25,7 +28,10 @@ def deliver(ctx: StageContext) -> dict[str, Any]:
     out_root = Path(case["output_root"])
     ctx.log(f"Delivering the rebuilt project to {out_root}…")
     assert_output_not_in_source(out_root, Path(case["source_root"]))
-    staging = st.cases.case_root(case["case_id"]) / "publish.staging"
+    # Stage inside the output folder: the final os.replace must stay on one volume (an output folder on another drive than
+    # the data folder failed with WinError 17 on a real install), and it keeps publication atomic per entry.
+    out_root.mkdir(parents=True, exist_ok=True)
+    staging = out_root / STAGING_NAME
     if staging.exists():
         shutil.rmtree(staging)
     (staging / "source").mkdir(parents=True)
