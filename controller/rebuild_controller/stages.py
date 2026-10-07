@@ -61,9 +61,16 @@ def stage_inventory(ctx: StageContext) -> dict[str, Any]:
             mid = st.cases.add_module(case["case_id"], f["path"], f["sha256"], f["size"], d["format"], d["profile"], d.get("arch"), {"flags": d.get("flags", {}), "bits": d.get("bits")})
             modules.append((mid, f["path"], d["profile"]))
     unsupported = []
+    dotnet_stems = {r.lower()[:-4]: r for _m, r, p in modules if p in ("dotnet", "unity_mono") and r.lower().endswith(".dll")}
     created = []
     for mid, rel, profile in modules:
         stage = PROFILE_STAGE.get(profile)
+        if stage == "analyze_module" and rel.lower().endswith(".exe") and dotnet_stems.get(rel.lower()[:-4]):
+            # .NET apphost: a generic native launcher; the C# is recovered from the managed .dll next to it, so a missing
+            # native analyser must not block recovery of a .NET app.
+            unsupported.append({"module": rel, "profile": profile, "reason": f".NET launcher (apphost) for {dotnet_stems[rel.lower()[:-4]]}: "
+                                "the C# is recovered from that .dll; the launcher itself is not analysed"})
+            continue
         if stage == "analyze_module" and (st.cases.get_module(mid).get("meta") or {}).get("flags", {}).get("engine_binary") == "unity":
             unsupported.append({"module": rel, "profile": profile, "reason": "Unity engine runtime (UnityPlayer.dll): the engine, not the game's code; not analysed"})
             continue
@@ -121,7 +128,7 @@ def _backend(ctx: StageContext, backend_id: str, what: str):
     info = st.registry.info(backend_id)
     if info.availability == Availability.MISSING:
         detail = "; ".join(t.detail for t in info.tools if t.availability == Availability.MISSING)
-        raise StageError(f"{what} is not available: {detail}", blocker=f"install {what} (Settings → Dependencies)")
+        raise StageError(f"{what} is not available: {detail}", blocker=f"open Tools (left sidebar) and install {what}, then press Resume")
     return b
 
 
