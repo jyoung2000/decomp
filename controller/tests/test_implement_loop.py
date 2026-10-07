@@ -588,3 +588,14 @@ def test_live_provider_runs_the_same_loop_with_a_small_budget(studio, tmp_path):
     out = case_outcome(studio, cid)
     assert (out["state"] == "fully_matched") == bool(res["verified"])                   # the verifier, not the model, decides
     assert key not in json.dumps([dict(r) for r in studio.db.query("SELECT payload FROM events")])
+
+
+def test_builtin_crates_are_dropped_from_model_cargo_toml():
+    """Found on the genuine install: deepseek-coder-v2:16b listed `std = "1"` twice; cargo failed before compiling."""
+    from rebuild_controller.implement import drop_builtin_crates
+    toml = ('[package]\nname = "notes"\n\n[dependencies]\nstd = "1.0"\nserde_json = "1"\n'
+            '[target.\'cfg(windows)\'.dependencies]\ncore = { version = "1" }\n[features]\nstd = []\n')
+    fixed, dropped = drop_builtin_crates(toml)
+    assert dropped == ["std", "core"]
+    assert 'serde_json = "1"' in fixed and "std = []" in fixed and 'std = "1.0"' not in fixed and "core =" not in fixed
+    assert drop_builtin_crates('[package]\nname = "a"\n') == ('[package]\nname = "a"\n', [])

@@ -574,6 +574,27 @@ def _record_failed_call(st: Any, ctx: StageContext, case: dict[str, Any], loop_i
          plan_item_id=st.plan.milestone_id(case["case_id"], "M-IMPL" if n == 1 else "M-FIX"))
 
 
+_BUILTIN_CRATES = ("std", "core", "alloc", "proc_macro", "test")
+_DEP_SECTION = re.compile(r"^\s*\[(?:target\.[^\]]+\.)?(?:dev-|build-)?dependencies\]\s*$")
+
+
+def drop_builtin_crates(cargo_toml: str) -> tuple[str, list[str]]:
+    """Drop dependency lines naming Rust's built-in crates (std, core, alloc, ...). Small local models often list ``std = "1"``,
+    which cargo rejects before compiling anything; removing it never changes what the program can use."""
+    out, dropped, in_deps = [], [], False
+    for line in cargo_toml.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped.startswith("["):
+            in_deps = bool(_DEP_SECTION.match(stripped))
+        elif in_deps:
+            m = re.match(r"^\s*([A-Za-z0-9_-]+)\s*=", line)
+            if m and m.group(1) in _BUILTIN_CRATES:
+                dropped.append(m.group(1))
+                continue
+        out.append(line)
+    return "".join(out), dropped
+
+
 def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, *, n: int, loop_id: str, prev_id: str, scaffold_id: str, packet: dict[str, Any],
                  feedback: dict[str, Any] | None, history: list[str], has_baseline: bool) -> dict[str, Any]:
     case_id = case["case_id"]
@@ -626,6 +647,12 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
         rec["build"] = {"status": "no_files", "note": problem}
         rec["feedback_for_next"] = {"kind": "unusable_response", "problem": problem, "instruction": "Reply with ONLY a JSON object mapping file paths to full file contents."}
         return _store_attempt(st, case_id, loop_id, n, rec)
+    if isinstance(files.get("Cargo.toml"), str):
+        fixed, dropped = drop_builtin_crates(files["Cargo.toml"])
+        if dropped:
+            files = {**files, "Cargo.toml": fixed}
+            _act(st, ctx, case, f"Removed {', '.join(dropped)} from {mname}'s Cargo.toml dependencies: they are part of Rust itself, "
+                 f"not packages (cargo fails with 'no matching package named `std`')", "proposal", origin="deterministic", outcome="sanitized", **act_base)
     cand = st.candidates.propose(case_id, files, note=f"AI attempt {n}", author="model", base_candidate=prev_id, plan_revision=st.plan.current_revision(case_id))
     cid = cand["candidate_id"]
     src = Path(cand["source_dir"])
