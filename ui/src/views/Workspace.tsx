@@ -116,7 +116,7 @@ export function WorkspaceView() {
             <button type="button" className="btn" disabled={!running || !!busy} data-tooltip={running ? 'Pause after current steps finish' : 'Only a running project can be paused'} onClick={() => act('Pause', () => api.pauseCase(caseId), 'Pause requested')} data-testid="btn-pause">
               ❚❚ Pause
             </button>
-            <button type="button" className="btn" disabled={!(paused || status === 'failed' || status === 'cancelled') || !!busy} data-tooltip={paused || finished ? 'Continue from the last completed step' : 'Nothing to resume'} onClick={() => act('Resume', () => api.resumeCase(caseId), 'Resumed')} data-testid="btn-resume">
+            <button type="button" className="btn" disabled={!(paused || status === 'failed' || status === 'cancelled' || status === 'blocked') || !!busy} data-tooltip={paused || finished ? 'Continue from the last completed step' : 'Nothing to resume'} onClick={() => act('Resume', () => api.resumeCase(caseId), 'Resumed')} data-testid="btn-resume">
               ↻ Resume
             </button>
             <button type="button" className="btn danger" disabled={!(running || paused) || !!busy} data-tooltip={running || paused ? 'Cancel all queued and running jobs' : 'Nothing is running'} data-tooltip-pos="left" onClick={() => setConfirmStop(true)} data-testid="btn-stop">

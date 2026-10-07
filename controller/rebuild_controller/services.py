@@ -55,6 +55,7 @@ class StudioServices:
         self.verifier = Verifier(self.db, self.events, self.cases, self.candidates, self.ledger)
         self.previews = PreviewManager(self.db, self.events, self.candidates, self.cases)
         self.knowledge = KnowledgeStore(self.db, self.events, self.settings)
+        self.events.subscribe(self._settle_case_status)
         # Optional sub-services (fail soft so the core keeps working; doctor reports them).
         self.budgets = self.connections = self.ai = None
         self.optional_errors: dict[str, str] = {}
@@ -136,6 +137,26 @@ class StudioServices:
             return ids
         return []
 
+    def _settle_case_status(self, ev: dict[str, Any]) -> None:
+        """When the last active job of a running case ends without delivery, move the case out of 'running':
+        'failed' if any job failed, else 'blocked' if any job is blocked. Found on a real install: a failed delivery left
+        the case 'running' forever with Resume disabled. Never raises (event-bus subscriber)."""
+        try:
+            if ev.get("kind") not in ("job.failed", "job.blocked", "job.cancelled") or not ev.get("case_id"):
+                return
+            cid = ev["case_id"]
+            if self.cases.get_case(cid).get("status") != "running":
+                return
+            states = {j.state for j in self.jobs.list(cid)}
+            if states & {JobState.QUEUED, JobState.RUNNING}:
+                return
+            if JobState.FAILED in states:
+                self.cases.set_case_status(cid, "failed")
+            elif JobState.BLOCKED in states:
+                self.cases.set_case_status(cid, "blocked")
+        except Exception:  # noqa: BLE001 - status is advisory; never break event delivery
+            pass
+
     def resume(self, job_id: str | None = None, case_id: str | None = None) -> list[str]:
         if job_id:
             return [self.jobs.resume(job_id).job_id]
@@ -143,7 +164,7 @@ class StudioServices:
             ok, why = self.cases.is_resumable(case_id)
             if not ok:
                 raise ValueError(f"case cannot be resumed: {why}")
-            out = [self.jobs.resume(j.job_id).job_id for j in self.jobs.list(case_id, [JobState.FAILED, JobState.CANCELLED, JobState.NEEDS_RETEST])]
+            out = [self.jobs.resume(j.job_id).job_id for j in self.jobs.list(case_id, [JobState.FAILED, JobState.CANCELLED, JobState.NEEDS_RETEST, JobState.BLOCKED])]
             self.cases.set_case_status(case_id, "running")
             return out
         return []

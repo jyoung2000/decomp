@@ -29,3 +29,24 @@ def test_dotnet_apphost_is_not_sent_to_native_analysis(settings, tmp_path):
         assert any(stage == "recover_managed" for stage, _ in jobs)
     finally:
         st.stop()
+
+
+def test_failed_job_settles_case_status_and_resume_requeues(settings, tmp_path):
+    """Found on a real install: a failed delivery left the case 'running' forever with Resume disabled."""
+    from rebuild_controller.services import StudioServices
+    st = StudioServices(settings)
+    try:
+        src = tmp_path / "src"; src.mkdir(); (src / "a.txt").write_text("x")
+        cid = st.create_case(name="settle", source_root=str(src), output_root=str(tmp_path / "out"), target_language="web",
+                             output_type="web", ai_policy={"mode": "no_ai"})["case_id"]
+        st.cases.set_case_status(cid, "running")
+        j = st.jobs.create(cid, "inventory", "inventory", {})
+        claimed = st.jobs.claim_next("w1")
+        assert claimed and claimed.job_id == j.job_id
+        st.jobs.fail(j.job_id, "w1", "boom", retry=False)
+        assert st.cases.get_case(cid)["status"] == "failed"
+        resumed = st.resume(case_id=cid)
+        assert j.job_id in resumed and st.jobs.get(j.job_id).state == JobState.QUEUED
+        assert st.cases.get_case(cid)["status"] == "running"
+    finally:
+        st.stop()
