@@ -86,3 +86,28 @@ therefore superseded by run 5.
 | GUI uninstall with "Delete the application data" ticked | PASS: program folder, desktop + Start-menu shortcuts, taskbar pin, Apps entry, `%LOCALAPPDATA%\RebuildStudio` and `RebuildStudio:*` Credential Manager entry removed; a sibling folder (`RebuildStudio.keep`) untouched; no processes left | ls/reg/cmdkey |
 | Reinstall after data-removal uninstall | PASS (passive install) | — |
 | Project that failed under the OLD build stayed 'running' with Resume disabled | KNOWN: the status settle is event-driven and only applies to failures under the new build; re-queuing the job via the API worked. New failures settle correctly (regression test) | — |
+
+## Run 8 — .NET rebuild with local AI through the genuine install (2026-10-07/08)
+
+Genuine install updated in place via Explorer-launched passive installer for each build; the installed controller's
+sha256 was checked against the build each time (last: c1bd68f5… = commit 219dcef).
+
+- Auto-detection (no user setup): Ollama 0.35 at 127.0.0.1:11434 found on launch, "Ollama (this PC)" connection created,
+  13 models rated per task; LM Studio / llama.cpp reported not running. "Use detected local models" applied `all_local`.
+- Tools installed through the app's tool setup into the genuine tools dir: private .NET runtime, ilspycmd, Rust compiler.
+  (Earlier copies were in the MSIX-redirected Claude package folder, invisible to the genuine app.)
+- Project "Notes app (.NET) with local AI": source fixtures/dotnetapp/original, output D:\Rebuild Studio Test Output\…,
+  consent recorded, 7 user scenarios recorded by running the original isolated (Low integrity + Job Object), local only, $0.
+
+| Run | Ladder / attempts | Result | Product bug found → fix |
+| --- | --- | --- | --- |
+| 1 | all_local, 3 | blocked at capture | recorded user scenarios ignored → b3de2f7 |
+| 1b | all_local, 3 | 4 models × 300 s timeout, scaffold 0/7 | fixed total timeout → always stream (12cdab4) |
+| 2 | all_local, 3 | recovery failed on re-run | stale recovery dir → 6fd6f5e |
+| 3 | all_local, 3 | deepseek answered (208–235 s) but `std = "1"` dep, then E0425; 0/7 | built-in crates dropped (7d13b1e) |
+| 4 | project override qwen2.5:14b first, 3 | qwen JSON had an unescaped quote; gemma4 spent 16k tokens thinking, no text; 0/7 | JSON-schema format + think:false (e7287e9) |
+| 5 | same, 6 | attempt 1 built→syntax error; repair refused (17.5k prompt + 16k reserve > 32k) | output reserve shrinks to fit (219dcef) |
+| 6 | same, 6 | all 6 attempts answered (384–543 s each, $0) and were compiled; none compiled cleanly (escape bug ×4, then E0599); 0/7 | — (model capability) |
+
+Verdict, every run: "Scaffold only: not a working remake", Behavior verified 0 of 7 — delivered and labelled honestly; the
+verifier, not the model, decided. Not achieved: a working .NET → Rust remake with the local models on this RTX 4070 12 GB.
