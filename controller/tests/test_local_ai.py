@@ -875,3 +875,23 @@ def test_native_adapter_constrains_file_map_json_and_turns_off_unrequested_think
     a.complete(big_request(1_000, stream=False))
     body = ollama.bodies("/api/chat")[-1]
     assert "format" not in body and body["think"] is False
+
+
+def test_output_reserve_shrinks_to_fit_the_context_instead_of_refusing(ollama):
+    """Found on the genuine install: a ~17.5k-token repair prompt plus the 16k output reserve exceeded the 32k context, so no
+    model was asked at all. The reserve shrinks to what fits (>= 4096) and the cap is recorded."""
+    a = OllamaChatAdapter(endpoint=ollama.root, model_context={"qwen2.5-coder:14b": 32768})
+    req = big_request(34_000, stream=False)          # ~17k estimated tokens
+    req.max_output_tokens = 16_000
+    est = estimate_tokens(req)
+    r = a.complete(req)
+    body = ollama.bodies("/api/chat")[-1]
+    assert body["options"]["num_ctx"] == 32768 and body["options"]["num_predict"] == 32768 - est - 256
+    assert r.meta["output_tokens_capped"] == {"requested": 16_000, "allowed": 32768 - est - 256}
+    assert req.max_output_tokens == 16_000            # the caller's request is not mutated
+    tiny = big_request(120_000, stream=False)        # leaves < 4096 tokens for the answer: still refused, nothing sent
+    tiny.max_output_tokens = 16_000
+    n = len(ollama.bodies("/api/chat"))
+    with pytest.raises(ContextWindowExceeded):
+        a.complete(tiny)
+    assert len(ollama.bodies("/api/chat")) == n

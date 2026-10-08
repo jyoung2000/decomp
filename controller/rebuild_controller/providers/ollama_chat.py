@@ -68,6 +68,9 @@ def size_num_ctx(needed: int, model_context: int | None, cap: int) -> tuple[int,
     return min(bucket(needed), bound), bound
 
 
+MIN_OUTPUT_TOKENS = 4096        # smallest output reserve worth sending when the context is the binding limit
+
+
 class OllamaChatAdapter(ProviderAdapter):
     provider_key = "ollama:chat"
 
@@ -163,11 +166,24 @@ class OllamaChatAdapter(ProviderAdapter):
         needed = est + int(request.max_output_tokens) + 256
         mctx = self.model_context.get(request.model)
         num_ctx, bound = size_num_ctx(needed, mctx, self.num_ctx_cap)
+        capped_from = None
         if needed > bound:
-            raise ContextWindowExceeded(self._too_big(est, request.max_output_tokens, bound, mctx), provider=self.provider_name,
-                                        request_sent=False)
+            # The output reserve is an upper bound, not a need: local models answered in ~2k tokens, but a 17.5k-token repair
+            # prompt plus a 16k reserve exceeded the 32k context and nothing was sent. Shrink the reserve to what fits (never
+            # below MIN_OUTPUT_TOKENS); a reply that hits it still ends with stop_reason max_tokens, so nothing is silently cut.
+            fit = bound - est - 256
+            if fit < min(MIN_OUTPUT_TOKENS, int(request.max_output_tokens)):
+                raise ContextWindowExceeded(self._too_big(est, request.max_output_tokens, bound, mctx), provider=self.provider_name,
+                                            request_sent=False)
+            capped_from = int(request.max_output_tokens)
+            request = copy.copy(request)
+            request.max_output_tokens = fit
+            num_ctx = bound
         try:
-            return self._complete_once(request, on_text, num_ctx, est, mctx)
+            r = self._complete_once(request, on_text, num_ctx, est, mctx)
+            if capped_from is not None:
+                r.meta["output_tokens_capped"] = {"requested": capped_from, "allowed": int(request.max_output_tokens)}
+            return r
         except InvalidRequest as e:
             n_prompt = getattr(e, "n_prompt_tokens", None)
             if not isinstance(n_prompt, int):
