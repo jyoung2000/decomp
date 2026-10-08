@@ -145,8 +145,14 @@ class OllamaChatAdapter(ProviderAdapter):
                                                                "parameters": t.parameters}} for t in request.tools]
         if request.json_schema is not None:
             body["format"] = request.json_schema.schema
+        elif (request.metadata or {}).get("output_format") == "json_file_map":
+            # Grammar-constrained JSON: a 14B model wrote correct Rust but left one quote unescaped, so the whole answer was unusable.
+            body["format"] = {"type": "object", "additionalProperties": {"type": "string"}}
         if request.reasoning is not None and (request.reasoning.effort or request.reasoning.budget_tokens):
             body["think"] = True
+        else:
+            # Unrequested hidden reasoning spent gemma4:12b's whole 16000-token budget and returned no answer text.
+            body["think"] = False
         return body
 
     # ------------------------------------------------------------------ complete

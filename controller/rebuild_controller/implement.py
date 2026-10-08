@@ -448,7 +448,7 @@ def ask_model(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy,
         raise ImplementStop(rs["code"], rs["message"])
     bid = ensure_case_budget(st, case["case_id"], pol.budget_usd)
     req = Request(model="", messages=[Message.user(prompt)], system=system, max_output_tokens=pol.max_output_tokens, stream=False,
-                  timeout_s=pol.request_timeout_s)
+                  timeout_s=pol.request_timeout_s, metadata={"output_format": "json_file_map"})
     sha = req.fingerprint()
 
     def do() -> dict[str, Any]:

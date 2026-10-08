@@ -861,3 +861,17 @@ def test_native_adapter_streams_so_slow_local_generation_is_not_cut_off():
         assert r.text == "fn main() {}" and seen[0]["stream"] is True
     finally:
         srv.shutdown(); srv.server_close()
+
+
+def test_native_adapter_constrains_file_map_json_and_turns_off_unrequested_thinking(ollama):
+    """Found on the genuine install: qwen2.5:14b's Rust was lost to one unescaped quote in its JSON, and gemma4:12b spent its whole
+    output budget on hidden thinking. File-map requests get grammar-constrained JSON; thinking is off unless asked for."""
+    a = OllamaChatAdapter(endpoint=ollama.root, model_context={"qwen2.5-coder:14b": 32768})
+    req = big_request(1_000, stream=False)
+    req.metadata["output_format"] = "json_file_map"
+    a.complete(req)
+    body = ollama.bodies("/api/chat")[-1]
+    assert body["format"] == {"type": "object", "additionalProperties": {"type": "string"}} and body["think"] is False
+    a.complete(big_request(1_000, stream=False))
+    body = ollama.bodies("/api/chat")[-1]
+    assert "format" not in body and body["think"] is False
