@@ -19,7 +19,7 @@ believe the vendors use. Live behaviour is checked only on demand (see "Opt-in l
 | developers.openai.com, platform.openai.com, api.openai.com | **unreachable** - docs unreachable on 2026-10-06; verify | OpenAI Responses/chat adapter written from the stable, well-known shapes |
 | ai.google.dev, generativelanguage.googleapis.com | **unreachable** (403 from the proxy) - docs unreachable on 2026-10-06; verify | Gemini adapter written from the stable, well-known REST shapes |
 | openrouter.ai | **unreachable** - docs unreachable on 2026-10-06; verify | OpenRouter served through the chat dialect; `usage.cost` / `/models` pricing handling is unverified |
-| JeV | no API documentation available | endpoint shape is an explicit assumption (below) |
+| docs.typesafe.ai/api (via the owner's JeV bridge, verified 2026-10-03) | read (bridge contract) | JeV advisor: `POST https://api.typesafe.ai/v1/systemone`, see docs/AI_LADDER.md section 9; one opt-in live check (`REBUILD_LIVE_JEV=1`) |
 
 Items marked "verify" must be exercised once against the real service (`pytest -m live`, or a manual probe from the Connections screen) before being relied on.
 
@@ -117,13 +117,14 @@ resolve route (primary then fallbacks, stored order) -> optional JeV reorder -> 
 and is applied to error text, logs (`RedactingFilter` on `rebuild.*` loggers), events and CLI output. `isolated_env()` builds provider-subprocess environments.
 **Windows gate:** the DPAPI path could not be executed on this Linux host (only its selection logic and the entry/backend plumbing are tested); run `pytest tests/test_secrets.py` plus a manual put/get on Windows before release.
 
-## JeV advisory router (optional)
+## JeV advisor (optional)
 
-Environment only: `JEV_API_KEY` (never stored), `JEV_ENDPOINT`, `JEV_MODEL`, optional `JEV_PRICE_INPUT_PER_MTOK` / `JEV_PRICE_OUTPUT_PER_MTOK`. Every decision carries `unverified: true`.
-**Assumption:** no JeV API documentation was available, so `JEV_ENDPOINT` is treated as an OpenAI-compatible `/chat/completions` base URL that accepts `response_format: json_schema`
-and returns `{"order":[...],"confidence":0..1,"reason":"..."}`; any other shape falls back. Caps are fixed in code ($0.05 `jev:setup`, $1.00 `jev:monthly:<yyyy-mm>`) and cannot be raised from the environment.
-Only task name, capability needs, token estimates and candidate descriptors are sent - never case content. Decisions are cached by request hash in `<data_dir>/jev/decisions.json` (atomic writes, bounded, corrupt files quarantined).
-No key, no endpoint, an HTTP/JSON failure, low confidence (< 0.6), invalid advice or an exhausted cap all return the deterministic order. JeV can only reorder candidates the deterministic router already resolved.
+Replaced in R9 by the documented TypeSafe contract; the full contract, invariants and API are in docs/AI_LADDER.md section 9.
+The key is entered in Connections -> "JeV advisor" (credential store, never returned or logged; the old `JEV_API_KEY`/`JEV_ENDPOINT`/
+`JEV_MODEL` environment variables are no longer read). Pinned model `jev-1.13.0`, list price $0.042 per million input tokens, monthly
+cap (default $1, settable 0-50) on `jev:monthly:<yyyy-mm>`, `jev:setup` ($0.05) for the "Test JeV" button. JeV only re-orders rungs
+and advises retry / switch / stop between repair attempts; any failure, low confidence (< 0.6), no key, off or an open breaker = the
+deterministic order. Decisions are cached in `<data_dir>/jev/decisions.json`; the last 50 are in `<data_dir>/jev/recent.json`.
 
 ## Opt-in live checks
 

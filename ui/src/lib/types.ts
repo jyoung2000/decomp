@@ -940,3 +940,153 @@ export interface McpConfig {
   command?: string;
   http_available?: boolean;
 }
+
+// ---- dependency health (R10: GET /health/dependencies, GET /cases/{id}/preflight) ----
+export type DepToolState = ToolSetupStatus | 'external' | 'broken';
+export type DepOverall = 'ok' | 'warn' | 'error' | 'busy';
+
+export interface DepFix {
+  kind: 'install' | 'repair' | 'start_ollama' | 'link' | 'open_tools' | 'recheck' | 'resume_queue' | 'retry_queue';
+  label: string;
+  items?: string[];
+  count?: number;
+  download_bytes?: number;
+  confirm?: boolean;
+  url?: string;
+}
+
+export interface DepNeededBy {
+  kind: 'project' | 'app';
+  case_id?: string;
+  name?: string | null;
+  required: boolean;
+  why: string;
+}
+
+export interface DepTool {
+  name: string;
+  title: string;
+  purpose: string;
+  optional: boolean;
+  state: DepToolState;
+  status: ToolSetupStatus;
+  disk_status: ToolSetupStatus;
+  satisfied: boolean;
+  installable: boolean;
+  version: string;
+  installed_version?: string | null;
+  hash_ok: boolean | null;
+  smoke: { ok: boolean; message: string; at: string; code?: string } | null;
+  external_path: string | null;
+  requires: string[];
+  blocked_reason?: string | null;
+  download_bytes: number;
+  disk_bytes: number;
+  install_path: string;
+  job: ToolSetupJob | null;
+  needed_by: DepNeededBy[];
+  required: boolean;
+}
+
+export interface DepCheck {
+  name: string;
+  title?: string;
+  state: 'ok' | 'warn' | 'error' | 'down' | 'missing' | 'unknown' | 'not_checked' | 'not_applicable';
+  sentence: string;
+  next_action?: string | null;
+  action?: DepFix | null;
+  required?: boolean;
+  why?: string;
+  needed_by?: { case_id: string; name?: string | null; required: boolean }[];
+  [k: string]: unknown;
+}
+
+export interface DepQueueItem {
+  name: string;
+  title: string;
+  status: 'queued' | 'installing' | 'done' | 'failed' | 'skipped' | 'cancelled' | 'interrupted';
+  repair: boolean;
+  bytes_total: number;
+  bytes_done: number;
+  phase: string | null;
+  message: string;
+  error: ToolSetupError | null;
+}
+
+export interface DepQueue {
+  id: string | null;
+  state: 'idle' | 'running' | 'done' | 'failed' | 'cancelled' | 'interrupted';
+  items: DepQueueItem[];
+  reason?: string | null;
+  total: number;
+  done: number;
+  failed: string[];
+  bytes_total: number;
+  bytes_done: number;
+  percent: number | null;
+  current: string | null;
+  running: boolean;
+}
+
+export interface DepSettings {
+  auto_install: boolean;
+  asked: boolean;
+  updated_at?: string | null;
+  install?: DepQueue | null;
+}
+
+export interface DepInstallOffer {
+  items: string[];
+  count: number;
+  download_bytes: number;
+  label: string;
+}
+
+export interface DependencyReport {
+  checked_at: string;
+  tools_dir: string;
+  tools: DepTool[];
+  services: DepCheck[];
+  host: DepCheck[];
+  projects: { case_id: string; name?: string | null; profile: string; target: string; required: string[]; optional: string[]; services: string[] }[];
+  queue: DepQueue;
+  settings: DepSettings;
+  missing_required: string[];
+  missing_recommended: string[];
+  install_all: DepInstallOffer | null;
+  overall: DepOverall;
+  sentence: string;
+  fix: DepFix | null;
+  next_action?: string | null;
+}
+
+export interface PreflightItem {
+  name: string;
+  title: string;
+  state: DepToolState;
+  why: string;
+  download_bytes: number;
+  installable: boolean;
+  blocked_reason?: string | null;
+  job: ToolSetupJob | null;
+}
+
+export interface Preflight {
+  case_id: string;
+  ok: boolean;
+  installing: boolean;
+  sentence: string;
+  profile: string;
+  profile_title: string;
+  target: string;
+  comparator: string;
+  ai: string;
+  missing: PreflightItem[];
+  optional: PreflightItem[];
+  services: DepCheck[];
+  blocking_services: string[];
+  host: DepCheck[];
+  install: DepInstallOffer | null;
+  optional_install: DepInstallOffer | null;
+  settings: DepSettings;
+}

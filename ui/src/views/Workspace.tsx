@@ -20,6 +20,7 @@ import { AiTab } from './workspace/AiTab';
 import { LiveLogTab } from './workspace/LiveLog';
 import { ScenariosTab } from './workspace/Scenarios';
 import { ConsentCard, PERMISSION_RE } from '../components/ConsentCard';
+import { PreflightCard, usePreflight } from '../components/Preflight';
 
 const TARGET: Record<string, string> = { rust: 'Rust', rust_bevy: 'Rust + Bevy', web: 'HTML/CSS/JS', auto: 'Auto' };
 
@@ -33,6 +34,8 @@ export function WorkspaceView() {
   const fetched = useResource(() => api.getCase(caseId), [api, caseId]);
   const [confirmStop, setConfirmStop] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const liveStatus = cs?.case?.value?.status ?? fetched.data?.status;
+  const preflight = usePreflight(caseId, liveStatus === 'running' || liveStatus === 'queued');
 
   useEffect(() => {
     if (caseId) setSelectedCase(caseId);
@@ -65,6 +68,8 @@ export function WorkspaceView() {
   const running = status === 'running' || status === 'queued';
   const paused = status === 'paused';
   const finished = ['completed', 'failed', 'cancelled'].includes(status);
+  // R10: Start waits until everything this project needs is installed and running (one "Install what's missing" action)
+  const blockedByDeps = !!preflight.data && !preflight.data.ok && !running;
   const act = async (name: string, fn: () => Promise<unknown>, done: string) => {
     setBusy(name);
     try {
@@ -74,6 +79,7 @@ export function WorkspaceView() {
       void store.refresh(caseId, 'jobs');
     } catch (e) {
       toast.error(`${name} failed`, e);
+      if (name === 'Start') preflight.reload();
     } finally {
       setBusy(null);
     }
@@ -110,7 +116,7 @@ export function WorkspaceView() {
             </div>
           </div>
           <div className="btn-group" role="group" aria-label="Run controls">
-            <button type="button" className="btn primary" disabled={running || paused || !!busy} data-tooltip={running ? 'Already running' : paused ? 'Paused — use Resume' : 'Start discovery and rebuild'} onClick={() => act('Start', () => api.startCase(caseId), 'Rebuild started')} data-testid="btn-start">
+            <button type="button" className="btn primary" disabled={running || paused || !!busy || blockedByDeps} aria-describedby={blockedByDeps ? 'preflight-sentence' : undefined} data-tooltip={running ? 'Already running' : paused ? 'Paused — use Resume' : blockedByDeps ? 'Install what this project needs first' : 'Start discovery and rebuild'} onClick={() => act('Start', () => api.startCase(caseId), 'Rebuild started')} data-testid="btn-start">
               ▶ Start
             </button>
             <button type="button" className="btn" disabled={!running || !!busy} data-tooltip={running ? 'Pause after current steps finish' : 'Only a running project can be paused'} onClick={() => act('Pause', () => api.pauseCase(caseId), 'Pause requested')} data-testid="btn-pause">
@@ -141,6 +147,7 @@ export function WorkspaceView() {
       </header>
       <div className="page">
         {needsOriginal && <ConsentCard caseId={caseId} variant="banner" />}
+        {preflight.data && !running && <PreflightCard pf={preflight.data} queue={preflight.queue} onChanged={preflight.reload} />}
         <Routes>
           <Route index element={<Navigate to={`${base}/overview`} replace />} />
           <Route path="overview" element={<OverviewTab caseId={caseId} />} />

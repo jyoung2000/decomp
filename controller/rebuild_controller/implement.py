@@ -103,7 +103,7 @@ class ImplementStop(Exception):
 
 
 # ====================================================================================== route / pricing preflight
-def route_status(st: Any, pol: LoopPolicy, task: str = "interpretation") -> dict[str, Any]:
+def route_status(st: Any, pol: LoopPolicy, task: str = "implementation") -> dict[str, Any]:
     """Can a call be made at all, and what would it cost? Pure read (no spend). Used by the forecast and the loop preflight."""
     out: dict[str, Any] = {"ok": False, "code": None, "message": None, "route": [], "free": False, "priced": True}
     if getattr(st, "ai", None) is None or getattr(st, "connections", None) is None:
@@ -426,7 +426,7 @@ def _task_for(st: Any, attempt: int, policy: dict[str, Any] | None = None) -> st
         from .providers.ladder import override_entries
         if override_entries(policy, "repair") or st.connections.route_entries("repair"):
             return "repair"
-    return "interpretation"
+    return "implementation"
 
 
 def ensure_case_budget(st: Any, case_id: str, limit_usd: float) -> str:
@@ -436,13 +436,13 @@ def ensure_case_budget(st: Any, case_id: str, limit_usd: float) -> str:
 
 
 def ask_model(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, *, task: str, system: str, prompt: str, key: str,
-              persist: Any = None, activity: dict[str, Any] | None = None) -> dict[str, Any]:
+              persist: Any = None, activity: dict[str, Any] | None = None, demote: list[tuple[str, str]] | None = None) -> dict[str, Any]:
     """Single budgeted, retried, fallback-aware model call. Raises ImplementStop for user-fixable conditions.
     Returns {text, usage, cost_usd, cost_known, provider, model, connection_id, call_id, prompt_sha256, router_attempts, stop_reason}."""
     from .budget import BudgetExhausted, DuplicateReservation
     from .providers.base import AuthError, Message, ProviderError, Request
     from .providers.pricing import ApprovalRequired
-    from .providers.router import AllCandidatesFailed, BudgetRequired, NoRoute
+    from .providers.router import AllCandidatesFailed, BudgetRequired, NoRoute, StopRequested
     rs = route_status(st, pol, task)
     if not rs["ok"]:
         raise ImplementStop(rs["code"], rs["message"])
@@ -454,7 +454,7 @@ def ask_model(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy,
     def do() -> dict[str, Any]:
         res = st.ai.call(task, req, job_id=ctx.job.job_id, case_id=case["case_id"], budget=bid, approve_unknown_pricing=pol.unknown_price_ok,
                          request_key=key, max_retries=pol.max_retries, retry_unavailable=True, backoff_base_s=pol.backoff_s,
-                         policy=pol.raw or None, activity=activity)
+                         policy=pol.raw or None, activity=activity, demote=demote)
         u = res.response.usage
         out = {"text": res.response.text or "", "usage": {"input_tokens": u.input_tokens, "output_tokens": u.output_tokens, "cached_tokens": u.cached_tokens, "known": u.known},
                "cost_usd": res.cost_usd, "cost_known": res.cost_known, "provider": res.provider, "model": res.model, "connection_id": res.connection_id,
@@ -478,6 +478,8 @@ def ask_model(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy,
         raise ImplementStop("no_budget", str(e)) from e
     except NoRoute as e:
         raise ImplementStop("ai_disabled" if type(e).__name__ == "AIDisabled" else "no_route", f"{redact(str(e))} {e.recovery}".strip()) from e
+    except StopRequested as e:          # a per-rung rule said "stop and ask me": the case is blocked with a plain message
+        raise ImplementStop("stopped_by_rule", e.message, spent=any(a.get("assumed_spent") for a in e.attempts)) from e
     except AllCandidatesFailed as e:
         detail = "; ".join(f"{a['model']}: {a.get('reason') or a['outcome']}" for a in e.attempts)
         kind = "auth_failed" if isinstance(e.last, AuthError) else "provider_failed"
@@ -508,6 +510,7 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
     stop: tuple[str, str] | None = None            # (code, message)
     prev_id, feedback, history = scaffold_id, None, []
     verified = False
+    demote: list[tuple[str, str]] | None = None
     ctx.log(f"AI implementation: up to {pol.max_attempts} attempts, budget ${pol.budget_usd:.2f}"
             + (f"; resuming after {len(records)} recorded attempt(s)" if records else ""))
     n = 0
@@ -519,7 +522,7 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
             if rec is None:
                 ctx.log(f"AI attempt {n} of {pol.max_attempts}: asking the model for the code" + (" (fixing what the last attempt got wrong)" if n > 1 else "") + "…")
                 rec = _run_attempt(st, ctx, case, pol, n=n, loop_id=loop_id, prev_id=prev_id, scaffold_id=scaffold_id, packet=packet,
-                                   feedback=feedback, history=history, has_baseline=has_baseline)
+                                   feedback=feedback, history=history, has_baseline=has_baseline, demote=demote)
                 records[n] = rec
         except ImplementStop as s:
             stop = (s.code, s.message)
@@ -547,11 +550,43 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
             _act(st, ctx, case, f"Next: stop. {stop[1]} The best attempt is kept and delivered, labelled honestly.", "next", origin="deterministic",
                  outcome="attempts_exhausted", plan_item_id=st.plan.milestone_id(case_id, "M-FIX"))
         else:
-            _act(st, ctx, case, f"Next: repair attempt {n + 1} of {pol.max_attempts}", "next", origin="deterministic", outcome="repair",
+            adv = _advisor_between(st, ctx, case, pol, rec, n)
+            if adv.get("advice") == "stop":
+                stop = ("advisor_stop", f"Stopped after attempt {n} of {pol.max_attempts}: the JeV advisor judged further repairs unlikely to help "
+                                        f"(confidence {adv['confidence']:.2f}). The best attempt is kept; resume or raise the attempt cap to continue.")
+                _act(st, ctx, case, f"Next: stop. {stop[1]}", "next", origin="model_proposed", outcome="advisor_stop",
+                     plan_item_id=st.plan.milestone_id(case_id, "M-FIX"), provider="jev")
+                break
+            demote = None
+            if adv.get("advice") == "switch" and (rec.get("call") or {}).get("connection_id"):
+                demote = [(rec["call"]["connection_id"], rec["call"]["model"])]
+            _act(st, ctx, case, f"Next: repair attempt {n + 1} of {pol.max_attempts}"
+                 + (f" (JeV advised switching away from {rec['call']['model']}, confidence {adv['confidence']:.2f})" if demote else ""),
+                 "next", origin="deterministic", outcome="repair",
                  plan_item_id=st.plan.milestone_id(case_id, "M-FIX"), candidate_id=rec.get("candidate_id"))
     stop = stop or ("attempts_exhausted", f"Stopped after {pol.max_attempts} attempts without a verified match.")
     ctx.log(f"AI implementation finished: {stop[1]}", "info" if stop[0] == "verified" else "warn")
     return _finish(st, ctx, case, pol, records, stop, scaffold_id, has_baseline, verified)
+
+
+def _advisor_between(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, rec: dict[str, Any], n: int) -> dict[str, Any]:
+    """Optional JeV advice between repair attempts (retry / switch / stop). Never runs after a verified attempt, never adds a model
+    and never fails the loop: anything unexpected = no advice (the deterministic plan continues)."""
+    adv = getattr(getattr(st, "ai", None), "advisor", None)
+    if adv is None or not hasattr(adv, "reassess"):
+        return {}
+    try:
+        task = _task_for(st, n + 1, pol.raw)
+        rs = route_status(st, pol, task)
+        call = rec.get("call") or {}
+        verdict = rec.get("verdict") or {}
+        out = adv.reassess(task, attempt=n, max_attempts=pol.max_attempts, build=(rec.get("build") or {}).get("status"),
+                           scenarios=verdict.get("scenarios"), passed=verdict.get("passed"),
+                           current={"provider": call.get("provider"), "model": call.get("model"), "locality": call.get("locality")},
+                           other_rungs=max(0, len(rs.get("route") or []) - 1), case_id=case["case_id"], job_id=ctx.job.job_id)
+        return out if isinstance(out, dict) else {}
+    except Exception:  # noqa: BLE001 - advisory only
+        return {}
 
 
 def _act(st: Any, ctx: StageContext, case: dict[str, Any], text: str, kind: str, **fields: Any) -> None:
@@ -596,7 +631,7 @@ def drop_builtin_crates(cargo_toml: str) -> tuple[str, list[str]]:
 
 
 def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, *, n: int, loop_id: str, prev_id: str, scaffold_id: str, packet: dict[str, Any],
-                 feedback: dict[str, Any] | None, history: list[str], has_baseline: bool) -> dict[str, Any]:
+                 feedback: dict[str, Any] | None, history: list[str], has_baseline: bool, demote: list[tuple[str, str]] | None = None) -> dict[str, Any]:
     case_id = case["case_id"]
     started = _now()
     key = f"{loop_id}:a{n}"
@@ -627,7 +662,7 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
         subject = (f"{case['name']} (attempt {n} of {pol.max_attempts})" if n == 1
                    else f"{case['name']} from candidate r{st.candidates.get(prev_id).get('revision', '?')} (attempt {n} of {pol.max_attempts})")
         resp = ask_model(st, ctx, case, pol, task=task, system=SYSTEM_PROMPT, prompt=prompt, key=key, persist=persist,
-                         activity={"plan_item_id": plan_item, "subject": subject, "origin": "model_proposed"})
+                         activity={"plan_item_id": plan_item, "subject": subject, "origin": "model_proposed"}, demote=demote)
         resp = {**resp, "evidence_id": resp.get("evidence_id")}
     ctx.heartbeat(force=True)
     rec: dict[str, Any] = {"loop_id": loop_id, "attempt": n, "task": task, "started_at": started,
@@ -844,14 +879,14 @@ def _ai_block(st: Any, case: dict[str, Any], pol: LoopPolicy, short: str, task: 
 
 
 def plan_ai(st: Any, case: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """``{plan_item_id: ai}`` for the plan items that may use AI (M-IMPL: interpretation, M-FIX: repair)."""
+    """``{plan_item_id: ai}`` for the plan items that may use AI (M-IMPL: implementation, M-FIX: repair)."""
     pol = LoopPolicy.from_case(case)
     cid = case["case_id"]
     repair_task = _task_for(st, 2, pol.raw) if getattr(st, "connections", None) is not None else "repair"
-    out = {f"{cid}:M-IMPL": _ai_block(st, case, pol, "M-IMPL", "interpretation", pol.max_attempts if pol.ai_enabled else 0)}
+    out = {f"{cid}:M-IMPL": _ai_block(st, case, pol, "M-IMPL", "implementation", pol.max_attempts if pol.ai_enabled else 0)}
     fix = _ai_block(st, case, pol, "M-FIX", repair_task, max(0, pol.max_attempts - 1) if pol.ai_enabled else 0)
     if repair_task != "repair":
-        fix["note"] = "no ladder is set for 'repair', so repairs use the interpretation ladder"
+        fix["note"] = "no ladder is set for 'repair', so repairs use the implementation ladder"
     out[f"{cid}:M-FIX"] = fix
     return out
 

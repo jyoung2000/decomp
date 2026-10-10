@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../App';
 import { caseRoutes, makeStore, type Routes } from '../test-utils';
 
-const tasks = ['interpretation', 'repair', 'visual_review', 'verification_assist', 'knowledge'];
+const tasks = ['implementation', 'repair', 'naming', 'visual_review', 'verification_assist', 'knowledge'];
 const fit = (ok: string[], note = '') => Object.fromEntries(tasks.map((t) => [t, { ok: ok.includes(t), note: ok.includes(t) ? note : 'not for this' }]));
-const coder = { id: 'qwen2.5-coder:14b', server: 'ollama', size_bytes: 8_990_000_000, parameter_size: '14.8B', quantization: 'Q4_K_M', context_window: 131072, effective_context: 32768, capabilities: { completion: true, tools: true, source: 'ollama /api/show' }, tasks: fit(['interpretation', 'repair', 'verification_assist', 'knowledge'], 'coding model'), quick_only: false, excluded: false, suitable: true, summary: 'Good for interpreting code, repairing builds.' };
+const coder = { id: 'qwen2.5-coder:14b', server: 'ollama', size_bytes: 8_990_000_000, parameter_size: '14.8B', quantization: 'Q4_K_M', context_window: 131072, effective_context: 32768, capabilities: { completion: true, tools: true, source: 'ollama /api/show' }, tasks: fit(['implementation', 'repair', 'verification_assist', 'knowledge'], 'coding model'), quick_only: false, excluded: false, suitable: true, summary: 'Good for interpreting code, repairing builds.' };
 const embed = { id: 'nomic-embed-text:latest', server: 'ollama', size_bytes: 270_000_000, capabilities: { completion: false, embedding: true, source: 'ollama /api/show' }, tasks: fit([]), excluded: true, suitable: false, summary: 'Not suitable: embedding-only model (cannot write text).' };
 const snap = (ladder = 'empty') => ({
   detected_at: '2026-10-07T00:00:00Z',

@@ -168,9 +168,9 @@ def test_context_window_and_capability_are_skipped_before_the_call(client, store
     img = Request(model="", messages=[Message("user", [ImagePart(data="AAAA"), TextPart("what is this")])], max_output_tokens=50)
     res = client.call("visual_review", img)
     assert ms.calls == [] and res.attempts[0]["outcome"] == "capability_unsupported" and "does not support images" in res.attempts[0]["reason"]
-    ladder(store, "interpretation", (small, "tiny:1b"), (big, "llava:7b"))
+    ladder(store, "implementation", (small, "tiny:1b"), (big, "llava:7b"))
     mb.script = ["long ok"]
-    res = client.call("interpretation", req("x" * 6000, max_output_tokens=500))
+    res = client.call("implementation", req("x" * 6000, max_output_tokens=500))
     assert ms.calls == [] and res.attempts[0]["outcome"] == "capability_unsupported"
     assert "does not fit its 1000-token context window" in res.attempts[0]["reason"] and res.response.text == "long ok"
 
@@ -181,10 +181,10 @@ def test_free_provider_out_of_credits_never_silently_moves_to_an_unpriced_paid_m
     paid = store.create("openrouter", "OpenRouter paid", api_key=KEY, models=[{"id": "big-unpriced"}])
     mp = MockProvider(["should not be used"])
     store.set_adapter_override(paid["connection_id"], mp)
-    ladder(store, "interpretation", (free, "llama:free"), (paid, "big-unpriced"))
+    ladder(store, "implementation", (free, "llama:free"), (paid, "big-unpriced"))
     ledger.create("job:j", "job:j", 5.0)
     with pytest.raises((ApprovalRequired, AllCandidatesFailed)) as ei:
-        client.call("interpretation", req(), budget="job:j")
+        client.call("implementation", req(), budget="job:j")
     att = ei.value.attempts
     assert [a["outcome"] for a in att] == ["credits_exhausted", "approval_required"] and mp.calls == []
     assert "ran out of free credits" in att[1]["reason"] and "without your approval" in att[1]["reason"]
@@ -197,21 +197,21 @@ def test_free_provider_out_of_credits_moves_to_a_priced_paid_model_only_within_b
     free, mf = cloud(store, "OpenRouter free", "llama:free", price=FREE, provider="openrouter",
                      script=[CreditsExhausted("openrouter HTTP 402: free tier used up", status=402)])
     paid, mp = cloud(store, "OpenRouter paid", "priced", price=PRICED, provider="openrouter", script=["paid answer"])
-    ladder(store, "interpretation", (free, "llama:free"), (paid, "priced"))
+    ladder(store, "implementation", (free, "llama:free"), (paid, "priced"))
     # no budget: the paid fallback is refused with a reason (never silently spent)
     with pytest.raises(AllCandidatesFailed) as ei:
-        client.call("interpretation", req())
+        client.call("implementation", req())
     assert ei.value.attempts[-1]["outcome"] == "budget_exhausted" and "no budget" in ei.value.attempts[-1]["reason"] and mp.calls == []
     mf.script = [CreditsExhausted("openrouter HTTP 402: free tier used up", status=402)]
     ledger.create("job:j", "job:j", 1.0)
-    res = client.call("interpretation", req(), budget="job:j")
+    res = client.call("implementation", req(), budget="job:j")
     assert res.response.text == "paid answer" and res.cost_usd > 0
     assert any("a paid model, up to $" in t for t in activity_texts(events))
 
 
 def test_no_ai_policy_refuses_before_any_adapter_and_never_touches_the_network(client, store, ledger, monkeypatch, cases, src_out, events, db):
     c, m = cloud(store, "Cloud", "m", script=["never"])
-    ladder(store, "interpretation", (c, "m"))
+    ladder(store, "implementation", (c, "m"))
     store.set_adapter_override(c["connection_id"], RaisingProvider())
 
     def no_network(*a, **k):
@@ -227,9 +227,9 @@ def test_no_ai_policy_refuses_before_any_adapter_and_never_touches_the_network(c
     case = cases.create_case(name="n", source_root=str(src), output_root=str(out), target_language="rust", output_type="exe",
                              ai_policy={"mode": "no_ai"})
     with pytest.raises(AIDisabled):
-        client.call("interpretation", req(), case_id=case["case_id"])                    # policy loaded from the case
+        client.call("implementation", req(), case_id=case["case_id"])                    # policy loaded from the case
     with pytest.raises(AIDisabled):
-        client.call("interpretation", req(), policy={"mode": "no_ai", "budget_usd": 3})  # explicit policy
+        client.call("implementation", req(), policy={"mode": "no_ai", "budget_usd": 3})  # explicit policy
     assert made == [] and db.query("SELECT COUNT(*) AS n FROM reservations")[0]["n"] == 0
     assert "AI is off for this project" in activity_texts(events, case["case_id"])[-1]
 
@@ -237,12 +237,12 @@ def test_no_ai_policy_refuses_before_any_adapter_and_never_touches_the_network(c
 def test_local_only_policy_skips_cloud_entries_with_policy_reason(client, store, ledger):
     c, mc = cloud(store, "Cloud", "gpt-x", script=["cloud"])
     l, ml = local(store, "Ollama", "qwen2.5:3b", script=["local answer"])
-    ladder(store, "interpretation", (c, "gpt-x"), (l, "qwen2.5:3b"))
-    res = client.call("interpretation", req(), policy={"mode": "assisted", "locality": "local_only"})
+    ladder(store, "implementation", (c, "gpt-x"), (l, "qwen2.5:3b"))
+    res = client.call("implementation", req(), policy={"mode": "assisted", "locality": "local_only"})
     assert mc.calls == [] and res.response.text == "local answer"
     assert res.attempts[0]["outcome"] == "policy_skipped" and "local models only" in res.attempts[0]["reason"]
     with pytest.raises(NoRoute) as ei:
-        client.call("interpretation", req(), policy={"mode": "assisted", "locality": "cloud_only", "ladder_overrides": {"interpretation": [
+        client.call("implementation", req(), policy={"mode": "assisted", "locality": "cloud_only", "ladder_overrides": {"implementation": [
             {"connection_id": l["connection_id"], "model": "qwen2.5:3b"}]}})
     assert ei.value.attempts[0]["outcome"] == "policy_skipped" and "cloud models only" in ei.value.recovery + ei.value.attempts[0]["reason"]
 
@@ -250,11 +250,11 @@ def test_local_only_policy_skips_cloud_entries_with_policy_reason(client, store,
 def test_project_ladder_override_replaces_the_global_ladder_unless_inherit(client, store):
     c, mc = cloud(store, "Cloud", "gpt-x", script=["global"])
     l, ml = local(store, "Ollama", "qwen2.5:3b", script=["project"])
-    ladder(store, "interpretation", (c, "gpt-x"))
-    ov = {"interpretation": [{"connection_id": l["connection_id"], "model": "qwen2.5:3b"}]}
-    assert client.call("interpretation", req(), policy={"mode": "custom", "ladder_overrides": ov}).response.text == "project"
+    ladder(store, "implementation", (c, "gpt-x"))
+    ov = {"implementation": [{"connection_id": l["connection_id"], "model": "qwen2.5:3b"}]}
+    assert client.call("implementation", req(), policy={"mode": "custom", "ladder_overrides": ov}).response.text == "project"
     store.db.execute("INSERT INTO budgets(budget_id, scope, limit_usd, updated_at) VALUES ('job:x','job:x',1,'t')")
-    assert client.call("interpretation", req(), policy={"mode": "inherit", "ladder_overrides": ov}, budget="job:x").response.text == "global"
+    assert client.call("implementation", req(), policy={"mode": "inherit", "ladder_overrides": ov}, budget="job:x").response.text == "global"
 
 
 def test_locality_rule():
@@ -329,7 +329,7 @@ def test_ladder_api_get_put_revision_snapshots_and_routes_compat(api):
     c, st = api
     loc, cl = api_conns(st)
     r0 = c.get("/ai/ladder").json()
-    assert set(r0["tasks"]) == {"interpretation", "repair", "visual_review", "verification_assist", "knowledge"}
+    assert set(r0["tasks"]) == {"implementation", "repair", "naming", "visual_review", "verification_assist", "knowledge"}
     rev0 = r0["config_revision"]
     r = c.put("/ai/ladder/repair", json={"entries": [{"connection_id": loc["connection_id"], "model": "qwen2.5:14b"},
                                                      {"connection_id": cl["connection_id"], "model": "claude-haiku-4-5"},
@@ -345,10 +345,10 @@ def test_ladder_api_get_put_revision_snapshots_and_routes_compat(api):
     # /routes still works and reflects the same storage; a PUT there also bumps the revision
     routes = {x["task"]: x for x in c.get("/routes").json()}
     assert routes["repair"]["primary_model"] == "qwen2.5:14b" and len(routes["repair"]["fallbacks"]) == 2
-    assert c.put("/routes/interpretation", json={"primary_connection": cl["connection_id"], "primary_model": "claude-haiku-4-5"}).status_code == 200
+    assert c.put("/routes/implementation", json={"primary_connection": cl["connection_id"], "primary_model": "claude-haiku-4-5"}).status_code == 200
     assert c.get("/ai/ladder").json()["config_revision"] == rev0 + 2
     snap = c.get("/ai/ladder/revisions", params={"revision": rev0 + 1}).json()
-    assert snap["tasks"]["repair"]["entries"][0]["model"] == "qwen2.5:14b" and "interpretation" not in snap["tasks"]
+    assert snap["tasks"]["repair"]["entries"][0]["model"] == "qwen2.5:14b" and "implementation" not in snap["tasks"]
     assert c.put("/ai/ladder/nope", json={"entries": []}).status_code == 400
     assert c.put("/ai/ladder/repair", json={"entries": [{"connection_id": "conn_missing", "model": "x"}]}).status_code == 400
     assert c.put("/ai/ladder/repair", json={"entries": []}).json()["entries"] == []
@@ -400,19 +400,19 @@ def make_case(c, tmp_path, policy):
 def test_case_ai_policy_get_put_validation_and_effective_ladder(api, tmp_path):
     c, st = api
     loc, cl = api_conns(st)
-    c.put("/ai/ladder/interpretation", json={"entries": [{"connection_id": cl["connection_id"], "model": "claude-haiku-4-5"},
+    c.put("/ai/ladder/implementation", json={"entries": [{"connection_id": cl["connection_id"], "model": "claude-haiku-4-5"},
                                                          {"connection_id": loc["connection_id"], "model": "qwen2.5:14b"}]})
     cid = make_case(c, tmp_path, {"mode": "assisted", "budget_usd": 1.0})
     g = c.get(f"/cases/{cid}/ai-policy").json()
     assert g["policy"]["mode"] == "assisted" and g["policy"]["locality"] == "any" and len(g["policy_hash"]) == 16
-    assert [e["model"] for e in g["effective"]["interpretation"]["entries"]] == ["claude-haiku-4-5", "qwen2.5:14b"]
+    assert [e["model"] for e in g["effective"]["implementation"]["entries"]] == ["claude-haiku-4-5", "qwen2.5:14b"]
     p = c.put(f"/cases/{cid}/ai-policy", json={"locality": "local_only"}).json()
     assert p["policy"]["budget_usd"] == 1.0 and p["policy_hash"] != g["policy_hash"]                 # additive merge
-    ents = p["effective"]["interpretation"]["entries"]
+    ents = p["effective"]["implementation"]["entries"]
     assert ents[0]["policy_skipped"] and ents[1]["policy_skipped"] is None
     ov = {"repair": [{"connection_id": loc["connection_id"], "model": "qwen2.5:14b"}]}
     p = c.put(f"/cases/{cid}/ai-policy", json={"mode": "custom", "ladder_overrides": ov}).json()
-    assert p["effective"]["repair"]["source"] == "project" and p["effective"]["interpretation"]["source"] == "global"
+    assert p["effective"]["repair"]["source"] == "project" and p["effective"]["implementation"]["source"] == "global"
     for bad in ({"mode": "turbo"}, {"locality": "mars"}, {"ladder_overrides": {"nope": []}},
                 {"ladder_overrides": {"repair": [{"connection_id": "conn_missing", "model": "x"}]}}, {"budget_usd": -1}):
         assert c.put(f"/cases/{cid}/ai-policy", json=bad).status_code == 400, bad
@@ -422,23 +422,23 @@ def test_case_ai_policy_get_put_validation_and_effective_ladder(api, tmp_path):
 def test_plan_exposes_ai_per_item_with_cost_and_without_ai(api, tmp_path):
     c, st = api
     loc, cl = api_conns(st)
-    c.put("/ai/ladder/interpretation", json={"entries": [{"connection_id": cl["connection_id"], "model": "claude-haiku-4-5"},
+    c.put("/ai/ladder/implementation", json={"entries": [{"connection_id": cl["connection_id"], "model": "claude-haiku-4-5"},
                                                          {"connection_id": loc["connection_id"], "model": "qwen2.5:14b"}]})
     cid = make_case(c, tmp_path, {"mode": "assisted", "budget_usd": 0.5, "max_attempts": 3, "max_output_tokens": 4000})
     plan = c.get(f"/cases/{cid}/plan").json()
     items = {i["item_id"].split(":")[-1]: i for i in plan["items"]}
     ai = items["M-IMPL"]["ai"]
-    assert ai["task"] == "interpretation" and ai["primary"]["model"] == "claude-haiku-4-5" and ai["primary"]["locality"] == "cloud"
+    assert ai["task"] == "implementation" and ai["primary"]["model"] == "claude-haiku-4-5" and ai["primary"]["locality"] == "cloud"
     assert [f["model"] for f in ai["fallbacks"]] == ["qwen2.5:14b"] and ai["rationale"] == "user"
     assert ai["expected_cost"]["known"] is True and 0 < ai["expected_cost"]["min_usd"] <= ai["expected_cost"]["max_usd"] <= 0.5
     assert ai["runs_without_ai"] is True and "scaffold" in ai["without_ai"] and ai["budget_usd"] == 0.5
     fix = items["M-FIX"]["ai"]
-    assert fix["runs_without_ai"] is False and fix["task"] == "interpretation" and "repair" in fix["note"]
+    assert fix["runs_without_ai"] is False and fix["task"] == "implementation" and "repair" in fix["note"]
     assert items["M-COMPARE"]["origin"] == "verifier_decided" and items["M-IMPL"]["origin"] == "deterministic"
     assert "ai" not in items["M-ANALYSIS"]
     # unknown price in the ladder => unknown_price, never a made-up number
     unk = st.connections.create("openai", "Unpriced", api_key=KEY, models=["gpt-unknown"])
-    c.put("/ai/ladder/interpretation", json={"entries": [{"connection_id": unk["connection_id"], "model": "gpt-unknown"}]})
+    c.put("/ai/ladder/implementation", json={"entries": [{"connection_id": unk["connection_id"], "model": "gpt-unknown"}]})
     c.put(f"/cases/{cid}/ai-policy", json={"max_output_tokens": None})
     assert c.get(f"/cases/{cid}/plan").json()["items"][[i["item_id"].endswith("M-IMPL") for i in plan["items"]].index(True)]["ai"]["expected_cost"] == \
         {"unknown_price": True, "note": "a model in the ladder has no known price; it is skipped until you set a price, an output-token cap or approve unknown pricing"}
@@ -457,11 +457,11 @@ def test_paused_ai_work_resumes_with_the_new_ladder_budget_and_policy(api, tmp_p
     ma, mb = MockProvider(["from A"]), MockProvider(["from B"])
     st.connections.set_adapter_override(a["connection_id"], ma)
     st.connections.set_adapter_override(b["connection_id"], mb)
-    c.put("/ai/ladder/interpretation", json={"entries": [{"connection_id": a["connection_id"], "model": "claude-haiku-4-5"}]})
+    c.put("/ai/ladder/implementation", json={"entries": [{"connection_id": a["connection_id"], "model": "claude-haiku-4-5"}]})
 
     def stage(ctx):
         case = st.cases.get_case(ctx.job.case_id)
-        out = ask_model(st, ctx, case, LoopPolicy.from_case(case), task="interpretation", system="sys", prompt="please", key=f"{ctx.job.job_id}:k")
+        out = ask_model(st, ctx, case, LoopPolicy.from_case(case), task="implementation", system="sys", prompt="please", key=f"{ctx.job.job_id}:k")
         return {k: out[k] for k in ("text", "model", "config_revision", "policy_hash")}
     st.stages.add("ai_probe_stage", stage)
     cid = make_case(c, tmp_path, {"mode": "assisted", "budget_usd": 1.0})
@@ -469,7 +469,7 @@ def test_paused_ai_work_resumes_with_the_new_ladder_budget_and_policy(api, tmp_p
     j = st.jobs.create(cid, "ai_probe_stage", "AI work", {})
     assert c.post(f"/cases/{cid}/pause").json()["paused"] >= 1
     # while paused: the global ladder and the project budget/policy change
-    rev = c.put("/ai/ladder/interpretation", json={"entries": [{"connection_id": b["connection_id"], "model": "claude-sonnet-5-5"}]}).json()["config_revision"]
+    rev = c.put("/ai/ladder/implementation", json={"entries": [{"connection_id": b["connection_id"], "model": "claude-sonnet-5-5"}]}).json()["config_revision"]
     new = c.put(f"/cases/{cid}/ai-policy", json={"budget_usd": 2.5, "approve_unknown_pricing": True}).json()
     assert new["policy_hash"] != old_hash
     c.post(f"/cases/{cid}/resume")
@@ -491,17 +491,20 @@ def test_activity_feed_api_and_no_keys_or_raw_prompts_anywhere(api, tmp_path):
     c, st = api
     planted = "sk-or-v1-PLANTED-FAKE-KEY-9f8e7d6c5b4a3210"
     marker = "RAW-PROMPT-MARKER-should-never-be-stored"
-    conn = st.connections.create("openrouter", "OR", api_key=planted, models=[{"id": "m1", "price": PRICED}, {"id": "m2", "price": PRICED}])
+    conn = st.connections.create("openrouter", "OR", api_key=planted, models=[{"id": "m1", "price": PRICED}])
+    conn2 = st.connections.create("openrouter", "OR2", api_key="sk-or-v1-OTHER-FAKE-KEY-0000000000", models=[{"id": "m2", "price": PRICED}])
     err = CreditsExhausted("placeholder", status=402)
     err.args = (f"openrouter HTTP 402: key {planted} has no credits",)     # an upstream body that echoes the key
-    st.connections.set_adapter_override(conn["connection_id"], MockProvider([err, "done"]))
-    st.connections.set_route("interpretation", conn["connection_id"], "m1", [{"connection": conn["connection_id"], "model": "m2"}])
+    st.connections.set_adapter_override(conn["connection_id"], MockProvider([err]))
+    st.connections.set_adapter_override(conn2["connection_id"], MockProvider(["done"]))
+    # (R9: a second model on the SAME connection would be skipped: OR is paused for every task after "no credits")
+    st.connections.set_route("implementation", conn["connection_id"], "m1", [{"connection": conn2["connection_id"], "model": "m2"}])
     cid = make_case(c, tmp_path, {"mode": "assisted", "budget_usd": 1})
     st.budgets.ensure(f"case:{cid}", f"case:{cid}", 1.0)
-    st.ai.call("interpretation", req(marker), case_id=cid, budget=f"case:{cid}", activity={"subject": "module demo.exe", "plan_item_id": f"{cid}:M-IMPL"})
+    st.ai.call("implementation", req(marker), case_id=cid, budget=f"case:{cid}", activity={"subject": "module demo.exe", "plan_item_id": f"{cid}:M-IMPL"})
     feed = c.get(f"/cases/{cid}/ai/activity").json()
     texts = [f["text"] for f in feed]
-    assert texts[0] == "Interpreting module demo.exe with cloud model m1 (OR)"
+    assert texts[0] == "Writing the implementation of module demo.exe with cloud model m1 (OR)"
     assert texts[1].startswith("OR has run out of credits for m1; trying m2")
     assert texts[2].startswith("m2 answered (")
     f0 = feed[0]

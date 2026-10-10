@@ -142,7 +142,7 @@ def test_live_local_model_repairs_a_tiny_rust_cli_through_the_real_implement_loo
     t_all = time.time()
     p = local_connection(studio)
     cid_conn = p["connection_id"]
-    rev = put_ladder(studio.connections, "interpretation", [{"connection_id": cid_conn, "model": MISSING},
+    rev = put_ladder(studio.connections, "implementation", [{"connection_id": cid_conn, "model": MISSING},
                                                            {"connection_id": cid_conn, "model": MODEL}])["config_revision"]
     orig = tmp_path / "original"
     orig.mkdir()

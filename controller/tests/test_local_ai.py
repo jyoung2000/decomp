@@ -319,11 +319,11 @@ def test_detect_ollama_capabilities_and_good_for(store, events, settings, ollama
     coder = by["qwen2.5-coder:14b"]
     assert coder["context_window"] == 32768 and coder["parameter_b"] == 14.8 and coder["quantization"] == "Q4_K_M"
     assert coder["size_bytes"] == 8_990_000_000 and coder["capabilities"]["tools"] is True
-    assert coder["tasks"]["interpretation"]["ok"] and coder["tasks"]["repair"]["note"] == "coding model"
+    assert coder["tasks"]["implementation"]["ok"] and coder["tasks"]["repair"]["note"] == "coding model"
     assert not coder["tasks"]["visual_review"]["ok"]
     assert by["llava:7b"]["tasks"]["visual_review"]["ok"] and not by["llava:7b"]["tasks"]["repair"]["ok"]
     small = by["qwen2.5:3b"]
-    assert small["quick_only"] and not small["tasks"]["interpretation"]["ok"] and "quick tasks only" in small["tasks"]["repair"]["note"]
+    assert small["quick_only"] and not small["tasks"]["implementation"]["ok"] and "quick tasks only" in small["tasks"]["repair"]["note"]
     emb = by["nomic-embed-text:latest"]
     assert emb["excluded"] and not emb["suitable"] and "embedding" in emb["summary"]
     assert by["gemma3:12b"]["capabilities"]["thinking"] is True and by["gemma3:12b"]["effective_context"] == 32768
@@ -445,10 +445,10 @@ def test_native_adapter_grows_num_ctx_when_the_server_counts_more_tokens(ollama,
 def test_router_uses_native_ollama_and_records_effective_context(store, events, settings, db, ollama):
     la = make_local(store, events, settings, specs(ollama=ollama))
     cid = la.detect()["servers"][0]["connection_id"]
-    store.set_route("interpretation", cid, "qwen2.5-coder:14b")
+    store.set_route("implementation", cid, "qwen2.5-coder:14b")
     client = AIClient(store, BudgetLedger(db, events), events, db, sleep=lambda s: None)
     client.advisor = None
-    res = client.call("interpretation", big_request(20_000))
+    res = client.call("implementation", big_request(20_000))
     assert res.response.text == "PURPLE-42"
     assert ollama.bodies("/v1/chat/completions") == [] and ollama.bodies("/api/chat")[-1]["options"]["num_ctx"] >= 10_000
     row = db.query("SELECT * FROM ai_calls WHERE outcome='ok'")[-1]
@@ -457,7 +457,7 @@ def test_router_uses_native_ollama_and_records_effective_context(store, events, 
     texts = [e["payload"]["text"] for e in events.events_since(0) if e["kind"] == "ai.activity"]
     assert any("context 16384 tokens" in t or "context 32768 tokens" in t for t in texts)
     with pytest.raises((AllCandidatesFailed, NoRoute)):
-        client.call("interpretation", big_request(120_000))                 # > 32k cap: refused, never cut
+        client.call("implementation", big_request(120_000))                 # > 32k cap: refused, never cut
     assert all(len(json.dumps(b)) < 100_000 for b in ollama.bodies("/api/chat"))
 
 

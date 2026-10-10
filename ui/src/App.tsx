@@ -11,6 +11,7 @@ import { KnowledgeView } from './views/Knowledge';
 import { SettingsView } from './views/Settings';
 import { ToolsView } from './views/Tools';
 import { Empty } from './components/Empty';
+import { DependencyStatusBar } from './components/DependencyStatus';
 
 function Sidebar() {
   const selected = useSelectedCase();
@@ -101,6 +102,7 @@ export function Shell() {
             />
           </Routes>
         </main>
+        <DependencyStatusBar />
       </div>
     </div>
   );

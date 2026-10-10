@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { rungKey } from '../../lib/ai';
 import type { LadderEntry } from '../../lib/types';
 import { Availability, Capabilities, LocalityBadge, PriceLabel } from './Badges';
@@ -7,7 +7,7 @@ import { Availability, Capabilities, LocalityBadge, PriceLabel } from './Badges'
  * One task's ladder: position 1 is the primary, 2.. are fallbacks tried in order.
  * Keyboard: Tab to a row, Alt+Up / Alt+Down moves it, the Move and Remove buttons work with Enter or Space.
  */
-export function LadderList({ id, label, entries, onChange, readOnlyReason }: { id: string; label: string; entries: LadderEntry[]; onChange: (e: LadderEntry[]) => void; readOnlyReason?: string }) {
+export function LadderList({ id, label, entries, onChange, readOnlyReason, extra }: { id: string; label: string; entries: LadderEntry[]; onChange: (e: LadderEntry[]) => void; readOnlyReason?: string; extra?: (e: LadderEntry, i: number) => ReactNode }) {
   const focusKey = useRef<string | null>(null);
   // Runs on the render that applied the move/remove (keyed on `entries`), not on an earlier render where the ref was
   // already set but the parent's state had not changed yet (that cleared the key too early on slower CI runners).
@@ -72,6 +72,7 @@ export function LadderList({ id, label, entries, onChange, readOnlyReason }: { i
                 <span aria-hidden="true">·</span>
                 <PriceLabel entry={e} />
               </div>
+              {extra ? extra(e, i) : null}
             </div>
             <div className="btn-group">
               <button type="button" className="btn sm icon" aria-label={`Move ${e.model} up`} disabled={i === 0} aria-describedby={i === 0 ? `${upWhy}-first` : undefined} onClick={() => move(i, -1)}>

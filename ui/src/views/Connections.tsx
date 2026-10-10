@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ConfirmDialog } from '../components/Dialog';
 import { Empty, Loading } from '../components/Empty';
 import { ErrorCallout } from '../components/ErrorCallout';
+import { JevAdvisorCard } from '../components/ai/JevAdvisorCard';
 import { LadderSection } from '../components/ai/LadderSection';
 import { LocalAiSection } from '../components/ai/LocalAiSection';
 import { StatusChip } from '../components/StatusChip';
@@ -19,8 +20,9 @@ export const PROVIDERS: { id: string; label: string; endpoint?: string; needsEnd
   { id: 'custom', label: 'Custom', needsEndpoint: true },
 ];
 export const TASKS: { id: string; label: string; sub: string }[] = [
-  { id: 'interpretation', label: 'Interpretation', sub: 'Explain decompiled code and data' },
+  { id: 'implementation', label: 'Implementation', sub: 'Write the program from the recovered evidence' },
   { id: 'repair', label: 'Repair', sub: 'Propose fixes for failing builds/tests' },
+  { id: 'naming', label: 'Naming', sub: 'Suggest function/variable names and comments' },
   { id: 'visual_review', label: 'Visual review', sub: 'Describe screenshot differences' },
   { id: 'verification_assist', label: 'Verification assist', sub: 'Suggest scenarios (never verdicts)' },
   { id: 'knowledge', label: 'Knowledge', sub: 'Propose reusable adapters/rules' },
@@ -131,6 +133,7 @@ export function ConnectionsView() {
 
       <AddConnection onAdded={conns.reload} />
       <LadderSection connections={conns.data ?? []} version={ladderTick} />
+      <JevAdvisorCard />
       <Costs />
       <Hermes />
 

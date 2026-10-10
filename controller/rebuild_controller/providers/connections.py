@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
@@ -33,7 +34,11 @@ install_redacting_filter(log)
 PROVIDERS = ("openai", "anthropic", "gemini", "openrouter", "local")
 AUTH_MODES = ("api_key", "subscription_handoff", "local", "none")
 STATES = ("unprobed", "ok", "auth_failed", "unreachable", "limited", "no_credits")
-TASKS = ("interpretation", "repair", "visual_review", "verification_assist", "knowledge")
+# R9: "interpretation" (which in fact wrote the first implementation) became "implementation"; "naming" was added.
+TASKS = ("implementation", "repair", "naming", "visual_review", "verification_assist", "knowledge")
+LEGACY_TASKS = {"interpretation": "implementation"}
+COOLDOWN_OUTCOMES = ("credits_exhausted", "usage_limit")
+DEFAULT_COOLDOWN_MINUTES = {"credits_exhausted": 1440.0, "usage_limit": 60.0}
 DIALECTS = ("responses", "chat", "auto")
 HANDOFF_FOR_PROVIDER = {"openai": "openai_siwc", "anthropic": "claude_agent_sdk", "gemini": "gemini_cli"}
 PROBE_BUDGET_USD = 0.50           # lifetime ceiling for capability probes per connection (budget id probe:<connection_id>)
@@ -45,12 +50,27 @@ class ConnectionStoreError(ValueError):
     pass
 
 
+def normalize_task(task: str) -> str:
+    """Accept the pre-R9 task name ``interpretation`` as an alias of ``implementation``."""
+    return LEGACY_TASKS.get(task, task) if isinstance(task, str) else task
+
+
 def locality_of(conn: Mapping[str, Any]) -> str:
     """``local`` when the connection is a local provider or its endpoint is a loopback address ("runs on this PC")."""
     if conn.get("provider") == "local":
         return "local"
     host = urlparse(conn.get("endpoint") or "").hostname or ""
     return "local" if host in _LOOPBACK or host.startswith("127.") else "cloud"
+
+
+def _iso(ts: float) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts))
+
+
+def cooldown_text(conn: Mapping[str, Any], c: Mapping[str, Any]) -> str:
+    what = {"credits_exhausted": "ran out of credits", "usage_limit": "hit its usage limit"}.get(str(c.get("outcome")), "reported a limit")
+    return (f"{conn.get('label') or conn.get('provider')} {what}; every task skips it until {c.get('until')} "
+            f"(clear the cooldown in Connections once it is usable again)")
 
 
 class ModelNotListed(ConnectionStoreError):
@@ -101,6 +121,8 @@ class ConnectionStore:
         self.prices = prices or PriceTable()
         self.ledger = ledger or BudgetLedger(db, events)
         self._overrides: dict[str, ProviderAdapter] = {}
+        self.clock = time.time            # cooldown clock (tests replace it)
+        self._ensure_r9()
 
     # ------------------------------------------------------------------ rows
     @staticmethod
@@ -434,7 +456,7 @@ class ConnectionStore:
         return [self._route_view(r) for r in self.db.query("SELECT * FROM task_routes ORDER BY task")]
 
     def get_route(self, task: str) -> dict[str, Any] | None:
-        row = self.db.query_one("SELECT * FROM task_routes WHERE task=?", (task,))
+        row = self.db.query_one("SELECT * FROM task_routes WHERE task=?", (normalize_task(task),))
         return self._route_view(row) if row else None
 
     def _check_target(self, connection_id: str, model: str, allow_unlisted: bool) -> None:
@@ -451,7 +473,10 @@ class ConnectionStore:
 
     def set_route(self, task: str, primary_connection: str, primary_model: str,
                   fallbacks: Iterable[Mapping[str, str]] | None = None, *, allow_unlisted: bool = False, rationale: str = "user",
-                  bump: bool = True) -> dict[str, Any]:
+                  bump: bool = True, rules: Mapping[tuple[str, str], Mapping[str, Any]] | None = None) -> dict[str, Any]:
+        """``rules`` (R9): ``{(connection_id, model): {failure_kind: rule}}`` replaces every per-rung failure rule of the task;
+        ``None`` keeps the stored rules (they follow the rung, keyed by connection + model)."""
+        task = normalize_task(task)
         if task not in TASKS:
             raise ConnectionStoreError(f"unknown task {task!r}; expected one of {TASKS}")
         fb = [{"connection": f["connection"], "model": f["model"]} for f in (fallbacks or [])]
@@ -466,11 +491,14 @@ class ConnectionStore:
                 seen.add(pair)
             self.db.upsert("task_routes", {"task": task, "primary_connection": primary_connection, "primary_model": primary_model,
                                            "fallbacks": fb, "updated_at": now_iso()}, "task")
+            if rules is not None:
+                self.set_rules(task, rules)
             if bump:
                 self.bump_revision(f"ladder for {task} changed", {task: rationale})
         return self.get_route(task)  # type: ignore[return-value]
 
     def delete_route(self, task: str, *, rationale: str = "user", bump: bool = True) -> bool:
+        task = normalize_task(task)
         with self.db.transaction():
             gone = self.db.execute("DELETE FROM task_routes WHERE task=?", (task,)).rowcount > 0
             if gone and bump:
@@ -504,7 +532,9 @@ class ConnectionStore:
             prev_tasks = self.revision_snapshot().get("tasks") or {}
             tasks: dict[str, Any] = {}
             for r in self.get_routes():
-                entries = [{"connection_id": c, "model": m} for c, m in self.route_entries(r["task"])]
+                rules = self.task_rules(r["task"])
+                entries = [{"connection_id": c, "model": m, **({"rules": rules[(c, m)]} if rules.get((c, m)) else {})}
+                           for c, m in self.route_entries(r["task"])]
                 why = rationale.get(r["task"]) or (prev_tasks.get(r["task"]) or {}).get("rationale") or "user"
                 tasks[r["task"]] = {"entries": entries, "rationale": why}
             for t, why in rationale.items():
@@ -514,6 +544,154 @@ class ConnectionStore:
                                                    "snapshot": {"tasks": tasks}})
         self.events.emit("ai.ladder", {"config_revision": rev, "reason": reason[:300]})
         return rev
+
+    # ------------------------------------------------------------------ R9: tables, task migration, rung rules, cooldowns, settings
+    def _ensure_r9(self) -> None:
+        """Idempotent: R9 tables (created here, not as a numbered migration, so parallel schema work cannot collide) and the
+        one-time task rename ``interpretation`` -> ``implementation`` for the global ladder and every project's overrides."""
+        self.db.execute("CREATE TABLE IF NOT EXISTS ai_rung_rules (task TEXT NOT NULL, connection_id TEXT NOT NULL, model TEXT NOT NULL, "
+                        "rules TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL, PRIMARY KEY (task, connection_id, model))")
+        self.db.execute("CREATE TABLE IF NOT EXISTS ai_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)")
+        self.migrate_tasks()
+
+    def migrate_tasks(self) -> dict[str, Any]:
+        """Rename legacy task ids in stored ladders, rung rules and project policies. Returns what changed (empty when nothing)."""
+        out: dict[str, Any] = {}
+        for old, new in LEGACY_TASKS.items():
+            row = self.db.query_one("SELECT * FROM task_routes WHERE task=?", (old,))
+            if row is None:
+                continue
+            with self.db.transaction():
+                keep_new = self.db.query_one("SELECT task FROM task_routes WHERE task=?", (new,)) is not None
+                if keep_new:          # both exist (e.g. a newer client already wrote the new task): the new one wins
+                    self.db.execute("DELETE FROM task_routes WHERE task=?", (old,))
+                else:
+                    self.db.execute("UPDATE task_routes SET task=?, updated_at=? WHERE task=?", (new, now_iso(), old))
+                self.db.execute("UPDATE OR IGNORE ai_rung_rules SET task=? WHERE task=?", (new, old))
+                self.db.execute("DELETE FROM ai_rung_rules WHERE task=?", (old,))
+                prev = ((self.revision_snapshot().get("tasks") or {}).get(old) or {}).get("rationale") or "user"
+                rev = self.bump_revision(f"task '{old}' renamed to '{new}' (it writes the program); its ladder was kept",
+                                         {new: prev} if not keep_new else None)
+            out[old] = {"to": new, "config_revision": rev, "kept_existing": keep_new}
+        flag = self.db.query_one("SELECT value FROM meta WHERE key='ai_tasks_r9'")
+        if flag is None:
+            n = 0
+            for c in self.db.query("SELECT case_id, ai_policy FROM cases"):
+                pol = loads(c["ai_policy"], {})
+                ov = pol.get("ladder_overrides") if isinstance(pol, Mapping) else None
+                if not isinstance(ov, Mapping) or not any(k in ov for k in LEGACY_TASKS):
+                    continue
+                pol = dict(pol)
+                pol["ladder_overrides"] = {LEGACY_TASKS.get(k, k): v for k, v in ov.items()
+                                           if not (k in LEGACY_TASKS and LEGACY_TASKS[k] in ov)}
+                self.db.update("cases", "case_id", c["case_id"], {"ai_policy": pol, "updated_at": now_iso()})
+                n += 1
+            self.db.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('ai_tasks_r9', ?)", (json.dumps({"at": now_iso(), "cases": n}),))
+            if n:
+                out["cases"] = n
+        return out
+
+    # -- per-rung failure rules (docs/AI_LADDER.md section 9)
+    def task_rules(self, task: str) -> dict[tuple[str, str], dict[str, Any]]:
+        rows = self.db.query("SELECT connection_id, model, rules FROM ai_rung_rules WHERE task=?", (normalize_task(task),))
+        return {(r["connection_id"], r["model"]): loads(r["rules"], {}) for r in rows}
+
+    def rules_for(self, task: str, connection_id: str | None, model: str) -> dict[str, Any]:
+        if not connection_id:
+            return {}
+        r = self.db.query_one("SELECT rules FROM ai_rung_rules WHERE task=? AND connection_id=? AND model=?",
+                              (normalize_task(task), connection_id, model))
+        return loads(r["rules"], {}) if r else {}
+
+    def set_rules(self, task: str, rules: Mapping[tuple[str, str], Mapping[str, Any]]) -> None:
+        task = normalize_task(task)
+        with self.db.transaction():
+            self.db.execute("DELETE FROM ai_rung_rules WHERE task=?", (task,))
+            for (cid, model), r in rules.items():
+                if r:
+                    self.db.insert("ai_rung_rules", {"task": task, "connection_id": cid, "model": model, "rules": dict(r),
+                                                     "updated_at": now_iso()})
+
+    # -- settings (key/value JSON)
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        r = self.db.query_one("SELECT value FROM ai_settings WHERE key=?", (key,))
+        return loads(r["value"], default) if r else default
+
+    def put_setting(self, key: str, value: Any) -> None:
+        self.db.upsert("ai_settings", {"key": key, "value": json.dumps(value, sort_keys=True), "updated_at": now_iso()}, "key")
+
+    def cooldown_minutes(self) -> dict[str, float]:
+        cur = self.get_setting("cooldown_minutes", {}) or {}
+        return {k: float(cur.get(k, v)) for k, v in DEFAULT_COOLDOWN_MINUTES.items()}
+
+    # -- provider cooldown: a connection that reported credits / usage exhausted is skipped by every task until it ends
+    def cooldown(self, conn: Mapping[str, Any] | str, model: str | None = None) -> dict[str, Any] | None:
+        """The active cooldown of a connection, or None. A cooldown started by a FREE model (its free tier ran out) only
+        covers the connection's free models: with ``model`` given, a paid model on the same connection is not paused."""
+        if isinstance(conn, str):
+            row = self.db.query_one("SELECT * FROM connections WHERE connection_id=?", (conn,))
+            conn = self._public(row) if row else {}
+        lim = conn.get("limits") or {}
+        c = lim.get("cooldown") if isinstance(lim, Mapping) else None
+        if not isinstance(c, Mapping):
+            return None
+        until = c.get("until_ts")
+        if isinstance(until, (int, float)) and until <= self.clock():
+            return None
+        if model is not None and c.get("scope") == "free_models" and conn.get("provider"):
+            p = self.prices.lookup(conn["provider"], model, connection=conn)
+            if not (p.known and p.input_per_mtok == 0 and p.output_per_mtok == 0):
+                return None
+        return dict(c)
+
+    def set_cooldown(self, connection_id: str, outcome: str, *, reason: str = "", seconds: float | None = None,
+                     free_only: bool = False) -> dict[str, Any] | None:
+        """Start (or extend) the cooldown for ``outcome``; ``seconds`` (e.g. a provider's reset time) wins over the setting.
+        A setting of 0 minutes disables cooldowns for that kind. Writes ``limits`` directly (keeps test adapter overrides)."""
+        if outcome not in COOLDOWN_OUTCOMES:
+            return None
+        mins = self.cooldown_minutes().get(outcome, 0.0)
+        if mins <= 0:
+            return None
+        if seconds is None:
+            seconds = mins * 60.0
+        row = self.db.query_one("SELECT limits FROM connections WHERE connection_id=?", (connection_id,))
+        if row is None:
+            return None
+        now = self.clock()
+        until = now + max(1.0, float(seconds))
+        lim = loads(row["limits"], {})
+        old = lim.get("cooldown") if isinstance(lim.get("cooldown"), Mapping) else None
+        if old and isinstance(old.get("until_ts"), (int, float)) and old["until_ts"] > until:
+            until = old["until_ts"]
+        scope = "free_models" if free_only and not (old and old.get("scope") == "connection") else "connection"
+        lim["cooldown"] = {"outcome": outcome, "reason": redact(reason)[:300], "set_at": _iso(now), "until": _iso(until), "until_ts": until,
+                           "scope": scope}
+        self.db.update("connections", "connection_id", connection_id, {"limits": lim, "updated_at": now_iso()})
+        self.events.emit("ai.cooldown", {"connection_id": connection_id, "outcome": outcome, "until": lim["cooldown"]["until"]})
+        return dict(lim["cooldown"])
+
+    def clear_cooldown(self, connection_id: str) -> bool:
+        row = self._row(connection_id)
+        lim = loads(row["limits"], {})
+        if "cooldown" not in lim:
+            return False
+        lim.pop("cooldown", None)
+        fields: dict[str, Any] = {"limits": lim, "updated_at": now_iso()}
+        if row["state"] in ("no_credits", "limited"):
+            fields["state"] = "unprobed"          # the user says it is usable again; the next call or probe decides
+        self.db.update("connections", "connection_id", connection_id, fields)
+        self.events.emit("ai.cooldown", {"connection_id": connection_id, "cleared": True})
+        return True
+
+    def cooldowns(self) -> list[dict[str, Any]]:
+        out = []
+        for conn in self.list():
+            c = self.cooldown(conn)
+            if c is not None:
+                out.append({"connection_id": conn["connection_id"], "connection_label": conn["label"], "provider": conn["provider"], **c,
+                            "text": cooldown_text(conn, c)})
+        return out
 
     # ------------------------------------------------------------------ per (connection, model) availability
     def mark_model(self, connection_id: str, model: str, state: str, *, detail: str | None = None) -> None:
@@ -544,7 +722,7 @@ class ConnectionStore:
             self.db.update("connections", "connection_id", connection_id, {"models": models, "updated_at": now_iso()})
 
     def route_entries(self, task: str) -> list[tuple[str, str]]:
-        route = self.get_route(task)
+        route = self.get_route(normalize_task(task))
         if route is None or not route["primary_connection"]:
             return []
         return [(route["primary_connection"], route["primary_model"])] + [(f["connection"], f["model"]) for f in route["fallbacks"]]
@@ -553,7 +731,9 @@ class ConnectionStore:
                           entries: Iterable[tuple[str, str]] | None = None) -> list[dict[str, Any]]:
         """Every ladder entry in order with its 1-based ``position``. ``conn`` is the public connection row (None when it no
         longer exists); ``skip`` is the plain-English reason the entry cannot be used at all and ``skip_outcome`` its taxonomy
-        label. ``entries`` replaces the global ladder (a project's ladder override)."""
+        label. ``entries`` replaces the global ladder (a project's ladder override). A connection in cooldown (R9: it reported
+        credits or usage exhausted) is skipped with ``skip_outcome="cooldown"`` until the cooldown ends or is cleared."""
+        task = normalize_task(task)
         ents = list(entries) if entries is not None else self.route_entries(task)
         out: list[dict[str, Any]] = []
         for i, (cid, model) in enumerate(ents, start=1):
@@ -568,8 +748,11 @@ class ConnectionStore:
                 continue
             conn = self._public(row)
             item["conn"] = conn
+            cool = self.cooldown(conn, model)
             if conn["auth_mode"] == "subscription_handoff":
                 item.update(skip="subscription handoff has no API path", skip_outcome="unusable")
+            elif cool is not None:
+                item.update(skip=cooldown_text(conn, cool), skip_outcome="cooldown", cooldown=cool)
             elif conn["state"] == "auth_failed":
                 item.update(skip="auth failed; update the key or re-probe", skip_outcome="auth_failed")
             else:
@@ -589,6 +772,7 @@ class ConnectionStore:
 
     def resolve_detailed(self, task: str, needs: Iterable[str] | None = None,
                          entries: Iterable[tuple[str, str]] | None = None) -> tuple[list[tuple[dict[str, Any], str]], list[dict[str, str]]]:
+        task = normalize_task(task)
         ents = list(entries) if entries is not None else self.route_entries(task)
         if not ents:
             return [], [{"reason": f"no route configured for task {task!r}"}]

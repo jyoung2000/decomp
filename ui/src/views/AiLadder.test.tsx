@@ -13,8 +13,8 @@ const conns = [
   { connection_id: 'conn_local', provider: 'local', label: 'Ollama (this PC)', endpoint: 'http://127.0.0.1:11434/v1', auth_mode: 'local', models: ['qwen2.5:14b'], capabilities: {}, limits: {}, state: 'ok', last_probe: NOW },
   { connection_id: 'conn_openai', provider: 'openai', label: 'OpenAI', endpoint: 'https://api.openai.com/v1', auth_mode: 'api_key', models: ['gpt-demo-small'], capabilities: {}, limits: {}, state: 'ok', last_probe: NOW },
 ];
-const tasks = ['interpretation', 'repair', 'visual_review', 'verification_assist', 'knowledge'];
-const ladderOf = (interp: unknown[]) => ({ config_revision: 7, tasks: Object.fromEntries(tasks.map((t) => [t, { entries: t === 'interpretation' ? interp : [], rationale: t === 'interpretation' ? 'user' : 'auto' }])) });
+const tasks = ['implementation', 'repair', 'naming', 'visual_review', 'verification_assist', 'knowledge'];
+const ladderOf = (interp: unknown[]) => ({ config_revision: 7, tasks: Object.fromEntries(tasks.map((t) => [t, { entries: t === 'implementation' ? interp : [], rationale: t === 'implementation' ? 'user' : 'auto' }])) });
 
 function ladderRoutes(over: Routes = {}) {
   let interp: unknown[] = [qwen, gpt, claude];
@@ -22,7 +22,7 @@ function ladderRoutes(over: Routes = {}) {
     '/connections': conns,
     '/routes': [],
     '/ai/ladder': () => ladderOf(interp),
-    'PUT /ai/ladder/interpretation': (b: unknown) => {
+    'PUT /ai/ladder/implementation': (b: unknown) => {
       const es = (b as { entries: { connection_id: string; model: string }[] }).entries;
       interp = es.map((e) => [qwen, gpt, claude].find((x) => x.model === e.model) ?? { ...e, locality: 'cloud' });
       return { config_revision: 8 };
@@ -43,7 +43,7 @@ async function openConnections(over: Routes = {}) {
   const m = makeStore(caseRoutes(ladderRoutes(over)));
   render(<App store={m.store} />);
   const sec = await screen.findByTestId('ladder-section');
-  await within(sec).findByTestId('lad-interpretation-ladder');
+  await within(sec).findByTestId('lad-implementation-ladder');
   return { ...m, sec };
 }
 
@@ -51,7 +51,7 @@ describe('model ladder editor', () => {
   it('shows version, numbered rungs, locality, availability, capabilities and price', async () => {
     const { store, sec } = await openConnections();
     expect(within(sec).getByTestId('ladder-version')).toHaveTextContent('Ladder version 7');
-    const list = within(sec).getByTestId('lad-interpretation-ladder');
+    const list = within(sec).getByTestId('lad-implementation-ladder');
     const rows = within(list).getAllByRole('listitem').filter((r) => r.getAttribute('data-testid'));
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent('qwen2.5:14b');
@@ -72,21 +72,21 @@ describe('model ladder editor', () => {
   it('reorders and removes with the keyboard, then saves the new order', async () => {
     const user = userEvent.setup();
     const { store, sec, calls } = await openConnections();
-    const save = within(sec).getByRole('button', { name: /Save ladder for Interpretation/ });
+    const save = within(sec).getByRole('button', { name: /Save ladder for Implementation/ });
     expect(save).toBeDisabled();
     expect(save.getAttribute('aria-describedby')).toBeTruthy();
     // button + Enter
     const down = within(sec).getByRole('button', { name: 'Move qwen2.5:14b down' });
     down.focus();
     await user.keyboard('{Enter}');
-    let rows = within(sec).getByTestId('lad-interpretation-ladder').querySelectorAll('[data-testid^="lad-interpretation-rung"]');
+    let rows = within(sec).getByTestId('lad-implementation-ladder').querySelectorAll('[data-testid^="lad-implementation-rung"]');
     expect(rows[0]).toHaveTextContent('gpt-demo-small');
     expect(rows[1]).toHaveTextContent('qwen2.5:14b');
     // focus stays on the moved rung so repeated moves work (moved after the re-render, so wait for it: CI runners are slower)
-    await waitFor(() => expect(within(sec).getByTestId('lad-interpretation-ladder').querySelectorAll('[data-testid^="lad-interpretation-rung"]')[1]).toHaveFocus(), { timeout: 5000 });
+    await waitFor(() => expect(within(sec).getByTestId('lad-implementation-ladder').querySelectorAll('[data-testid^="lad-implementation-rung"]')[1]).toHaveFocus(), { timeout: 5000 });
     // Alt+ArrowUp on the focused row moves it back
     await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
-    rows = within(sec).getByTestId('lad-interpretation-ladder').querySelectorAll('[data-testid^="lad-interpretation-rung"]');
+    rows = within(sec).getByTestId('lad-implementation-ladder').querySelectorAll('[data-testid^="lad-implementation-rung"]');
     expect(rows[0]).toHaveTextContent('qwen2.5:14b');
     // first row cannot move up and says why
     const up = within(sec).getByRole('button', { name: 'Move qwen2.5:14b up' });
@@ -99,20 +99,20 @@ describe('model ladder editor', () => {
     expect(within(sec).queryByText('claude-demo')).not.toBeInTheDocument();
     within(sec).getByRole('button', { name: 'Move gpt-demo-small up' }).focus();
     await user.keyboard(' ');
-    await user.click(within(sec).getByRole('button', { name: /Save ladder for Interpretation/ }));
-    await waitFor(() => expect(calls.find((c) => c.method === 'PUT' && c.path === '/ai/ladder/interpretation')?.body).toEqual({ entries: [{ connection_id: 'conn_openai', model: 'gpt-demo-small' }, { connection_id: 'conn_local', model: 'qwen2.5:14b' }] }));
+    await user.click(within(sec).getByRole('button', { name: /Save ladder for Implementation/ }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT' && c.path === '/ai/ladder/implementation')?.body).toEqual({ entries: [{ connection_id: 'conn_openai', model: 'gpt-demo-small' }, { connection_id: 'conn_local', model: 'qwen2.5:14b' }] }));
     store.stop();
   }, 20_000);   // keyboard reorders + async focus moves are slow on hosted CI runners
 
   it('model picker searches the catalog, filters local/cloud and keeps manual model-ID entry', async () => {
     const user = userEvent.setup();
     const { store, sec, calls } = await openConnections({ '/ai/ladder': () => ladderOf([qwen]), '/ai/models': () => [qwen, gpt, claude] });
-    await user.click(within(sec).getByRole('button', { name: /Add model to Interpretation/ }));
+    await user.click(within(sec).getByRole('button', { name: /Add model to Implementation/ }));
     const dlg = await screen.findByRole('dialog');
     const box = within(dlg).getByRole('combobox', { name: 'Search models' });
     await waitFor(() => expect(within(within(dlg).getByRole('listbox')).getAllByRole('option').length).toBe(3));
     await user.type(box, 'gpt');
-    await waitFor(() => expect(calls.some((c) => c.path.startsWith('/ai/models') && c.path.includes('q=gpt') && c.path.includes('task=interpretation'))).toBe(true));
+    await waitFor(() => expect(calls.some((c) => c.path.startsWith('/ai/models') && c.path.includes('q=gpt') && c.path.includes('task=implementation'))).toBe(true));
     // local-only filter hides cloud models and the already-added one is flagged
     await user.selectOptions(within(dlg).getByLabelText('Where it runs'), 'local');
     await waitFor(() => expect(within(within(dlg).getByRole('listbox')).getAllByRole('option')).toHaveLength(1));
@@ -122,10 +122,10 @@ describe('model ladder editor', () => {
     box.focus();
     await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(within(sec).getByTestId('lad-interpretation-ladder')).toHaveTextContent('gpt-demo-small');
+    expect(within(sec).getByTestId('lad-implementation-ladder')).toHaveTextContent('gpt-demo-small');
 
     // manual entry
-    await user.click(within(sec).getByRole('button', { name: /Add model to Interpretation/ }));
+    await user.click(within(sec).getByRole('button', { name: /Add model to Implementation/ }));
     const d2 = await screen.findByRole('dialog');
     const add = within(d2).getByRole('button', { name: 'Add this model' });
     expect(add).toBeDisabled();
@@ -163,7 +163,7 @@ describe('model ladder editor', () => {
     const pv = await within(sec).findByTestId('preset-preview');
     expect(calls.filter((c) => c.path === '/ai/ladder/preset')).toEqual([{ method: 'POST', path: '/ai/ladder/preset', body: { preset: 'all_local', apply: false } }]);
     expect(pv).toHaveTextContent('Preview: All local (not applied yet)');
-    expect(pv).toHaveTextContent('Interpretation: 1. qwen2.5:14b Local');
+    expect(pv).toHaveTextContent('Implementation: 1. qwen2.5:14b Local');
     expect(pv).toHaveTextContent('Visual review: no model');
     expect(within(pv).getByRole('alert')).toHaveTextContent('No local model supports images');
     await user.click(within(pv).getByRole('button', { name: /Apply/ }));
@@ -266,7 +266,7 @@ describe('plan AI chips', () => {
 });
 
 describe('AI activity feed', () => {
-  const act1 = { at: '2026-01-01T10:00:00Z', kind: 'attempt', text: 'qwen2.5:14b is not available (model not found); trying gpt-demo-small', plan_item_id: 'M2', job_id: 'j1', task: 'interpretation', provider: 'local', model: 'qwen2.5:14b', locality: 'local', outcome: 'model_unavailable', fallback_reason: 'model not found', config_revision: 6, origin: 'model_proposed', prompt: 'LEAK-INITIAL-PROMPT' };
+  const act1 = { at: '2026-01-01T10:00:00Z', kind: 'attempt', text: 'qwen2.5:14b is not available (model not found); trying gpt-demo-small', plan_item_id: 'M2', job_id: 'j1', task: 'implementation', provider: 'local', model: 'qwen2.5:14b', locality: 'local', outcome: 'model_unavailable', fallback_reason: 'model not found', config_revision: 6, origin: 'model_proposed', prompt: 'LEAK-INITIAL-PROMPT' };
 
   it('renders initial and live lines grouped by plan item with fallback text, cost, ladder version and links; never raw prompts', async () => {
     window.location.hash = '#/projects/c1/ai';

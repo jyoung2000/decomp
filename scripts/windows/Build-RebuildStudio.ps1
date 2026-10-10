@@ -186,6 +186,15 @@ $info = [ordered]@{ tools = [ordered]@{} }
 
 # ---- 1 preflight --------------------------------------------------------------------------------------------------
 Step 'preflight'
+# R10 gate: every tool the app can install must carry a pinned sha256, and the project->tools table must ship next to the lock.
+$unhashed = @(foreach ($p in $Lock.tools.PSObject.Properties) {
+    $art = $p.Value.artifact
+    if ($null -ne $art -and -not ([string]$art.sha256 -match '^[0-9a-fA-F]{64}$')) { "$($p.Name): artifact.sha256 is missing or not a sha256" }
+})
+if ($unhashed.Count -gt 0) { throw "dependency-lock.json has tools without a pinned hash: $($unhashed -join '; ')" }
+$needsFile = Join-RsPath @((Split-Path -Parent $LockFile), 'dependency-needs.json')
+if (-not (Test-Path -LiteralPath $needsFile)) { throw "dependency-needs.json (project -> tools table) is missing next to $LockFile" }
+Write-RsLog "lock gate ok: $(@($Lock.tools.PSObject.Properties).Count) tools carry a pinned sha256; needs table present" 'INFO'
 if ($DryRun) {
     Write-RsLog "check: node major >= $($tc.node.major) (lock tested $($tc.node.tested)); npm >= 10 (npm sbom)" 'DRY'
     Write-RsLog "check: python 3.11-3.13 (lock: $($tc.python.version)); rustc + target $Target; cargo-tauri $($tc.tauri_cli.version) ($($tc.tauri_cli.install))" 'DRY'
@@ -352,6 +361,9 @@ function Test-Sidecar([string]$Exe) {
         $broken = @($doc.backends | Where-Object { $_.title -like '*(failed to load)*' } | ForEach-Object { "$($_.backend_id): $($_.tools[0].detail)" })
         if ($broken.Count -gt 0) { throw "frozen controller cannot load backends: $($broken -join '; ')" }
         Write-RsLog "sidecar doctor ok: $(@($doc.backends).Count) backends load in the frozen build" 'INFO'
+        # R10: the frozen controller must import the dependency health service (the doctor carries its summary).
+        if ($null -eq $doc.dependencies -or $null -ne $doc.dependencies.error) { throw "frozen controller cannot run the dependency health check: $($doc.dependencies.error)" }
+        Write-RsLog "sidecar dependency health ok: $($doc.dependencies.overall) - $($doc.dependencies.sentence)" 'INFO'
     } finally {
         Stop-RsProcessTree $proc.Id
         if ($null -ne $prevData) { $env:REBUILD_STUDIO_DATA = $prevData } else { Remove-Item Env:\REBUILD_STUDIO_DATA -ErrorAction SilentlyContinue }
@@ -432,6 +444,7 @@ if ($DryRun) {
     New-Item -ItemType Directory -Force -Path (Join-RsPath @($stage, 'docs')) | Out-Null
     Copy-Item -LiteralPath (Join-RsPath @($RepoRoot, 'docs', 'NOTICES.md')) -Destination (Join-RsPath @($stage, 'docs'))
     Copy-Item -LiteralPath $LockFile -Destination (Join-RsPath @($stage, 'docs', 'dependency-lock.json'))
+    Copy-Item -LiteralPath $needsFile -Destination (Join-RsPath @($stage, 'docs', 'dependency-needs.json'))
     Copy-Item -LiteralPath (Join-RsPath @($RepoRoot, 'docs', 'NOTICES.md')) -Destination (Join-RsPath @($stage, 'NOTICES.md'))
     if (-not $Signing) {
         Save-RsText (Join-RsPath @($stage, 'UNSIGNED.txt')) ("This Rebuild Studio build is UNSIGNED. Windows SmartScreen will warn on first run.`nVerify the file hashes in SHA256SUMS.txt against the build record. Version $Version.`n")

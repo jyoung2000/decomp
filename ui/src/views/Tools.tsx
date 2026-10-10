@@ -6,7 +6,8 @@ import { StatusChip } from '../components/StatusChip';
 import { useToast } from '../components/Toasts';
 import { bytes } from '../lib/format';
 import { useApi, useResource } from '../lib/store';
-import type { ToolSetupEntry, ToolSetupSnapshot } from '../lib/types';
+import type { DepTool, ToolSetupEntry, ToolSetupSnapshot } from '../lib/types';
+import { FixButton, QueueProgress, useDepFix, useDependencyReport } from '../components/DependencyStatus';
 
 const CHIP: Record<string, [string, string, string]> = {
   not_installed: ['missing', 'Not installed', 'Not on this computer yet.'],
@@ -33,7 +34,9 @@ const PHASE: Record<string, string> = {
 export function ToolsView() {
   const api = useApi();
   const res = useResource(() => api.toolsSetup(), [api]);
-  const installing = !!res.data?.tools.some((t) => t.status === 'installing');
+  const deps = useDependencyReport();
+  const depByName = new Map((deps.data?.tools ?? []).map((t) => [t.name, t]));
+  const installing = !!res.data?.tools.some((t) => t.status === 'installing') || !!deps.data?.queue.running;
   const reload = res.reload;
   useEffect(() => {
     if (!installing) return;
@@ -59,12 +62,22 @@ export function ToolsView() {
         <Loading what="tools" />
       ) : res.data ? (
         <>
+          <DependencyPanel report={deps} onChanged={res.reload} />
           <p className="small muted" style={{ marginBottom: 12 }}>
             Installed under <span className="mono wrap-any">{res.data.tools_dir}</span>
           </p>
           <div className="grid grid-2">
             {res.data.tools.map((t) => (
-              <ToolCard key={t.name} tool={t} snapshot={res.data!} onChanged={res.reload} />
+              <ToolCard
+                key={t.name}
+                tool={t}
+                snapshot={res.data!}
+                dep={depByName.get(t.name)}
+                onChanged={() => {
+                  res.reload();
+                  deps.reload();
+                }}
+              />
             ))}
           </div>
         </>
@@ -73,7 +86,119 @@ export function ToolsView() {
   );
 }
 
-function ToolCard({ tool, snapshot, onChanged }: { tool: ToolSetupEntry; snapshot: ToolSetupSnapshot; onChanged: () => void }) {
+const CHECK_TONE: Record<string, 'ok' | 'warn' | 'bad'> = { ok: 'ok', not_applicable: 'ok', warn: 'warn', not_checked: 'warn', unknown: 'warn', missing: 'bad', down: 'bad', error: 'bad' };
+
+/** R10: what the user's projects need, one-click install of all of it, automatic-install switch, services and host checks. */
+function DependencyPanel({ report, onChanged }: { report: ReturnType<typeof useDependencyReport>; onChanged: () => void }) {
+  const api = useApi();
+  const toast = useToast();
+  const uid = useId();
+  const reload = () => {
+    report.reload();
+    onChanged();
+  };
+  const fixer = useDepFix(reload);
+  const [checking, setChecking] = useState(false);
+  const [savingAuto, setSavingAuto] = useState(false);
+  const r = report.data;
+  if (!r || report.error) return null;
+  const offer = r.install_all;
+  const running = r.queue.running;
+  const check = async () => {
+    setChecking(true);
+    try {
+      await api.dependencies({ refresh: true, smoke: true, network: true });
+    } catch (e) {
+      toast.error('The check could not run', e);
+    } finally {
+      setChecking(false);
+      reload();
+    }
+  };
+  const setAuto = async (on: boolean) => {
+    setSavingAuto(true);
+    try {
+      await api.putDependencySettings(on);
+    } catch (e) {
+      toast.error('The setting could not be saved', e);
+    } finally {
+      setSavingAuto(false);
+      reload();
+    }
+  };
+  const checks = [...r.services, ...r.host];
+  return (
+    <>
+      <section className="card" aria-labelledby={`${uid}-h`} data-testid="dep-panel" data-state={r.overall} style={{ marginBottom: 16 }}>
+        <div className="card-head">
+          <h3 id={`${uid}-h`}>What your projects need</h3>
+          <StatusChip
+            status={r.overall === 'ok' ? 'verified' : r.overall === 'error' ? 'failed' : 'stale'}
+            label={r.overall === 'ok' ? 'All set' : r.overall === 'error' ? 'Action needed' : r.overall === 'busy' ? 'Installing' : 'Attention'}
+          />
+        </div>
+        <p data-testid="dep-sentence">{r.sentence}</p>
+        {r.next_action && <p className="small">Next: {r.next_action}</p>}
+        <div className="btn-group" style={{ marginTop: 8 }}>
+          {offer && (
+            <button
+              type="button"
+              className="btn primary"
+              disabled={fixer.busy || running}
+              aria-describedby={running ? `${uid}-busy` : undefined}
+              onClick={() => fixer.run({ kind: 'install', items: offer.items, label: offer.label })}
+              data-testid="dep-install-all"
+            >
+              {offer.label.replace("Install what's missing", 'Install everything needed')}
+            </button>
+          )}
+          {r.fix && r.fix.kind !== 'install' && r.fix.kind !== 'open_tools' && <FixButton fix={r.fix} run={fixer.run} busy={fixer.busy} primary={!offer} />}
+          <button type="button" className="btn" disabled={checking} aria-describedby={`${uid}-check`} onClick={check} data-testid="dep-check">
+            {checking ? 'Checking…' : 'Check everything'}
+          </button>
+        </div>
+        <p className="xs muted" id={`${uid}-check`} style={{ marginTop: 4 }}>
+          Check everything starts each installed tool once and tests the connection to every download server.
+        </p>
+        {running && (
+          <p className="xs muted" id={`${uid}-busy`}>
+            An install is running; wait for it to finish or cancel it below.
+          </p>
+        )}
+        <label className="row small" style={{ marginTop: 8, gap: 8 }}>
+          <input type="checkbox" checked={r.settings.auto_install} disabled={savingAuto} onChange={(e) => setAuto(e.target.checked)} data-testid="dep-auto" />
+          Install what projects need automatically (pinned, checksum-verified tools only, into the tools folder)
+        </label>
+        {checks.length > 0 && (
+          <ul className="dep-checks" style={{ marginTop: 12 }} aria-label="Services and computer checks">
+            {checks.map((c) => (
+              <li key={c.name} className="small" data-testid={`dep-check-${c.name}`} data-state={c.state}>
+                <span className={`dot ${CHECK_TONE[c.state] ?? 'warn'}`} aria-hidden="true" /> <strong>{c.title ?? c.name}:</strong> {c.sentence}
+                {c.next_action ? <span className="muted"> {c.next_action}</span> : null}
+                {c.action && c.state !== 'ok' && (
+                  <>
+                    {' '}
+                    <FixButton fix={c.action} run={fixer.run} busy={fixer.busy} primary={false} />
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <QueueProgress queue={r.queue} onChanged={reload} />
+      {fixer.dialog}
+    </>
+  );
+}
+
+function neededBy(dep: DepTool | undefined): string | null {
+  if (!dep || !dep.needed_by.length) return null;
+  const parts = dep.needed_by.map((b) => `${b.name ?? 'a project'}${b.kind === 'app' ? ' (recommended)' : b.required ? ' (required)' : ' (optional)'}`);
+  return [...new Set(parts)].join(', ');
+}
+
+function ToolCard({ tool, snapshot, dep, onChanged }: { tool: ToolSetupEntry; snapshot: ToolSetupSnapshot; dep?: DepTool; onChanged: () => void }) {
   const api = useApi();
   const toast = useToast();
   const uid = useId();
@@ -81,6 +206,7 @@ function ToolCard({ tool, snapshot, onChanged }: { tool: ToolSetupEntry; snapsho
   const [fromFile, setFromFile] = useState(false);
   const [path, setPath] = useState('');
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmRepair, setConfirmRepair] = useState(false);
   const job = tool.job;
   const status = tool.status;
   const [tone, label, meaning] = CHIP[status] ?? ['unprobed', status, ''];
@@ -132,6 +258,21 @@ function ToolCard({ tool, snapshot, onChanged }: { tool: ToolSetupEntry; snapsho
         {tool.optional ? ' · Optional' : ''}
       </p>
       {tool.requires.length > 0 && <p className="xs muted">Also installs: {tool.requires.join(', ')} if missing.</p>}
+      {neededBy(dep) && (
+        <p className="xs" data-testid={`tool-${tool.name}-needed-by`}>
+          Needed by: {neededBy(dep)}
+        </p>
+      )}
+      {dep?.state === 'external' && dep.external_path && (
+        <p className="xs muted">
+          Found outside Rebuild Studio at <span className="mono wrap-any">{dep.external_path}</span>; projects use that copy.
+        </p>
+      )}
+      {dep?.state === 'broken' && dep.smoke && (
+        <div className="callout warn" role="alert" style={{ marginTop: 8 }}>
+          This tool is installed but did not start: {dep.smoke.message} Press Repair to reinstall a verified copy.
+        </div>
+      )}
 
       {status === 'installing' && job && (
         <div className="progress" style={{ marginTop: 8 }}>
@@ -183,9 +324,14 @@ function ToolCard({ tool, snapshot, onChanged }: { tool: ToolSetupEntry; snapsho
             disabled={busy || !!disabledWhy}
             aria-describedby={disabledWhy ? whyId : undefined}
             data-tooltip={disabledWhy ?? undefined}
-            onClick={() => act(() => api.installTool(tool.name), `${tool.title} could not be installed`)}
+            onClick={() => (installLabel === 'Repair' ? setConfirmRepair(true) : act(() => api.installTool(tool.name), `${tool.title} could not be installed`))}
           >
             {installLabel}
+          </button>
+        )}
+        {dep?.state === 'broken' && status === 'installed' && (
+          <button type="button" className="btn primary" disabled={busy || otherBusy} aria-describedby={otherBusy ? whyId : undefined} onClick={() => setConfirmRepair(true)}>
+            Repair
           </button>
         )}
         {canInstall && !blocked && (
@@ -254,6 +400,17 @@ function ToolCard({ tool, snapshot, onChanged }: { tool: ToolSetupEntry; snapsho
         </p>
       )}
 
+      <ConfirmDialog
+        open={confirmRepair}
+        title={`Repair ${tool.title}?`}
+        body={<>The installed copy is replaced with a fresh download that is checked against its pinned checksum. Projects that use it wait until the repair finishes.</>}
+        confirmLabel="Repair"
+        onClose={() => setConfirmRepair(false)}
+        onConfirm={() => {
+          setConfirmRepair(false);
+          void act(() => api.installDependencies({ items: [tool.name], repair: true }), `${tool.title} could not be repaired`);
+        }}
+      />
       <ConfirmDialog
         open={confirmRemove}
         title={`Remove ${tool.title}?`}

@@ -88,7 +88,7 @@ const MODELS = [
   { connection_id: 'conn_openai', model: 'gpt-demo-small', capabilities: { vision: true, tools: true, context_window: 128000 }, price: { known: true, input_per_mtok: 0.15, output_per_mtok: 0.6, source: 'provider price list (demo)' }, free: false },
   { connection_id: 'conn_handoff', model: 'claude-demo', capabilities: { vision: true, tools: true, context_window: 200000 }, price: { known: false }, free: false },
 ];
-const AI_TASK_IDS = ['interpretation', 'repair', 'visual_review', 'verification_assist', 'knowledge'];
+const AI_TASK_IDS = ['implementation', 'repair', 'naming', 'visual_review', 'verification_assist', 'knowledge'];
 function catalogEntry(m, position) {
   const c = S.connections.get(m.connection_id);
   const local = c?.provider === 'local' || c?.provider === 'local_openai';
@@ -106,7 +106,7 @@ function ladderEntries(pairs) {
   return pairs.map((p, i) => catalogEntry(findModel(p.connection_id, p.model), i + 1));
 }
 // ---------------------------------------------------------------- local AI on this PC (mock: one Ollama with 3 models, fake HF hub)
-const LOCAL_TASKS = ['interpretation', 'repair', 'visual_review', 'verification_assist', 'knowledge'];
+const LOCAL_TASKS = ['implementation', 'repair', 'naming', 'visual_review', 'verification_assist', 'knowledge'];
 const lfit = (ok, note = '') => Object.fromEntries(LOCAL_TASKS.map((t) => [t, { ok: ok.includes(t), note: ok.includes(t) ? note : 'not suited' }]));
 const WIN_HOME = 'C:\\Users\\demo';
 const LOCAL = {
@@ -116,7 +116,7 @@ const LOCAL = {
   jobs: new Map(),
   downloads: [],
   models: [
-    { id: 'qwen2.5-coder:14b', server: 'ollama', size_bytes: 8990000000, parameter_size: '14.8B', parameter_b: 14.8, quantization: 'Q4_K_M', context_window: 131072, capabilities: { completion: true, tools: true, source: 'ollama /api/show' }, tasks: lfit(['interpretation', 'repair', 'verification_assist', 'knowledge'], 'coding model'), quick_only: false, excluded: false, suitable: true, summary: 'Good for interpreting code, repairing builds, suggesting test scenarios, extracting reusable knowledge.' },
+    { id: 'qwen2.5-coder:14b', server: 'ollama', size_bytes: 8990000000, parameter_size: '14.8B', parameter_b: 14.8, quantization: 'Q4_K_M', context_window: 131072, capabilities: { completion: true, tools: true, source: 'ollama /api/show' }, tasks: lfit(['implementation', 'repair', 'verification_assist', 'knowledge'], 'coding model'), quick_only: false, excluded: false, suitable: true, summary: 'Good for interpreting code, repairing builds, suggesting test scenarios, extracting reusable knowledge.' },
     { id: 'llava:13b', server: 'ollama', size_bytes: 8000000000, parameter_size: '13B', parameter_b: 13, quantization: 'Q4_0', context_window: 4096, capabilities: { completion: true, vision: true, source: 'ollama /api/show' }, tasks: lfit(['visual_review'], 'can read screenshots'), quick_only: false, excluded: false, suitable: true, summary: 'Good for reviewing screenshots.' },
     { id: 'nomic-embed-text:latest', server: 'ollama', size_bytes: 274000000, parameter_size: '137M', parameter_b: 0.137, capabilities: { completion: false, embedding: true, source: 'ollama /api/show' }, tasks: lfit([]), quick_only: false, excluded: true, suitable: false, summary: 'Not suitable: embedding-only model (cannot write text).' },
   ],
@@ -238,8 +238,153 @@ function mockLocalAi(rest, m, body, url) {
   return null;
 }
 
+// ---------------------------------------------------------------- R9: rung rules, cooldowns, route test, JeV advisor (docs/AI_LADDER.md section 9)
+const FAILURE_KINDS = [
+  { kind: 'credits_exhausted', label: 'runs out of credits', wait_allowed: true },
+  { kind: 'usage_limit', label: 'hits its usage limit', wait_allowed: true },
+  { kind: 'rate_limit', label: 'is rate-limited', wait_allowed: true },
+  { kind: 'auth_failed', label: 'rejects the key', wait_allowed: false },
+  { kind: 'model_unavailable', label: 'does not have the model', wait_allowed: false },
+  { kind: 'capability_unsupported', label: 'cannot take this input', wait_allowed: false },
+  { kind: 'context_exceeded', label: 'the request does not fit its context window', wait_allowed: false },
+  { kind: 'unreachable', label: 'cannot be reached', wait_allowed: true },
+  { kind: 'unavailable', label: 'has a server error', wait_allowed: true },
+];
+const RULES_META = { failure_kinds: FAILURE_KINDS, actions: ['next', 'wait', 'stop'], default: { action: 'next' }, max_wait_minutes: 240, max_tries: 20 };
+function r9() {
+  S.rungRules ??= {};
+  S.cooldowns ??= new Map();
+  S.cooldownMinutes ??= { credits_exhausted: 1440, usage_limit: 60 };
+  S.jev ??= { enabled: true, key: null, keySource: null, cap: 1, spent: 0.00021, failures: 0, decisions: [
+    { kind: 'order', task: 'repair', choice: 'R2', confidence: 0.82, model: 'jev-1.13.0', source: 'jev', suggested_first: 'qwen2.5-coder:14b', spent_usd: 0.00002, at: now() },
+    { kind: 'reassess', task: 'repair', choice: 'RETRY', confidence: 0.71, model: 'jev-1.13.0', source: 'jev', attempt: 1, spent_usd: 0.00001, at: now() },
+  ] };
+  return S;
+}
+function validRules(rules) {
+  const out = {};
+  for (const [k, v] of Object.entries(rules ?? {})) {
+    const f = FAILURE_KINDS.find((x) => x.kind === k);
+    if (!f) return { error: `unknown failure kind '${k}'` };
+    const a = typeof v === 'string' ? v : v?.action ?? 'next';
+    if (!['next', 'wait', 'stop'].includes(a)) return { error: `unknown action '${a}' for ${k}` };
+    if (a === 'next') continue;
+    if (a === 'wait' && !f.wait_allowed) return { error: `waiting does not help when a model ${f.label}; choose next or stop for ${k}` };
+    out[k] = a === 'stop' ? { action: 'stop' } : { action: 'wait', wait_minutes: Number(v.wait_minutes ?? 5), max_tries: Number(v.max_tries ?? 3) };
+  }
+  return { rules: out };
+}
+const rungKey = (e) => `${e.connection_id}::${e.model}`;
+function cooldownOf(cid) {
+  const c = r9().cooldowns.get(cid);
+  if (!c) return null;
+  if (Date.parse(c.until) <= Date.now()) {
+    S.cooldowns.delete(cid);
+    return null;
+  }
+  return c;
+}
+function r9Entries(task, pairs) {
+  return ladderEntries(pairs).map((e) => ({ ...e, rules: r9().rungRules[task]?.[rungKey(e)] ?? {}, cooldown: cooldownOf(e.connection_id) }));
+}
+function chainText(entries) {
+  if (!entries.length) return 'No model: work that needs this task is skipped.';
+  const n = entries.map((e) => (e.locality === 'local' ? `local ${e.model}` : `${e.model} (${e.connection_label})`));
+  if (n.length === 1) return `Use ${n[0]}; nothing else is tried if it fails.`;
+  return `Use ${n[0]}; if it hits a limit or fails, use ${n[1]}` + n.slice(2).map((x) => `; then ${x}`).join('') + '.';
+}
+function cooldownList() {
+  return [...r9().cooldowns.keys()].map((cid) => cooldownOf(cid)).filter(Boolean);
+}
+function ruleLine(kind, r) {
+  const what = FAILURE_KINDS.find((x) => x.kind === kind)?.label ?? kind;
+  return r.action === 'stop' ? `if it ${what}: stop and ask me` : `if it ${what}: wait ${r.wait_minutes} min and retry (up to ${r.max_tries} times), then the next rung`;
+}
+function routeTest(task) {
+  const entries = r9Entries(task, S.ladder[task]?.entries ?? []);
+  let answer = null;
+  const rungs = entries.map((e) => {
+    let status = 'standby', outcome = null, reason = e.free ? 'used only if the rungs above fail (no cost)' : 'used only if the rungs above fail';
+    const c = S.connections.get(e.connection_id);
+    if (e.cooldown) [status, outcome, reason] = ['skipped', 'cooldown', e.cooldown.text];
+    else if (!c) [status, outcome, reason] = ['skipped', 'unusable', `${e.model} cannot be used (connection no longer exists)`];
+    else if (c.state === 'auth_failed') [status, outcome, reason] = ['skipped', 'auth_failed', `${c.label} rejected the API key`];
+    else if (!e.price?.known && !e.free) [status, outcome, reason] = ['skipped', 'approval_required', `${e.model} has no known price; it is skipped until you set a price or approve unknown pricing`];
+    else if (answer == null) {
+      answer = e.position;
+      [status, outcome, reason] = ['would_answer', 'ok', `${e.model} would be asked first${e.free ? ' (no cost)' : ''}`];
+    }
+    return { ...e, status, outcome, reason, rules_text: Object.entries(e.rules ?? {}).map(([k, r]) => ruleLine(k, r)) };
+  });
+  const win = rungs.find((r) => r.status === 'would_answer');
+  const skipped = rungs.filter((r) => r.status === 'skipped');
+  const summary = !rungs.length ? `No model is configured for ${task}; nothing would be sent.`
+    : !win ? `No rung could answer right now: ${skipped.map((r) => r.reason).join('; ')}.`
+    : `Right now position ${win.position} (${win.model}, ${win.connection_label}) would answer${skipped.length ? `; skipped: ${skipped.map((r) => r.reason).join('; ')}` : ''}.`;
+  return { task, config_revision: S.ladderRev, policy_hash: null, source: 'global', sent: false, tokens_spent: 0, answer, rungs, chain: chainText(entries), summary,
+    ...(jevStatus().offline_reason ? {} : { advisor: 'JeV may re-order the usable rungs when the real call is made; it never adds a model.' }) };
+}
+function jevStatus() {
+  const j = r9().jev;
+  const offline = !j.enabled ? 'off' : !j.key ? 'no_key' : null;
+  return { enabled: j.enabled, has_key: !!j.key, key_source: j.keySource, model: 'jev-1.13.0', endpoint: 'https://api.typesafe.ai/v1/systemone',
+    monthly_cap_usd: j.cap, setup_cap_usd: 0.05, price: { input_per_mtok: 0.042, source: 'TypeSafe list price (local estimate)' },
+    month: { budget_id: `jev:monthly:${now().slice(0, 7)}`, limit_usd: j.cap, spent_usd: j.spent, reserved_usd: 0 },
+    setup: { budget_id: 'jev:setup', limit_usd: 0.05, spent_usd: 0, reserved_usd: 0 },
+    breaker: { state: 'closed', failures: j.failures, open_until: null }, offline_reason: offline, min_confidence: 0.6,
+    jev_install: { key_file_found: true, path: `${WIN_HOME}\\.jev\\secrets\\typesafe.key` }, last_decisions: j.decisions.slice(0, 20) };
+}
+function mockAiControl(seg, m, body) {
+  const key = `${m} /${seg.join('/')}`;
+  const j = r9().jev;
+  if (key === 'GET /ai/jev') return [200, jevStatus()];
+  if (key === 'PUT /ai/jev') {
+    if (body.monthly_cap_usd != null && !(Number(body.monthly_cap_usd) >= 0 && Number(body.monthly_cap_usd) <= 50)) return [400, { error: { code: 'jev_settings', message: 'monthly_cap_usd must be between 0 and 50', affected: 'JeV', next_action: 'use a monthly cap between $0 and $50' } }];
+    if (body.enabled != null) j.enabled = !!body.enabled;
+    if (body.monthly_cap_usd != null) j.cap = Number(body.monthly_cap_usd);
+    return [200, jevStatus()];
+  }
+  if (key === 'PUT /ai/jev/key') {
+    const k = typeof body.key === 'string' ? body.key.trim() : '';
+    if (body.key != null && (k.length < 8 || /\s/.test(k))) return [400, { error: { code: 'jev_key', message: 'that does not look like a JeV / TypeSafe API key', affected: 'JeV', next_action: 'paste the key exactly as TypeSafe shows it' } }];
+    j.key = k || null;
+    j.keySource = k ? 'entered' : null;
+    return [200, jevStatus()];
+  }
+  if (key === 'POST /ai/jev/key/import') {
+    j.key = 'mock-key-from-install';
+    j.keySource = 'jev_install';
+    return [200, { ...jevStatus(), imported: true, path: jevStatus().jev_install.path }];
+  }
+  if (key === 'POST /ai/jev/test') {
+    if (!j.key) return [200, { ok: false, reason: 'no_key', message: 'Enter a JeV key first.' }];
+    return [200, { ok: true, reason: 'ok', model: 'jev-1.13.0', spent_usd: 0.000004, message: 'JeV answered (jev-1.13.0); the advisor is ready.' }];
+  }
+  if (key === 'GET /ai/rules') return [200, RULES_META];
+  if (key === 'GET /ai/cooldowns') return [200, { settings: { cooldown_minutes: S.cooldownMinutes }, cooldowns: cooldownList() }];
+  if (key === 'PUT /ai/cooldowns/settings') {
+    for (const [k, v] of Object.entries(body.cooldown_minutes ?? {})) {
+      if (!(k in S.cooldownMinutes)) return [400, { error: { code: 'cooldown', message: `unknown cooldown kind '${k}'`, affected: 'cooldowns', next_action: 'use credits_exhausted or usage_limit' } }];
+      S.cooldownMinutes[k] = Number(v);
+    }
+    return [200, { settings: { cooldown_minutes: S.cooldownMinutes }, cooldowns: cooldownList() }];
+  }
+  if (seg[1] === 'cooldowns' && seg[2] && m === 'DELETE') {
+    const had = S.cooldowns.delete(seg[2]);
+    emit('ai.cooldown', { connection_id: seg[2], cleared: true });
+    return [200, { connection_id: seg[2], cleared: had, cooldowns: cooldownList() }];
+  }
+  if (key === 'POST /ai/route/test') {
+    const t = body.task === 'interpretation' ? 'implementation' : body.task;
+    if (!AI_TASK_IDS.includes(t)) return [400, { error: { code: 'ladder', message: `unknown task '${body.task}'`, affected: 'route test', next_action: 'pick a listed task' } }];
+    return [200, routeTest(t)];
+  }
+  return null;
+}
+
 function currentLadder() {
-  return { config_revision: S.ladderRev, tasks: Object.fromEntries(AI_TASK_IDS.map((t) => [t, { entries: ladderEntries(S.ladder[t]?.entries ?? []), rationale: S.ladder[t]?.rationale ?? 'auto' }])) };
+  return { config_revision: S.ladderRev, task_ids: AI_TASK_IDS, rules_meta: RULES_META, cooldowns: cooldownList(),
+    tasks: Object.fromEntries(AI_TASK_IDS.map((t) => { const es = r9Entries(t, S.ladder[t]?.entries ?? []); return [t, { entries: es, rationale: S.ladder[t]?.rationale ?? 'auto', chain: chainText(es) }]; })) };
 }
 function presetPairs(preset) {
   const local = MODELS.filter((m) => S.connections.get(m.connection_id)?.provider === 'local_openai');
@@ -292,7 +437,7 @@ function seed() {
   const items = [
     planItem({ item_id: 'M1', title: 'Inventory the original', outcome: 'Every file classified with format, profile and hash', sort_order: 1, owner: 'discovery', acceptance: [{ id: 'A1', command: 'rebuildctl inventory --check', status: 'untested' }] }),
     planItem({ item_id: 'M1.1', parent_id: 'M1', kind: 'deliverable', title: 'Module list with formats', outcome: 'modules table populated', sort_order: 1 }),
-    planItem({ item_id: 'M2', title: 'Recover program logic', outcome: 'Functions and data structures recovered with evidence', depends_on: ['M1'], sort_order: 2, owner: 'recovery', origin: 'deterministic', ai: { task: 'interpretation', primary: { provider: 'local_openai', model: 'qwen2.5-coder:14b', locality: 'local' }, fallbacks: [{ provider: 'openai', model: 'gpt-demo-small', locality: 'cloud' }], rationale: 'Local first: free and private', expected_cost: { min_usd: 0, max_usd: 0.02, known: true }, budget_usd: 0.5, runs_without_ai: true, without_ai: 'Functions are still recovered deterministically; AI only adds explanations.' } }),
+    planItem({ item_id: 'M2', title: 'Recover program logic', outcome: 'Functions and data structures recovered with evidence', depends_on: ['M1'], sort_order: 2, owner: 'recovery', origin: 'deterministic', ai: { task: 'implementation', primary: { provider: 'local_openai', model: 'qwen2.5-coder:14b', locality: 'local' }, fallbacks: [{ provider: 'openai', model: 'gpt-demo-small', locality: 'cloud' }], rationale: 'Local first: free and private', expected_cost: { min_usd: 0, max_usd: 0.02, known: true }, budget_usd: 0.5, runs_without_ai: true, without_ai: 'Functions are still recovered deterministically; AI only adds explanations.' } }),
     planItem({ item_id: 'M2.1', parent_id: 'M2', kind: 'deliverable', title: 'Item list command', outcome: '`list` prints the same rows as the original', sort_order: 1, feature_id: 'F1' }),
     planItem({ item_id: 'M2.2', parent_id: 'M2', kind: 'deliverable', title: 'Add item dialog', outcome: 'Adding an item updates the saved file identically', sort_order: 2, feature_id: 'F2' }),
     planItem({ item_id: 'M3', title: 'Implement the web rebuild', outcome: 'HTML/CSS/JS app with matching behaviour', depends_on: ['M2'], sort_order: 3, owner: 'implementation', origin: 'model_proposed', ai: { task: 'repair', primary: { provider: 'anthropic', model: 'claude-demo', locality: 'cloud' }, fallbacks: [{ provider: 'openai', model: 'gpt-demo-large', locality: 'cloud' }, { provider: 'local_openai', model: 'deepseek-coder-v2:16b', locality: 'local' }], rationale: null, expected_cost: { unknown_price: true }, budget_usd: 0.5, runs_without_ai: false, without_ai: 'A deterministic web port is attempted first; otherwise this becomes a scaffold.' } }),
@@ -319,7 +464,7 @@ function seed() {
   S.connections.set('conn_local', { connection_id: 'conn_local', provider: 'local_openai', label: 'Ollama (this PC)', endpoint: 'http://127.0.0.1:11434/v1', auth_mode: 'local', models: ['qwen2.5-coder:14b', 'deepseek-coder-v2:16b', 'llava:13b'], capabilities: {}, limits: {}, state: 'ok', last_probe: now(), created_at: now() });
   S.connections.set('conn_openai', { connection_id: 'conn_openai', provider: 'openai', label: 'OpenAI (demo key)', endpoint: 'https://api.openai.com/v1', auth_mode: 'api_key', models: ['gpt-demo-large', 'gpt-demo-small'], capabilities: {}, limits: {}, state: 'ok', last_probe: now(), created_at: now() });
   S.connections.set('conn_handoff', { connection_id: 'conn_handoff', provider: 'anthropic', label: 'Claude desktop (handoff)', endpoint: '', auth_mode: 'subscription_handoff', models: ['claude-demo'], capabilities: {}, limits: { text: 'Uses the external client’s subscription limits; about 40 requests per 5 hours (demo value).' }, state: 'unprobed', last_probe: null, created_at: now() });
-  for (const t of ['interpretation', 'repair', 'visual_review', 'verification_assist', 'knowledge'])
+  for (const t of AI_TASK_IDS)
     S.routes.set(t, { task: t, primary_connection: t === 'visual_review' ? 'conn_handoff' : 'conn_openai', primary_model: t === 'visual_review' ? 'claude-demo' : 'gpt-demo-small', fallbacks: t === 'repair' ? [{ connection: 'conn_handoff', model: 'claude-demo' }] : [], updated_at: now() });
   {
     const lp = (t) => presetPairs('local_first').out[t];
@@ -594,10 +739,10 @@ const STEPS = [
     b2.spent_usd = 0.084;
     b2.reserved_usd = 0.12;
     emit('budget.updated', { budget: b2 }, DEMO);
-    S.aiCalls.push({ call_id: id('call'), case_id: DEMO, job_id: r.job_id, provider: 'openai', model: 'gpt-demo-small', task: 'interpretation', input_tokens: 5400, output_tokens: 800, cached_tokens: 0, cost_usd: 0.084, cost_known: true, outcome: 'ok', latency_ms: 2300, created_at: now() });
-    emit('ai.call', { task: 'interpretation', cost_usd: 0.084 }, DEMO);
-    activity(DEMO, { text: 'Interpreting list_items with local model qwen2.5-coder:14b', plan_item_id: 'M2.1', job_id: r.job_id, task: 'interpretation', provider: 'local_openai', model: 'qwen2.5-coder:14b', locality: 'local', outcome: 'model_unavailable', fallback_reason: 'qwen2.5-coder:14b is not available (model not found); trying gpt-demo-small', origin: 'model_proposed' });
-    activity(DEMO, { text: 'gpt-demo-small explained 3 functions', plan_item_id: 'M2.1', job_id: r.job_id, task: 'interpretation', provider: 'openai', model: 'gpt-demo-small', locality: 'cloud', outcome: 'ok', tokens_in: 5400, tokens_out: 800, cost_usd: 0.084, cost_known: true, evidence_ids: ['ev_demo'], origin: 'model_proposed' });
+    S.aiCalls.push({ call_id: id('call'), case_id: DEMO, job_id: r.job_id, provider: 'openai', model: 'gpt-demo-small', task: 'implementation', input_tokens: 5400, output_tokens: 800, cached_tokens: 0, cost_usd: 0.084, cost_known: true, outcome: 'ok', latency_ms: 2300, created_at: now() });
+    emit('ai.call', { task: 'implementation', cost_usd: 0.084 }, DEMO);
+    activity(DEMO, { text: 'Interpreting list_items with local model qwen2.5-coder:14b', plan_item_id: 'M2.1', job_id: r.job_id, task: 'implementation', provider: 'local_openai', model: 'qwen2.5-coder:14b', locality: 'local', outcome: 'model_unavailable', fallback_reason: 'qwen2.5-coder:14b is not available (model not found); trying gpt-demo-small', origin: 'model_proposed' });
+    activity(DEMO, { text: 'gpt-demo-small explained 3 functions', plan_item_id: 'M2.1', job_id: r.job_id, task: 'implementation', provider: 'openai', model: 'gpt-demo-small', locality: 'cloud', outcome: 'ok', tokens_in: 5400, tokens_out: 800, cost_usd: 0.084, cost_known: true, evidence_ids: ['ev_demo'], origin: 'model_proposed' });
     activity(DEMO, { kind: 'note', text: 'Next: repair attempt 1 of 3', plan_item_id: 'M3', origin: 'deterministic' });
   },
   // 7: triage open feedback
@@ -768,7 +913,7 @@ async function handle(req, res) {
   // mock-only control + static demo pages (no auth; loopback dev tool)
   if (p.startsWith('/__mock/')) return mockControl(req, res, url);
 
-  const isApi = /^\/(health|events|doctor|capabilities|cases|jobs|evidence|candidates|previews|feedback|connections|routes|budgets|ai|knowledge|settings|hermes)(\/|$)/.test(p);
+  const isApi = /^\/(health|events|doctor|capabilities|cases|jobs|evidence|candidates|previews|feedback|connections|routes|budgets|ai|knowledge|settings|hermes|tools)(\/|$)/.test(p);
   if (!isApi) {
     if (m === 'GET' && serveStatic(req, res, p)) return;
     return send(res, 404, 'not found');
@@ -798,6 +943,11 @@ async function handle(req, res) {
     const cid = url.searchParams.get('case_id');
     return send(res, 200, S.events.filter((e) => e.seq > since && (!cid || e.case_id === cid || e.case_id == null)).slice(0, 5000));
   }
+  if (seg[0] === 'tools' && seg[1] === 'setup') return toolSetupRoutes(res, m, seg);
+  if (p.startsWith('/health/')) {
+    const handled = depRoutes(res, m, p, seg, body);
+    if (handled !== undefined) return handled;
+  }
   if (p === '/doctor') return send(res, 200, doctor(url.searchParams.get('smoke') === '1'));
   if (p === '/capabilities') return send(res, 200, capabilities());
   if (p === '/cases' && m === 'GET') return send(res, 200, [...S.cases.values()].map(caseWithCounts).sort((a, b) => b.created_at.localeCompare(a.created_at)));
@@ -809,8 +959,11 @@ async function handle(req, res) {
     const cid = c.case_id;
     const sub = seg.slice(2).join('/');
     if (!sub && m === 'GET') return send(res, 200, caseWithCounts(c));
+    if (sub === 'preflight' && m === 'GET') return send(res, 200, depPreflight(c));
     if (sub === 'start' && m === 'POST') {
       if (c.status === 'running') return err(res, 409, 'already_running', 'This project is already running.', 'Nothing changed.', 'Use Pause or Stop instead.');
+      const pf = depPreflight(c);
+      if (!pf.ok && url.searchParams.get('preflight') !== '0') return err(res, 409, 'dependencies_missing', pf.sentence, pf.missing.map((x) => x.title).join(', '), pf.install ? `Press '${pf.install.label}' and start again.` : 'Open Tools to see what is missing.');
       if (cid === DEMO) {
         if (S.step === 0) step();
         else setCase(cid, 'running');
@@ -1024,6 +1177,10 @@ async function handle(req, res) {
     const r = mockLocalAi(seg.slice(2), m, body, url);
     if (r) return send(res, r[0], r[1]);
   }
+  if (seg[0] === 'ai' && ['jev', 'rules', 'cooldowns', 'route'].includes(seg[1])) {
+    const r = mockAiControl(seg, m, body);
+    if (r) return send(res, r[0], r[1]);
+  }
   if (p === '/ai/ladder' && m === 'GET') return send(res, 200, currentLadder());
   if (seg[0] === 'ai' && seg[1] === 'ladder' && seg[2] === 'preset' && m === 'POST') {
     const ok = ['local_first', 'cloud_first', 'all_local', 'all_cloud', 'no_ai'];
@@ -1037,12 +1194,23 @@ async function handle(req, res) {
     return send(res, 200, { preset: body.preset, applied: !!body.apply, config_revision: S.ladderRev, tasks: Object.fromEntries(AI_TASK_IDS.map((t) => [t, { entries: ladderEntries(out[t]) }])), warnings });
   }
   if (seg[0] === 'ai' && seg[1] === 'ladder' && seg[2] && m === 'PUT') {
-    if (!AI_TASK_IDS.includes(seg[2])) return notFound(res, `Task ${seg[2]}`);
-    const entries = Array.isArray(body.entries) ? body.entries.filter((e) => e && e.connection_id && e.model).map((e) => ({ connection_id: e.connection_id, model: e.model })) : [];
+    const task = seg[2] === 'interpretation' ? 'implementation' : seg[2];
+    if (!AI_TASK_IDS.includes(task)) return notFound(res, `Task ${seg[2]}`);
+    const raw = Array.isArray(body.entries) ? body.entries.filter((e) => e && e.connection_id && e.model) : [];
+    const entries = raw.map((e) => ({ connection_id: e.connection_id, model: e.model }));
     for (const e of entries) if (!S.connections.has(e.connection_id)) return err(res, 400, 'unknown_connection', `Connection ${e.connection_id} does not exist.`, 'The ladder was not saved.', 'Pick a listed connection.');
-    S.ladder[seg[2]] = { entries, rationale: 'user' };
+    if (raw.some((e) => 'rules' in e)) {
+      const next = {};
+      for (const e of raw) {
+        const v = validRules(e.rules);
+        if (v.error) return err(res, 400, 'ladder', v.error, 'The ladder was not saved.', 'Fix the failure rule and save again.');
+        if (Object.keys(v.rules).length) next[rungKey(e)] = v.rules;
+      }
+      r9().rungRules[task] = next;
+    }
+    S.ladder[task] = { entries, rationale: 'user' };
     S.ladderRev += 1;
-    return send(res, 200, { config_revision: S.ladderRev, entries: ladderEntries(entries) });
+    return send(res, 200, { config_revision: S.ladderRev, task, entries: r9Entries(task, entries), chain: chainText(r9Entries(task, entries)) });
   }
   if (p === '/ai/models' && m === 'GET') {
     const q = (url.searchParams.get('q') ?? '').toLowerCase();
@@ -1109,6 +1277,214 @@ async function handle(req, res) {
 const MOCK_CONSENT = {};
 const MOCK_SCENARIOS = {};
 
+// ------------------------------------------------------------------------------------------------ dependency health (R10)
+// Same shapes as controller/rebuild_controller/dependency_health.py. Rust targets need Rizin + the Rust compiler; the
+// mock starts with Rizin installed and the Rust compiler missing, so a new Rust project shows the preflight block.
+const DEP_TOOLS = [
+  { name: 'rizin', title: 'Rizin', purpose: 'Needed to analyze native Windows programs (.exe and .dll files).', size: 140_530_846, requires: [], optional: false },
+  { name: 'gdre', title: 'GDRE Tools', purpose: 'Needed to recover Godot games (.pck files).', size: 42_619_156, requires: [], optional: false },
+  { name: 'dotnet-runtime', title: 'Private .NET runtime', purpose: 'Runs the .NET recovery tool.', size: 33_322_727, requires: [], optional: false },
+  { name: 'ilspycmd', title: 'ILSpy', purpose: 'Needed to recover .NET programs.', size: 4_183_395, requires: ['dotnet-runtime'], optional: false },
+  { name: 'rust', title: 'Rust compiler (private)', purpose: 'Needed to build rebuilt programs as Windows .exe files.', size: 159_721_664, requires: [], optional: true },
+  { name: 'node', title: 'Node.js (optional)', purpose: 'Optional. Unpacks Electron apps and runs browser behaviour tests.', size: 35_556_852, requires: [], optional: true },
+  { name: 'playwright-core', title: 'Browser test library (optional)', purpose: 'Optional. Compares web apps in a browser.', size: 2_208_739, requires: ['node'], optional: true },
+];
+const DEP = { installed: new Set(['rizin', 'dotnet-runtime', 'ilspycmd']), settings: { auto_install: false, asked: false }, queue: depEmptyQueue(), timer: null };
+const mb = (n) => `${Math.max(1, Math.round(n / 1_000_000))} MB`;
+
+function depEmptyQueue() {
+  return { id: null, state: 'idle', items: [], reason: null, started_at: null, finished_at: null };
+}
+function depNeeds(c) {
+  if (c.target_language === 'web') return { required: [], optional: ['node'], profile: 'web', title: 'Web apps' };
+  return { required: ['rizin', 'rust'], optional: [], profile: 'native_pe', title: 'Windows programs (.exe/.dll)' };
+}
+function depOrder(names) {
+  const out = [];
+  const visit = (n) => {
+    if (out.includes(n)) return;
+    for (const r of DEP_TOOLS.find((t) => t.name === n)?.requires ?? []) if (!DEP.installed.has(r)) visit(r);
+    out.push(n);
+  };
+  names.filter((n) => !DEP.installed.has(n)).forEach(visit);
+  return out;
+}
+function depQueueView() {
+  const q = DEP.queue;
+  const total = q.items.reduce((a, i) => a + i.bytes_total, 0);
+  const done = q.items.reduce((a, i) => a + (i.status === 'done' ? i.bytes_total : i.bytes_done), 0);
+  const cur = q.items.find((i) => i.status === 'installing');
+  return { ...q, total: q.items.length, done: q.items.filter((i) => i.status === 'done').length, failed: q.items.filter((i) => i.status === 'failed').map((i) => i.name),
+    bytes_total: total, bytes_done: done, percent: total ? Math.round((1000 * done) / total) / 10 : null, current: cur?.name ?? null, running: q.state === 'running' };
+}
+function depStart(names, reason) {
+  const order = depOrder(names);
+  if (!order.length) return null;
+  if (DEP.queue.state === 'running') return 'busy';
+  DEP.queue = { id: id('q'), state: 'running', reason, started_at: now(), finished_at: null,
+    items: order.map((n) => { const t = DEP_TOOLS.find((x) => x.name === n); return { name: n, title: t.title, status: 'queued', repair: false, requested: names.includes(n), bytes_total: t.size, bytes_done: 0, phase: null, message: 'Waiting', error: null }; }) };
+  clearInterval(DEP.timer);
+  DEP.timer = setInterval(() => {
+    const it = DEP.queue.items.find((i) => i.status === 'queued' || i.status === 'installing');
+    if (!it) {
+      DEP.queue.state = 'done';
+      DEP.queue.finished_at = now();
+      clearInterval(DEP.timer);
+      emit('dependencies.queue', { state: 'done' });
+      return;
+    }
+    it.status = 'installing';
+    it.phase = 'downloading';
+    it.message = 'Downloading';
+    it.bytes_done = Math.min(it.bytes_total, it.bytes_done + Math.ceil(it.bytes_total / 6));
+    if (it.bytes_done >= it.bytes_total) {
+      it.status = 'done';
+      it.phase = 'done';
+      it.message = 'Installed';
+      DEP.installed.add(it.name);
+    }
+  }, 400);
+  return depQueueView();
+}
+function depTool(t) {
+  const neededBy = [];
+  for (const c of S.cases.values()) {
+    const n = depNeeds(c);
+    if (n.required.includes(t.name)) neededBy.push({ kind: 'project', case_id: c.case_id, name: c.name, required: true, why: `to analyze ${n.title}` });
+    if (n.optional.includes(t.name)) neededBy.push({ kind: 'project', case_id: c.case_id, name: c.name, required: false, why: `optional for ${n.title}` });
+  }
+  if (['rizin', 'ilspycmd', 'gdre'].includes(t.name)) neededBy.push({ kind: 'app', name: 'Rebuild Studio (common program types)', required: false, why: 'recommended for common program types' });
+  const inst = DEP.installed.has(t.name);
+  const it = DEP.queue.items.find((i) => i.name === t.name && i.status === 'installing');
+  const state = it ? 'installing' : inst ? 'installed' : 'not_installed';
+  return { name: t.name, title: t.title, purpose: t.purpose, optional: t.optional, state, status: state, disk_status: inst ? 'installed' : 'not_installed', satisfied: inst,
+    installable: !it, version: '1.0', installed_version: inst ? '1.0' : null, hash_ok: inst ? true : null, smoke: null, external_path: null, requires: t.requires, blocked_reason: null,
+    download_bytes: t.size, disk_bytes: t.size * 3, install_path: `C:\\Users\\demo\\AppData\\Local\\RebuildStudio\\tools\\${t.name}`, job: null,
+    needed_by: neededBy, required: neededBy.some((b) => b.kind === 'project' && b.required) };
+}
+function depOffer(names) {
+  if (!names.length) return null;
+  const size = names.reduce((a, n) => a + DEP_TOOLS.find((t) => t.name === n).size, 0);
+  return { items: names, count: names.length, download_bytes: size, label: `Install what's missing (${names.length} item${names.length === 1 ? '' : 's'}, ${mb(size)})` };
+}
+function depReport() {
+  const tools = DEP_TOOLS.map(depTool);
+  const required = depOrder(tools.filter((t) => t.required).map((t) => t.name));
+  const core = depOrder(['rizin', 'ilspycmd', 'gdre']).filter((n) => !required.includes(n));
+  const q = depQueueView();
+  const title = (ns) => ns.map((n) => DEP_TOOLS.find((t) => t.name === n).title).join(', ');
+  let overall = 'ok', sentence = 'Everything your projects need is installed and working.', fix = null;
+  if (q.running) {
+    overall = 'busy';
+    const cur = DEP_TOOLS.find((t) => t.name === q.current);
+    sentence = `Installing ${q.done + 1} of ${q.total}: ${cur?.title ?? ''} (${Math.floor(q.percent ?? 0)}% of all downloads).`;
+    fix = { kind: 'open_tools', label: 'Show progress' };
+  } else if (required.length) {
+    overall = 'error';
+    sentence = `${required.length} tool${required.length === 1 ? '' : 's'} your projects need ${required.length === 1 ? 'is' : 'are'} missing: ${title(required)}.`;
+    fix = { kind: 'install', ...depOffer(required) };
+  } else if (core.length) {
+    overall = 'warn';
+    sentence = `Recommended analysis tools are not installed yet: ${title(core)}.`;
+    fix = { kind: 'install', ...depOffer(core) };
+  }
+  return { checked_at: now(), tools_dir: 'C:\\Users\\demo\\AppData\\Local\\RebuildStudio\\tools', tools,
+    services: [{ name: 'rizin_worker', title: 'Native analysis engine (rizin)', state: 'ok', sentence: 'Ready (0 analysis processes open).', action: null, required: false, needed_by: [] }],
+    host: [
+      { name: 'webview2', title: 'Microsoft Edge WebView2 runtime', state: 'ok', sentence: 'Installed (version 130.0.0.0).' },
+      { name: 'disk_space', title: 'Free disk space for tools', state: 'ok', sentence: '120.0 GB free.' },
+      { name: 'tools_write', title: 'Write access to the tools folder', state: 'ok', sentence: 'Rebuild Studio can write to its tools folder.' },
+      { name: 'long_paths', title: 'Long file paths', state: 'ok', sentence: 'Long paths are off; the tools folder path is short, so this is fine.' },
+      { name: 'download_hosts', title: 'Download servers', state: 'not_checked', sentence: 'Not checked yet.', next_action: "Press 'Check everything' to test the internet connection to each download server." },
+    ],
+    projects: [], queue: q, settings: DEP.settings, missing_required: required, missing_recommended: core,
+    install_all: depOffer([...required, ...core]), overall, sentence, fix };
+}
+function depPreflight(c) {
+  const n = depNeeds(c);
+  const missing = depOrder(n.required);
+  const optional = depOrder(n.optional).filter((x) => !missing.includes(x));
+  const installing = DEP.queue.state === 'running' && DEP.queue.items.some((i) => missing.includes(i.name));
+  const row = (x, why) => { const t = DEP_TOOLS.find((y) => y.name === x); return { name: x, title: t.title, state: 'not_installed', why, download_bytes: t.size, installable: true, blocked_reason: null, job: null }; };
+  const ok = missing.length === 0;
+  const sentence = ok ? 'Everything this project needs is installed and running.'
+    : installing ? `Installing what this project needs: ${missing.map((x) => DEP_TOOLS.find((t) => t.name === x).title).join(', ')}. Start is available when it finishes.`
+    : `This project needs ${missing.map((x) => DEP_TOOLS.find((t) => t.name === x).title).join(' and ')} before it can start (${n.title} → ${c.target_language}).`;
+  return { case_id: c.case_id, ok, installing, sentence, profile: n.profile, profile_title: n.title, target: c.target_language, comparator: 'cli', ai: c.ai_policy?.mode ?? 'no_ai',
+    missing: missing.map((x) => row(x, x === 'rust' ? `to build the ${c.target_language} rebuild` : `to analyze ${n.title}`)), optional: optional.map((x) => row(x, `optional for ${n.title}`)),
+    services: [], blocking_services: [], host: [], install: depOffer(missing), optional_install: depOffer(optional), settings: DEP.settings };
+}
+function depRoutes(res, m, p, seg, body) {
+  if (p === '/health/dependencies' && m === 'GET') return send(res, 200, depReport());
+  if (p === '/health/dependencies/settings' && m === 'GET') return send(res, 200, DEP.settings);
+  if (p === '/health/dependencies/settings' && m === 'PUT') {
+    DEP.settings = { auto_install: !!body.auto_install, asked: true, updated_at: now() };
+    const install = body.auto_install ? depStart(depReport().install_all?.items ?? [], 'auto-install turned on') : null;
+    return send(res, 200, { ...DEP.settings, install: install === 'busy' ? null : install });
+  }
+  if (p === '/health/dependencies/install' && m === 'GET') return send(res, 200, depQueueView());
+  if (p === '/health/dependencies/install' && m === 'POST') {
+    const c = body.case_id ? S.cases.get(body.case_id) : null;
+    const names = body.items ?? (c ? depPreflight(c).install?.items : depReport().install_all?.items) ?? [];
+    const unknown = names.find((n) => !DEP_TOOLS.some((t) => t.name === n));
+    if (unknown) return err(res, 404, 'unknown_tool', `'${unknown}' is not a tool Rebuild Studio can install.`, unknown, 'Pick one of the tools listed in Tools setup.');
+    const q = depStart(names, c ? `project ${c.case_id}` : 'user');
+    if (q === 'busy') return err(res, 409, 'busy', 'Another install is running. Wait for it to finish or cancel it.', 'Nothing was started.', 'Wait for the running install, or press Cancel on it.');
+    if (!q) return err(res, 409, 'nothing_to_install', 'Nothing is missing.', 'Nothing was started.', 'Nothing to do.');
+    return send(res, 200, q);
+  }
+  if (p === '/health/dependencies/install/cancel' && m === 'POST') {
+    if (DEP.queue.state !== 'running') return err(res, 409, 'not_running', 'No install is running.', 'Nothing changed.', 'Nothing to cancel.');
+    clearInterval(DEP.timer);
+    for (const i of DEP.queue.items) if (i.status !== 'done') Object.assign(i, { status: 'cancelled', message: 'Cancelled. Nothing was installed.', bytes_done: 0 });
+    DEP.queue.state = 'cancelled';
+    return send(res, 200, depQueueView());
+  }
+  if (p === '/health/dependencies/install/retry' && m === 'POST') {
+    const names = DEP.queue.items.filter((i) => i.status !== 'done').map((i) => i.name);
+    const q = names.length ? depStart(names, 'retry') : null;
+    if (!q || q === 'busy') return err(res, 409, 'nothing_to_retry', 'Nothing failed, so there is nothing to retry.', 'Nothing changed.', 'Nothing to do.');
+    return send(res, 200, q);
+  }
+  if (p === '/health/services/ollama/start' && m === 'POST') return send(res, 200, { started: true, running: true, message: 'Ollama started.' });
+  return undefined;
+}
+/** GET /tools/setup (+ install / cancel / remove) backed by the same mock tool state, so the Tools page works in dev:mock. */
+function toolSetupEntry(t) {
+  const it = DEP.queue.items.find((i) => i.name === t.name && i.status === 'installing');
+  const inst = DEP.installed.has(t.name);
+  const status = it ? 'installing' : inst ? 'installed' : 'not_installed';
+  return { name: t.name, title: t.title, purpose: t.purpose, role: t.purpose, version: '1.0', installed_version: inst ? '1.0' : null, license: 'see NOTICES', optional: t.optional,
+    size_bytes: t.size, file_name: `${t.name}.zip`, url: `https://example.invalid/${t.name}.zip`, sha256: 'a'.repeat(64), footprint: null, requires: t.requires,
+    status, disk_status: inst ? 'installed' : 'not_installed', blocked_reason: null, install_path: `C:\\Users\\demo\\AppData\\Local\\RebuildStudio\\tools\\${t.name}`,
+    job: it ? { phase: 'downloading', bytes_done: it.bytes_done, bytes_total: it.bytes_total, percent: Math.round((100 * it.bytes_done) / it.bytes_total), message: 'Downloading', error: null, finished: false, chain: [t.name], cancelled: false } : null };
+}
+function toolSetupRoutes(res, m, seg) {
+  if (seg.length === 2 && m === 'GET') {
+    const tools = DEP_TOOLS.map(toolSetupEntry);
+    return send(res, 200, { tools_dir: 'C:\\Users\\demo\\AppData\\Local\\RebuildStudio\\tools', lock_path: null, tools, any_installed: tools.some((t) => t.status === 'installed'),
+      required_missing: tools.filter((t) => !t.optional && t.status !== 'installed').map((t) => t.name), busy: DEP.queue.state === 'running' });
+  }
+  const t = DEP_TOOLS.find((x) => x.name === seg[2]);
+  if (!t) return err(res, 404, 'unknown_tool', `'${seg[2]}' is not a tool Rebuild Studio can install.`, seg[2], 'Pick one of the tools listed in Tools setup.');
+  if (seg[3] === 'install' && m === 'POST') {
+    const q = depStart([t.name], 'user');
+    if (q === 'busy') return err(res, 409, 'busy', 'Another tool is being installed. Wait for it to finish or cancel it.', t.name, 'Wait for the running install, or press Cancel on it.');
+    return send(res, 200, toolSetupEntry(t));
+  }
+  if (seg[3] === 'cancel' && m === 'POST') {
+    clearInterval(DEP.timer);
+    for (const i of DEP.queue.items) if (i.status !== 'done') Object.assign(i, { status: 'cancelled', bytes_done: 0, message: 'Cancelled. Nothing was installed.' });
+    DEP.queue.state = 'cancelled';
+    return send(res, 200, toolSetupEntry(t));
+  }
+  if (seg.length === 3 && m === 'DELETE') {
+    DEP.installed.delete(t.name);
+    return send(res, 200, toolSetupEntry(t));
+  }
+  return err(res, 404, 'not_found', `${m} ${seg.join('/')} is not available in the mock.`, 'Only this request.', 'Use the Tools page.');
+}
+
 function createCase(res, b) {
   const missing = ['name', 'source_root', 'output_root', 'target_language', 'output_type'].filter((k) => !b[k]);
   if (missing.length) return err(res, 400, 'invalid_case', `Missing fields: ${missing.join(', ')}.`, 'The project was not created.', 'Fill in the missing fields.');
@@ -1118,6 +1494,7 @@ function createCase(res, b) {
   const cid = id('case');
   const c = { case_id: cid, name: b.name, source_root: b.source_root, output_root: b.output_root, target_language: b.target_language, output_type: b.output_type, ai_policy: b.ai_policy ?? { mode: 'no_ai' }, launch_profile: b.launch_profile ?? { execute_original: false }, status: 'created', created_at: now(), updated_at: now(), app_version: '0.1.0-mock', settings: b.settings ?? {}, started_at: null };
   S.cases.set(cid, c);
+  c.dependency_preflight = depPreflight(c);
   emit('case.created', { case: c }, cid);
   const items = [planItem({ item_id: 'M1', title: 'Inventory the original', outcome: 'Every file classified', sort_order: 1 })];
   S.plans.set(cid, { revision: 1, items: new Map(items.map((i) => [i.item_id, i])), unknown_scope: ['Everything until discovery runs'], progress: { analysis: { done: 0, total: null } }, eta: null, revisions: [{ revision: 1, reason: 'Initial plan', created_at: now() }] });

@@ -55,7 +55,7 @@ def build_router(setup: ToolSetup) -> APIRouter:
 
 
 def mount_tools_routes(app: FastAPI, studio: Any) -> ToolSetup:
-    setup = ToolSetup(studio.settings, studio.events)
+    setup = getattr(studio, "tool_setup", None) or ToolSetup(studio.settings, studio.events)   # one installer for the whole app
     app.state.tool_setup = setup
     app.include_router(build_router(setup))
     return setup

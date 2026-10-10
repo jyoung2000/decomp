@@ -94,6 +94,24 @@ class StudioServices:
             wb = self.__dict__["_re"] = ReWorkbench(self)
         return wb
 
+    @property
+    def tool_setup(self) -> Any:
+        """The one ToolSetup (hash-verified installer) shared by the Tools page, the install queue and the health check."""
+        ts = self.__dict__.get("_tool_setup")
+        if ts is None:
+            from .tool_setup import ToolSetup
+            ts = self.__dict__["_tool_setup"] = ToolSetup(self.settings, self.events)
+        return ts
+
+    @property
+    def dependency_health(self) -> Any:
+        """R10: installed / version / hash / smoke / running / needed-by for every pinned tool and runtime service."""
+        dh = self.__dict__.get("_dependency_health")
+        if dh is None:
+            from .dependency_health import DependencyHealth
+            dh = self.__dict__["_dependency_health"] = DependencyHealth(self, self.tool_setup)
+        return dh
+
     # ------------------------------------------------------------------ lifecycle
     def start(self) -> None:
         self.runner.start()
@@ -132,7 +150,12 @@ class StudioServices:
         return out
 
     def doctor(self, smoke: bool = False, verify: bool = False) -> dict[str, Any]:
-        return self.registry.doctor(smoke=smoke, verify=verify)
+        report = self.registry.doctor(smoke=smoke, verify=verify)
+        try:
+            report["dependencies"] = self.dependency_health.summary()
+        except Exception as e:  # noqa: BLE001 - the packaged-build gate fails on this key, the doctor itself never does
+            report["dependencies"] = {"error": f"{type(e).__name__}: {e}"}
+        return report
 
     def job_status(self, job_id: str) -> dict[str, Any]:
         return self.jobs.get(job_id).to_dict()

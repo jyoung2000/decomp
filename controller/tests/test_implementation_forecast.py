@@ -34,7 +34,7 @@ def _route(studio, *, price=True, provider="openai", model="gpt-x"):
         conn = studio.connections.create("local", "LM Studio", endpoint="http://127.0.0.1:1234/v1", auth_mode="local", models=[entry], dialect="chat")
     else:
         conn = studio.connections.create("openai", "My OpenAI", endpoint="http://127.0.0.1:9/v1", auth_mode="api_key", api_key="sk-test-0123456789abcdef", models=[entry], dialect="chat")
-    studio.connections.set_route("interpretation", conn["connection_id"], model)
+    studio.connections.set_route("implementation", conn["connection_id"], model)
     return conn
 
 
@@ -111,7 +111,7 @@ def test_forecast_is_in_capabilities_case_plan_and_a_pre_case_endpoint(client, s
     cid = created["case_id"]
     assert c.get(f"/cases/{cid}").json()["implementation_forecast"]["summary"].startswith("No AI connected")
     assert c.get(f"/cases/{cid}/plan").json()["implementation_forecast"]["state"] == "scaffold_only"
-    started = c.post(f"/cases/{cid}/start").json()
+    started = c.post(f"/cases/{cid}/start?preflight=0").json()   # dependency preflight (R10) is tested in test_dependency_health.py
     assert started["implementation_forecast"]["can_produce_implementation"] is False
     bad = c.post("/implementation/forecast", json={"target_language": "cobol", "output_type": "exe"})
     assert bad.status_code == 422 or bad.status_code == 400

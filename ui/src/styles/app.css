@@ -383,3 +383,12 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
   .live-log-chips { grid-column: 3; }
   .live-log-text { grid-column: 3; }
 }
+
+/* ---------- dependency status bar (R10) ---------- */
+.dep-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2) var(--s-3); padding: var(--s-2) var(--s-4); font-size: var(--fs-sm); border-top: 1px solid var(--border); background: var(--bg-elev); color: var(--fg-2); }
+.dep-bar.warn { background: var(--warn-bg); color: var(--fg); }
+.dep-bar.bad { background: var(--bad-bg); color: var(--fg); }
+.dep-bar .spacer { flex: 1; }
+.dep-bar .dep-sentence { min-width: 0; overflow-wrap: anywhere; }
+.dep-items { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.dep-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); }

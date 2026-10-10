@@ -78,7 +78,7 @@ DEFAULT_SERVERS = (
 INSTALL_PAGES = {"ollama": "https://ollama.com/download", "lmstudio": "https://lmstudio.ai/download",
                  "llamacpp": "https://github.com/ggml-org/llama.cpp/releases"}
 
-TASK_LABEL = {"interpretation": "Interpreting code", "repair": "Repairing builds", "visual_review": "Reviewing screenshots",
+TASK_LABEL = {"implementation": "Writing implementations", "repair": "Repairing builds", "naming": "Naming functions and variables", "visual_review": "Reviewing screenshots",
               "verification_assist": "Suggesting test scenarios", "knowledge": "Extracting reusable knowledge"}
 
 _CODER = re.compile(r"(?i)(coder|codestral|devstral|starcoder|codellama|codegemma|deepseek-coder|qwen3-coder|granite-code)")
@@ -113,7 +113,7 @@ def ollama_models_folder() -> str:
 def judge(m: Mapping[str, Any], *, num_ctx_cap: int | None = None) -> dict[str, Any]:
     """Per Rebuild Studio task: ``{task: {ok, note}}`` plus ``quick_only``, ``excluded`` and a one-line ``summary``.
 
-    Rules: embedding-only models are excluded; interpretation/repair need code ability and >= 16k context; visual review
+    Rules: embedding-only models are excluded; implementation/repair need code ability and >= 16k context; visual review
     needs vision; models under 4B parameters are marked "quick tasks only". Unknown facts are said to be unknown."""
     caps = m.get("capabilities") or {}
     name = str(m.get("id") or "")
@@ -137,7 +137,7 @@ def judge(m: Mapping[str, Any], *, num_ctx_cap: int | None = None) -> dict[str, 
     vision = caps.get("vision")
     for t in TASKS:
         ok, note = True, ""
-        if t in ("interpretation", "repair"):
+        if t in ("implementation", "repair"):
             if small:
                 ok, note = False, f"too small for code work ({pb:g}B): quick tasks only"
             elif not coder and pb is not None and pb < 7:

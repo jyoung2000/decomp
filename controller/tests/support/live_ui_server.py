@@ -78,7 +78,7 @@ def main() -> None:
     p = studio.connections.probe(conn["connection_id"])
     print("probe:", p["state"], [m["id"] for m in p["models"]], flush=True)
     cc = conn["connection_id"]
-    rev = put_ladder(studio.connections, "interpretation", [{"connection_id": cc, "model": MISSING}, {"connection_id": cc, "model": a.model}])["config_revision"]
+    rev = put_ladder(studio.connections, "implementation", [{"connection_id": cc, "model": MISSING}, {"connection_id": cc, "model": a.model}])["config_revision"]
 
     orig = data / "original"
     orig.mkdir(exist_ok=True)

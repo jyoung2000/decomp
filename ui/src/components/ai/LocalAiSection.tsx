@@ -12,7 +12,7 @@ import { useToast } from '../Toasts';
 
 const RECHECK_MS = 60_000;
 const CTX_CHOICES = [8192, 16384, 32768, 65536, 131072];
-const SHORT_TASK: Record<string, string> = { interpretation: 'Interpret', repair: 'Repair', visual_review: 'Screenshots', verification_assist: 'Scenarios', knowledge: 'Knowledge' };
+const SHORT_TASK: Record<string, string> = { implementation: 'Implement', repair: 'Repair', naming: 'Naming', visual_review: 'Screenshots', verification_assist: 'Scenarios', knowledge: 'Knowledge' };
 
 export const kTokens = (n: number | null | undefined) => (n ? (n >= 1024 ? `${Math.round(n / 1024)}k` : String(n)) : '—');
 const fmtEta = (s: number | null | undefined) => (s == null ? '' : s < 60 ? `${Math.ceil(s)} s left` : `${Math.ceil(s / 60)} min left`);

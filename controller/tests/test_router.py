@@ -44,7 +44,7 @@ def req(text="hello", **kw):
     return Request(model="", messages=[Message.user(text)], **kw)
 
 
-def two_routes(store, task="interpretation", a_script=None, b_script=None):
+def two_routes(store, task="implementation", a_script=None, b_script=None):
     """Connection A (primary) and B (fallback), both with priced Anthropic models, backed by mock adapters."""
     a = store.create("anthropic", "A", api_key=KEY_A, models=["claude-sonnet-5-5"])
     b = store.create("anthropic", "B", api_key=KEY_B, models=["claude-haiku-4-5"])
@@ -123,9 +123,9 @@ def test_delete_removes_secret_and_cleans_routes(store, secret_store, db):
     a, b, *_ = two_routes(store)
     ref = db.query_one("SELECT secret_ref FROM connections WHERE connection_id=?", (b["connection_id"],))["secret_ref"]
     assert store.delete(b["connection_id"]) is True and secret_store.get(ref) is None
-    assert store.get_route("interpretation")["fallbacks"] == []
+    assert store.get_route("implementation")["fallbacks"] == []
     assert store.delete(a["connection_id"]) is True
-    r = store.get_route("interpretation")
+    r = store.get_route("implementation")
     assert r["primary_connection"] is None and r["primary_model"] is None
     assert store.delete("conn_missing") is False
 
@@ -148,16 +148,16 @@ def test_routes_require_an_explicit_model_and_known_task(store):
 
 def test_resolve_is_deterministic_primary_then_fallbacks(store):
     a, b, *_ = two_routes(store)
-    r = store.resolve("interpretation")
+    r = store.resolve("implementation")
     assert [(c["label"], m) for c, m in r] == [("A", "claude-sonnet-5-5"), ("B", "claude-haiku-4-5")]
-    assert store.resolve("interpretation") == r
+    assert store.resolve("implementation") == r
     assert store.resolve("repair") == []  # nothing configured => nothing invented
 
 
 def test_resolve_skips_unusable_connections_and_explains(store):
     a, b, *_ = two_routes(store)
     store.set_state(a["connection_id"], "auth_failed")
-    usable, skipped = store.resolve_detailed("interpretation")
+    usable, skipped = store.resolve_detailed("implementation")
     assert [m for _, m in usable] == ["claude-haiku-4-5"] and "auth failed" in skipped[0]["reason"]
     h = store.create("openai", "plan", auth_mode="subscription_handoff")
     store.set_route("repair", h["connection_id"], "whatever")
@@ -169,8 +169,8 @@ def test_resolve_honours_probed_capabilities_only_when_rejected(store, db):
     a, b, *_ = two_routes(store)
     db.update("connections", "connection_id", a["connection_id"], {"capabilities": {"tools": "rejected", "images": "untested"}})
     db.update("connections", "connection_id", b["connection_id"], {"capabilities": {"tools": "accepted_no_call"}})
-    assert [c["label"] for c, _ in store.resolve("interpretation", {"tools"})] == ["B"]   # inconclusive != unsupported
-    assert [c["label"] for c, _ in store.resolve("interpretation", {"images"})] == ["A", "B"]  # untested is not excluded
+    assert [c["label"] for c, _ in store.resolve("implementation", {"tools"})] == ["B"]   # inconclusive != unsupported
+    assert [c["label"] for c, _ in store.resolve("implementation", {"images"})] == ["A", "B"]  # untested is not excluded
 
 
 # =============================================================================================== probing / discovery
@@ -362,7 +362,7 @@ def test_connection_model_price_overrides_and_local_is_free(store):
 def test_successful_call_reserves_sends_settles_logs_and_emits(client, store, ledger, db, events):
     a, b, ma, mb = two_routes(store, a_script=["the answer"])
     ledger.create("job:j1", "job:j1", 0.01)
-    res = client.call("interpretation", req(), job_id="j1", case_id="c1", budget="job:j1")
+    res = client.call("implementation", req(), job_id="j1", case_id="c1", budget="job:j1")
     assert res.response.text == "the answer" and res.model == "claude-sonnet-5-5" and res.connection_id == a["connection_id"]
     assert ma.calls[0].model == "claude-sonnet-5-5" and mb.calls == []
     assert res.cost_usd == pytest.approx((10 * 2 + 5 * 10) / 1e6) and res.cost_known
@@ -370,7 +370,7 @@ def test_successful_call_reserves_sends_settles_logs_and_emits(client, store, le
     assert bud["spent_usd"] == pytest.approx(res.cost_usd) and bud["reserved_usd"] == 0
     row = db.query_one("SELECT * FROM ai_calls")
     assert (row["provider"], row["model"], row["task"], row["outcome"], row["case_id"], row["job_id"]) == \
-        ("anthropic", "claude-sonnet-5-5", "interpretation", "ok", "c1", "j1")
+        ("anthropic", "claude-sonnet-5-5", "implementation", "ok", "c1", "j1")
     assert (row["input_tokens"], row["output_tokens"], row["cost_known"]) == (10, 5, 1) and row["latency_ms"] is not None
     ev = [e for e in events.events_since(0) if e["kind"] == "ai.call"]
     assert len(ev) == 1 and ev[0]["case_id"] == "c1" and ev[0]["job_id"] == "j1"
@@ -381,7 +381,7 @@ def test_exhausted_budget_blocks_the_send(client, store, ledger, db):
     a, b, ma, mb = two_routes(store)
     ledger.create("job:j", "job:j", 0.0000001)
     with pytest.raises(BudgetExhausted):
-        client.call("interpretation", req(), budget="job:j")
+        client.call("implementation", req(), budget="job:j")
     assert ma.calls == [] and mb.calls == []          # nothing was sent anywhere
     assert ledger.get("job:j")["spent_usd"] == 0 and ledger.reservations("job:j") == []
     assert [r["outcome"] for r in db.query("SELECT outcome FROM ai_calls")] == ["budget_exhausted", "budget_exhausted"]
@@ -391,7 +391,7 @@ def test_cheaper_fallback_can_fit_when_primary_does_not(client, store, ledger):
     a, b, ma, mb = two_routes(store, b_script=["from B"])
     # ceiling(A, sonnet 5.5 @ $10/M out) ~ 0.0011; ceiling(B, haiku @ $5/M out) ~ 0.0006
     ledger.create("job:j", "job:j", 0.0008)
-    res = client.call("interpretation", req(), budget="job:j")
+    res = client.call("implementation", req(), budget="job:j")
     assert res.response.text == "from B" and ma.calls == [] and len(mb.calls) == 1
     assert [x["outcome"] for x in res.attempts] == ["budget_exhausted", "ok"]
 
@@ -399,10 +399,10 @@ def test_cheaper_fallback_can_fit_when_primary_does_not(client, store, ledger):
 def test_duplicate_request_key_is_rejected_before_sending(client, store, ledger):
     a, b, ma, mb = two_routes(store)
     ledger.create("job:j", "job:j", 1.0)
-    client.call("interpretation", req(), budget="job:j", request_key="job:j:step-3")
+    client.call("implementation", req(), budget="job:j", request_key="job:j:step-3")
     assert len(ma.calls) == 1
     with pytest.raises(DuplicateReservation):
-        client.call("interpretation", req(), budget="job:j", request_key="job:j:step-3")
+        client.call("implementation", req(), budget="job:j", request_key="job:j:step-3")
     assert len(ma.calls) == 1 and mb.calls == []
 
 
@@ -438,7 +438,7 @@ def test_user_supplied_price_makes_a_model_known(client, store, ledger):
 def test_paid_call_without_a_budget_is_refused_but_local_is_free(client, store):
     a, b, ma, mb = two_routes(store)
     with pytest.raises(BudgetRequired):
-        client.call("interpretation", req(), budget=None)
+        client.call("implementation", req(), budget=None)
     assert ma.calls == []
     loc = store.create("local", "LM", endpoint="http://localhost:1/v1", auth_mode="none", models=["m"])
     store.set_adapter_override(loc["connection_id"], MockProvider(["local ok"]))
@@ -451,7 +451,7 @@ def test_missing_usage_settles_at_the_reservation_not_zero(client, store, ledger
     a, b, ma, mb = two_routes(store, a_script=[Response(provider="mock", model="m", text="t", tool_calls=[], stop_reason="end_turn",
                                                        usage=Usage(known=False))])
     ledger.create("job:j", "job:j", 1.0)
-    res = client.call("interpretation", req(), budget="job:j")
+    res = client.call("implementation", req(), budget="job:j")
     assert res.cost_known is False and res.cost_usd > 0
     assert ledger.get("job:j")["spent_usd"] == pytest.approx(res.cost_usd)
 
@@ -460,7 +460,7 @@ def test_provider_reported_cost_wins(client, store, ledger):
     a, b, ma, mb = two_routes(store, a_script=[Response(provider="mock", model="m", text="t", tool_calls=[], stop_reason="end_turn",
                                                        usage=Usage(input_tokens=1, output_tokens=1, reported_cost_usd=0.0042))])
     ledger.create("job:j", "job:j", 1.0)
-    assert client.call("interpretation", req(), budget="job:j").cost_usd == pytest.approx(0.0042)
+    assert client.call("implementation", req(), budget="job:j").cost_usd == pytest.approx(0.0042)
 
 
 def test_no_route_is_a_typed_error_with_reasons(client, store):
@@ -470,14 +470,14 @@ def test_no_route_is_a_typed_error_with_reasons(client, store):
     store.db.update("connections", "connection_id", a["connection_id"], {"capabilities": {"tools": "rejected"}})
     store.db.update("connections", "connection_id", b["connection_id"], {"capabilities": {"tools": "rejected"}})
     with pytest.raises(NoRoute, match="rejected tools"):
-        client.call("interpretation", req(tools=[Tool("t", "d", {"type": "object"})]), budget="x")
+        client.call("implementation", req(tools=[Tool("t", "d", {"type": "object"})]), budget="x")
 
 
 # -------------------------------------------------------------------------------------------- bounded retries
 def test_rate_limit_is_retried_at_most_once_with_bounded_wait(client, store, ledger):
     a, b, ma, mb = two_routes(store, a_script=[RateLimit("slow", retry_after=2.0), "after wait"])
     ledger.create("job:j", "job:j", 1.0)
-    res = client.call("interpretation", req(), budget="job:j")
+    res = client.call("implementation", req(), budget="job:j")
     assert res.response.text == "after wait" and len(ma.calls) == 2 and mb.calls == [] and client.sleeps == [2.0]
     assert [x["outcome"] for x in res.attempts] == ["rate_limit", "ok"]
     assert len(ledger.reservations("job:j", "released")) == 1 and len(ledger.reservations("job:j", "settled")) == 1
@@ -487,27 +487,27 @@ def test_rate_limit_is_retried_at_most_once_with_bounded_wait(client, store, led
 def test_retry_wait_is_capped(client, store, ledger):
     a, b, ma, mb = two_routes(store, a_script=[RateLimit("slow", retry_after=9999), "ok"])
     ledger.create("job:j", "job:j", 1.0)
-    client.call("interpretation", req(), budget="job:j")
+    client.call("implementation", req(), budget="job:j")
     assert client.sleeps == [client.max_retry_wait_s]
 
 
 def test_second_rate_limit_is_not_retried_again_and_falls_back(client, store, ledger):
     a, b, ma, mb = two_routes(store, a_script=[RateLimit("1"), RateLimit("2"), "never"], b_script=["fallback"])
     ledger.create("job:j", "job:j", 1.0)
-    res = client.call("interpretation", req(), budget="job:j")
+    res = client.call("implementation", req(), budget="job:j")
     assert len(ma.calls) == 2 and ma.script == ["never"] and res.response.text == "fallback" and len(mb.calls) == 1
     with pytest.raises(AllCandidatesFailed) as ei:
         two = AIClient(store, ledger, client.events, client.db, sleep=lambda s: None)
         store.set_adapter_override(b["connection_id"], MockProvider([RateLimit("x"), RateLimit("y")]))
         store.set_adapter_override(a["connection_id"], MockProvider([RateLimit("x"), RateLimit("y")]))
-        two.call("interpretation", req(), budget="job:j")
+        two.call("implementation", req(), budget="job:j")
     assert len(ei.value.attempts) == 4  # 2 candidates x (1 try + 1 resend): bounded
 
 
 def test_timeout_is_never_resent_and_is_charged_in_full(client, store, ledger):
     a, b, ma, mb = two_routes(store, a_script=[Timeout("read timeout", retry_safe=False)], b_script=["via fallback"])
     ledger.create("job:j", "job:j", 1.0)
-    res = client.call("interpretation", req(), budget="job:j")
+    res = client.call("implementation", req(), budget="job:j")
     assert len(ma.calls) == 1 and client.sleeps == []                           # no re-send to the same endpoint
     rsv = ledger.reservations("job:j", "settled")
     assert len(rsv) == 2                                                         # the timed-out request may have been billed
@@ -519,14 +519,14 @@ def test_timeout_is_never_resent_and_is_charged_in_full(client, store, ledger):
 def test_connect_timeout_confirms_not_sent_so_one_resend_is_allowed(client, store, ledger):
     a, b, ma, mb = two_routes(store, a_script=[Timeout("connect timeout", retry_safe=True, request_sent=False), "ok"])
     ledger.create("job:j", "job:j", 1.0)
-    res = client.call("interpretation", req(), budget="job:j")
+    res = client.call("implementation", req(), budget="job:j")
     assert len(ma.calls) == 2 and res.response.text == "ok" and ledger.get("job:j")["spent_usd"] == pytest.approx(res.cost_usd)
 
 
 def test_ambiguous_completion_not_retried_and_settled_at_ceiling_with_partial_usage_noted(client, store, ledger, db):
     a, b, ma, mb = two_routes(store, a_script=[AmbiguousCompletion("cut off", partial_usage=Usage(input_tokens=50, output_tokens=2))], b_script=["ok"])
     ledger.create("job:j", "job:j", 1.0)
-    client.call("interpretation", req(), budget="job:j")
+    client.call("implementation", req(), budget="job:j")
     assert len(ma.calls) == 1
     amb = [r for r in ledger.reservations("job:j", "settled") if r["usage"].get("outcome") == "ambiguous"][0]
     assert amb["actual_usd"] == pytest.approx(amb["amount_usd"]) and amb["usage"]["partial_usage"]["input_tokens"] == 50
@@ -539,17 +539,17 @@ def test_ambiguous_stops_at_once_when_fallback_after_ambiguity_is_disabled(clien
     client.fallback_on_ambiguous = False
     ledger.create("job:j", "job:j", 1.0)
     with pytest.raises(AllCandidatesFailed):
-        client.call("interpretation", req(), budget="job:j")
+        client.call("implementation", req(), budget="job:j")
     assert mb.calls == []
 
 
 def test_auth_failure_releases_marks_state_and_falls_back(client, store, ledger):
     a, b, ma, mb = two_routes(store, a_script=[AuthError("bad key")], b_script=["B answers"])
     ledger.create("job:j", "job:j", 1.0)
-    res = client.call("interpretation", req(), budget="job:j")
+    res = client.call("implementation", req(), budget="job:j")
     assert res.response.text == "B answers" and len(ma.calls) == 1
     assert store.get(a["connection_id"])["state"] == "auth_failed" and store.get(b["connection_id"])["state"] == "ok"
-    assert [x["connection_id"] for x in [{"connection_id": c["connection_id"]} for c, _ in store.resolve("interpretation")]] == [b["connection_id"]]
+    assert [x["connection_id"] for x in [{"connection_id": c["connection_id"]} for c, _ in store.resolve("implementation")]] == [b["connection_id"]]
     assert len(ledger.reservations("job:j", "released")) == 1
     assert ledger.get("job:j")["spent_usd"] == pytest.approx(res.cost_usd)  # the failed auth cost nothing
 
@@ -557,7 +557,7 @@ def test_auth_failure_releases_marks_state_and_falls_back(client, store, ledger)
 def test_usage_limit_marks_connection_limited_without_resend(client, store, ledger):
     a, b, ma, mb = two_routes(store, a_script=[UsageLimit("quota exhausted")], b_script=["ok"])
     ledger.create("job:j", "job:j", 1.0)
-    client.call("interpretation", req(), budget="job:j")
+    client.call("implementation", req(), budget="job:j")
     assert len(ma.calls) == 1 and client.sleeps == [] and store.get(a["connection_id"])["state"] == "limited"
 
 
@@ -566,7 +566,7 @@ def test_usage_limit_marks_connection_limited_without_resend(client, store, ledg
 def test_other_failures_release_the_reservation(client, store, ledger, err, outcome):
     a, b, ma, mb = two_routes(store, a_script=[err, err], b_script=["ok"])
     ledger.create("job:j", "job:j", 1.0)
-    res = client.call("interpretation", req(), budget="job:j")
+    res = client.call("implementation", req(), budget="job:j")
     assert res.attempts[0]["outcome"] == outcome and res.response.text == "ok"
     assert all(r["actual_usd"] == 0 for r in ledger.reservations("job:j", "released"))
 
@@ -575,7 +575,7 @@ def test_all_candidates_failing_raises_with_every_attempt(client, store, ledger)
     a, b, ma, mb = two_routes(store, a_script=[AuthError("x")], b_script=[ProviderUnavailable("y")])
     ledger.create("job:j", "job:j", 1.0)
     with pytest.raises(AllCandidatesFailed) as ei:
-        client.call("interpretation", req(), budget="job:j")
+        client.call("implementation", req(), budget="job:j")
     assert [x["outcome"] for x in ei.value.attempts] == ["auth_failed", "unavailable"] and isinstance(ei.value.last, ProviderUnavailable)
     assert ledger.get("job:j")["spent_usd"] == 0 and ledger.get("job:j")["reserved_usd"] == 0
 
@@ -588,7 +588,7 @@ def test_secrets_never_reach_events_logs_or_ai_calls(client, store, ledger, db, 
     ma.script = [err]
     ledger.create("job:j", "job:j", 1.0)
     with caplog.at_level(logging.DEBUG):
-        res = client.call("interpretation", req(), budget="job:j")
+        res = client.call("implementation", req(), budget="job:j")
     blob = repr(events.events_since(0)) + repr(db.query("SELECT * FROM ai_calls")) + repr(res.attempts) + caplog.text + repr(db.query("SELECT * FROM reservations"))
     assert KEY_A not in blob and KEY_B not in blob
     assert "[REDACTED]" in repr(events.events_since(0))
@@ -625,7 +625,7 @@ def test_advisor_reorders_only_among_resolved_candidates(client, store, ledger):
     adv = FixedAdvisor([1, 0])
     client.advisor = adv
     ledger.create("job:j", "job:j", 1.0)
-    res = client.call("interpretation", req("secret case text"), budget="job:j")
+    res = client.call("implementation", req("secret case text"), budget="job:j")
     assert res.response.text == "B" and ma.calls == [] and res.advisor["source"] == "jev"
     cands, summary = adv.seen[0]
     assert [c["index"] for c in cands] == [0, 1] and "secret case text" not in repr(adv.seen)   # only metadata is shared
@@ -636,7 +636,7 @@ def test_advisor_failure_or_nonsense_keeps_the_deterministic_order(client, store
     a, b, ma, mb = two_routes(store, a_script=["A"], b_script=["B"])
     client.advisor = advisor
     ledger.create("job:j", "job:j", 1.0)
-    assert client.call("interpretation", req(), budget="job:j").response.text == "A"
+    assert client.call("implementation", req(), budget="job:j").response.text == "A"
 
 
 # -------------------------------------------------------------------------------------------- reuse demo & real adapter
@@ -659,9 +659,9 @@ def test_end_to_end_with_real_anthropic_adapter_over_mock_transport(store, ledge
     rec = Recorder(lambda r: anthropic_stream())
     store.transport = rec.transport
     c = store.create("anthropic", "A", api_key=KEY_A, models=["claude-sonnet-5-5"])
-    store.set_route("interpretation", c["connection_id"], "claude-sonnet-5-5")
+    store.set_route("implementation", c["connection_id"], "claude-sonnet-5-5")
     ledger.create("case:c1", "case:c1", 0.05)
-    res = AIClient(store, ledger, events, db).call("interpretation", req("analyse this"), case_id="c1", budget="case:c1")
+    res = AIClient(store, ledger, events, db).call("implementation", req("analyse this"), case_id="c1", budget="case:c1")
     assert res.response.text == "Hi there"
     assert res.cost_usd == pytest.approx((25 * 2 + 100 * 0.2 + 10 * 2.5 + 42 * 10) / 1e6) and res.cost_known
     assert rec.requests[0].headers["x-api-key"] == KEY_A

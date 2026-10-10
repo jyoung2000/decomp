@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AI_TASKS, PRESETS, presetLadders, rungKey, taskLabel } from '../../lib/ai';
+import { aiControl, cleanRules, rulesSig, type Cooldown, type RuleEntry, type RulesMeta, type RungRules } from '../../lib/aiControl';
 import { useApi, useResource } from '../../lib/store';
-import type { Connection, LadderEntry, LadderPresetId, PresetResult } from '../../lib/types';
+import type { Connection, Ladder, LadderEntry, LadderPresetId, PresetResult } from '../../lib/types';
+import { CooldownBadge, CooldownList } from './Cooldowns';
+import { RouteTest } from './RouteTest';
+import { RungRulesEditor } from './RungRules';
 import { Empty, Loading } from '../Empty';
 import { ErrorCallout } from '../ErrorCallout';
 import { useToast } from '../Toasts';
@@ -45,15 +49,19 @@ export function LadderSection({ connections, version = 0 }: { connections: Conne
       ) : (
         <div className="stack-lg">
           <PresetBar onApplied={ladder.reload} />
+          <CooldownList cooldowns={(ladder.data as R9Ladder).cooldowns ?? []} onCleared={ladder.reload} />
           {connections.length === 0 && <Empty title="No connections yet">Add a provider above (a local model server or a cloud key) before building a ladder.</Empty>}
           {AI_TASKS.map((t) => (
-            <TaskLadder key={t.id} task={t} entries={ladder.data!.tasks?.[t.id]?.entries ?? []} rationale={ladder.data!.tasks?.[t.id]?.rationale} revision={ladder.data!.config_revision} connections={connections} onSaved={ladder.reload} />
+            <TaskLadder key={t.id} task={t} entries={ladder.data!.tasks?.[t.id]?.entries ?? []} rationale={ladder.data!.tasks?.[t.id]?.rationale} chain={(ladder.data as R9Ladder).tasks?.[t.id]?.chain} rulesMeta={(ladder.data as R9Ladder).rules_meta} revision={ladder.data!.config_revision} connections={connections} onSaved={ladder.reload} />
           ))}
         </div>
       )}
     </section>
   );
 }
+
+/** GET /ai/ladder since R9 (docs/AI_LADDER.md section 9): per-task `chain`, `rules_meta`, `cooldowns`. */
+type R9Ladder = Ladder & { cooldowns?: Cooldown[]; rules_meta?: RulesMeta; tasks?: Record<string, { chain?: string }> };
 
 function rationaleText(r: string | undefined): string {
   if (!r) return '';
@@ -165,22 +173,34 @@ function PresetBar({ onApplied }: { onApplied: () => void }) {
   );
 }
 
-function TaskLadder({ task, entries, rationale, revision, connections, onSaved }: { task: { id: string; label: string; sub: string }; entries: LadderEntry[]; rationale?: string; revision: number; connections: Connection[]; onSaved: () => void }) {
+function rulesOf(es: LadderEntry[]): Record<string, RungRules> {
+  return Object.fromEntries(es.map((e) => [rungKey(e), cleanRules((e as RuleEntry).rules)]));
+}
+
+function TaskLadder({ task, entries, rationale, chain, rulesMeta, revision, connections, onSaved }: { task: { id: string; label: string; sub: string }; entries: LadderEntry[]; rationale?: string; chain?: string; rulesMeta?: RulesMeta; revision: number; connections: Connection[]; onSaved: () => void }) {
   const api = useApi();
   const toast = useToast();
   const [draft, setDraft] = useState<LadderEntry[]>(entries);
+  const [rules, setRules] = useState<Record<string, RungRules>>(() => rulesOf(entries));
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
   const sig = (es: LadderEntry[]) => es.map(rungKey).join('|');
   const serverSig = sig(entries);
-  useEffect(() => setDraft(entries), [serverSig, revision]); // eslint-disable-line react-hooks/exhaustive-deps
-  const dirty = sig(draft) !== serverSig;
+  const serverRules = rulesOf(entries);
+  const serverRulesSig = entries.map((e) => `${rungKey(e)}=${rulesSig(serverRules[rungKey(e)])}`).join('|');
+  useEffect(() => {
+    setDraft(entries);
+    setRules(rulesOf(entries));
+  }, [serverSig, serverRulesSig, revision]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rulesDirty = draft.some((e) => rulesSig(rules[rungKey(e)]) !== rulesSig(serverRules[rungKey(e)]));
+  const dirty = sig(draft) !== serverSig || rulesDirty;
   const existing = useMemo(() => new Set(draft.map(rungKey)), [draft]);
   const id = `lad-${task.id}`;
   const save = async () => {
     setSaving(true);
     try {
-      await api.putLadder(task.id, draft.map((e) => ({ connection_id: e.connection_id, model: e.model })));
+      if (rulesDirty) await aiControl(api).putLadder(task.id, draft.map((e) => ({ connection_id: e.connection_id, model: e.model, rules: cleanRules(rules[rungKey(e)]) })));
+      else await api.putLadder(task.id, draft.map((e) => ({ connection_id: e.connection_id, model: e.model })));
       toast.success(`${task.label} ladder saved`, 'The ladder version increased.');
       onSaved();
     } catch (e) {
@@ -196,7 +216,24 @@ function TaskLadder({ task, entries, rationale, revision, connections, onSaved }
       </legend>
       <div className="stack">
         {rationale && <p className="small muted">Currently {rationaleText(rationale)}.</p>}
-        <LadderList id={id} label={`${task.label} model ladder`} entries={draft} onChange={setDraft} />
+        {chain && draft.length > 0 && !dirty && (
+          <p className="small" data-testid={`${id}-chain`}>
+            {chain}
+          </p>
+        )}
+        <LadderList
+          id={id}
+          label={`${task.label} model ladder`}
+          entries={draft}
+          onChange={setDraft}
+          extra={(e) => (
+            <>
+              <CooldownBadge c={(e as RuleEntry).cooldown} />
+              <RungRulesEditor model={e.model} rules={rules[rungKey(e)]} kinds={rulesMeta?.failure_kinds} onChange={(r) => setRules((cur) => ({ ...cur, [rungKey(e)]: r }))} testId={`${id}-rules-${rungKey(e)}`} />
+            </>
+          )}
+        />
+        <RouteTest task={task.id} taskLabel={task.label} disabledReason={dirty ? 'Save the ladder first: the test uses the saved ladder.' : draft.length === 0 ? 'Add a model first.' : undefined} />
         <div className="row">
           <button type="button" className="btn sm" onClick={() => setPicking(true)}>
             Add model<span className="sr-only"> to {task.label}</span>

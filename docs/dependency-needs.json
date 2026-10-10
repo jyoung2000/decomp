@@ -1,0 +1,42 @@
+{
+  "$comment": "Which pinned tools (names from dependency-lock.json 'tools') and runtime services each kind of project needs (R10). Read by controller/rebuild_controller/dependency_health.py and mirrored byte-identically to controller/rebuild_controller/data/dependency-needs.json (a test enforces it). 'required' blocks Start until installed (one 'Install what's missing' action); 'optional' is offered, never forced. Tool-to-tool dependencies (ILSpy needs the private .NET runtime, CFR/jadx need the Java runtime, the browser test library needs Node.js) come from the lock's layout.requires and are added automatically, in dependency order.",
+  "schema_version": 1,
+  "core": {
+    "title": "Rebuild Studio (common program types)",
+    "recommended": ["rizin", "ilspycmd", "gdre"]
+  },
+  "profiles": {
+    "native_pe": {"title": "Windows programs (.exe/.dll)", "required": ["rizin"], "optional": ["upx"], "services": ["rizin_worker"]},
+    "native_elf": {"title": "Linux programs (ELF)", "required": ["rizin"], "services": ["rizin_worker"]},
+    "native_macho": {"title": "macOS programs (Mach-O)", "required": ["rizin"], "services": ["rizin_worker"]},
+    "unity_il2cpp": {"title": "Unity games (IL2CPP)", "required": ["rizin"], "services": ["rizin_worker"]},
+    "unreal": {"title": "Unreal Engine games", "required": ["rizin"], "services": ["rizin_worker"]},
+    "gamemaker": {"title": "GameMaker games", "required": ["rizin"], "services": ["rizin_worker"]},
+    "dotnet": {"title": ".NET programs", "required": ["ilspycmd"]},
+    "unity_mono": {"title": "Unity games (Mono)", "required": ["ilspycmd"]},
+    "godot": {"title": "Godot games", "required": ["gdre"]},
+    "jvm": {"title": "Java programs (.jar)", "required": ["cfr"]},
+    "android": {"title": "Android apps (.apk)", "required": ["jadx"]},
+    "electron": {"title": "Electron apps", "optional": ["node"]},
+    "web": {"title": "Web apps"},
+    "unknown": {"title": "Programs of an unknown type", "optional": ["rizin"]}
+  },
+  "targets": {
+    "rust": {"title": "Rust (.exe)", "required": ["rust"]},
+    "rust_bevy": {"title": "Rust + Bevy (.exe)", "required": ["rust"]},
+    "web": {"title": "HTML/CSS/JS"}
+  },
+  "auto_target": {"web": ["web", "electron"], "rust_bevy": ["godot"], "default": "rust"},
+  "ai": {
+    "local": {"title": "AI on this PC", "services": ["local_ai_server"]}
+  },
+  "comparators": {
+    "web": {"title": "browser comparisons", "required": ["node", "playwright-core"], "services": ["browser"]},
+    "cli": {"title": "command-line comparisons"}
+  },
+  "services": {
+    "rizin_worker": {"title": "Native analysis engine (rizin)"},
+    "local_ai_server": {"title": "Local AI server (Ollama or LM Studio)"},
+    "browser": {"title": "Browser for comparisons (Microsoft Edge)"}
+  }
+}

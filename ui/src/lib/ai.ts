@@ -7,13 +7,15 @@ import type {
 export const UNKNOWN_PRICE = 'Unknown price — needs approval';
 
 export const AI_TASKS: { id: string; label: string; sub: string }[] = [
-  { id: 'interpretation', label: 'Interpretation', sub: 'Explain decompiled code and data' },
+  { id: 'implementation', label: 'Implementation', sub: 'Write the program from the recovered evidence' },
   { id: 'repair', label: 'Repair', sub: 'Propose fixes for failing builds/tests' },
+  { id: 'naming', label: 'Naming', sub: 'Suggest function/variable names and comments' },
   { id: 'visual_review', label: 'Visual review', sub: 'Describe screenshot differences' },
   { id: 'verification_assist', label: 'Verification assist', sub: 'Suggest scenarios (never verdicts)' },
   { id: 'knowledge', label: 'Knowledge', sub: 'Propose reusable adapters/rules' },
 ];
-export const taskLabel = (id: string | null | undefined) => (id ? AI_TASKS.find((t) => t.id === id)?.label ?? humanize(id) : 'AI');
+/** `interpretation` is the pre-R9 name of `implementation` (old activity rows still carry it). */
+export const taskLabel = (id: string | null | undefined) => (id ? AI_TASKS.find((t) => t.id === (id === 'interpretation' ? 'implementation' : id))?.label ?? humanize(id) : 'AI');
 
 export const PRESETS: { id: 'local_first' | 'cloud_first' | 'all_local' | 'all_cloud' | 'no_ai'; label: string; sub: string }[] = [
   { id: 'local_first', label: 'Local first', sub: 'Models on this PC first, cloud as fallback' },
@@ -116,6 +118,7 @@ export const OUTCOME_INFO: Record<string, { icon: string; tone: string; label: s
   approval_required: { icon: '!', tone: 'warn', label: 'Needs your approval (unknown price)' },
   budget_exhausted: { icon: '!', tone: 'warn', label: 'Budget would be exceeded' },
   policy_skipped: { icon: '–', tone: 'muted', label: 'Skipped by project policy' },
+  cooldown: { icon: '⏸', tone: 'warn', label: 'Paused (provider cooldown)' },
 };
 export const outcomeInfo = (o: string | null | undefined) => (o ? OUTCOME_INFO[o] ?? { icon: '·', tone: 'outline', label: humanize(o) } : null);
 

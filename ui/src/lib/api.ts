@@ -6,6 +6,7 @@ import type {
   CaseLog, AiActivity, AiPolicy, Ladder, LadderPresetId, ModelCatalogItem, PresetResult,
   IsolationInfo, OriginalConsent, RecordResult, ScenarioList, UserScenario, UserScenarioBody,
   DownloadedModel, HfRepoFiles, HfSearchResult, LocalAiConfig, LocalAiSnapshot, LocalJob, McpClient, McpConfig,
+  DependencyReport, DepQueue, DepSettings, Preflight,
 } from './types';
 
 /** Error with the controller's three-part explanation: what happened, what is affected, what to do next. */
@@ -98,6 +99,17 @@ export class Api {
   installToolFromFile = (name: string, path: string) => this.post<ToolSetupEntry>(`/tools/setup/${encodeURIComponent(name)}/install-from-file`, { path });
   cancelToolInstall = (name: string) => this.post<ToolSetupEntry>(`/tools/setup/${encodeURIComponent(name)}/cancel`);
   removeTool = (name: string) => this.del<ToolSetupEntry>(`/tools/setup/${encodeURIComponent(name)}`);
+  /** R10 dependency health: installed / hash / smoke / running / needed-by, plus the one-click install queue. */
+  dependencies = (o: { refresh?: boolean; smoke?: boolean; network?: boolean } = {}) =>
+    this.get<DependencyReport>(`/health/dependencies${qs({ refresh: o.refresh ? '1' : undefined, smoke: o.smoke ? '1' : undefined, network: o.network ? '1' : undefined })}`);
+  installDependencies = (b: { items?: string[]; case_id?: string; repair?: boolean; include_optional?: boolean } = {}) => this.post<DepQueue>('/health/dependencies/install', b);
+  dependencyQueue = () => this.get<DepQueue>('/health/dependencies/install');
+  cancelDependencyInstall = () => this.post<DepQueue>('/health/dependencies/install/cancel');
+  retryDependencyInstall = () => this.post<DepQueue>('/health/dependencies/install/retry');
+  dependencySettings = () => this.get<DepSettings>('/health/dependencies/settings');
+  putDependencySettings = (autoInstall: boolean) => this.put<DepSettings>('/health/dependencies/settings', { auto_install: autoInstall });
+  startOllama = () => this.post<{ started: boolean; running: boolean; message: string; next_action?: string }>('/health/services/ollama/start');
+  preflight = (id: string) => this.get<Preflight>(`/cases/${enc(id)}/preflight`);
 
   cases = () => this.get<Case[]>('/cases');
   createCase = (b: NewCaseBody) => this.post<Case>('/cases', b);

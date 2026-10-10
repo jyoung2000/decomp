@@ -47,7 +47,7 @@ builds and compares; it can never set verification verdicts. See `examples/pecli
 
 ## AI connections
 Connections → add a provider (OpenAI Responses, Anthropic, Gemini, OpenRouter, local OpenAI-compatible, custom), probe it, assign
-models per task (interpretation, repair, visual review, verification assist, knowledge) with fallbacks. A per-job budget is required
+models per task (implementation, repair, naming, visual review, verification assist, knowledge) with fallbacks. A per-job budget is required
 before any automatic cloud work; unknown pricing requires explicit approval. Subscription "handoff" modes only launch your own
 installed CLI (`codex`, `claude`, `gemini`) with a task packet; see docs/PROVIDERS.md for what is and is not supported.
 

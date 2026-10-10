@@ -156,7 +156,7 @@ def connect(studio, server: FakeOpenAI, *, price: dict | None = PRICE, label: st
     else:
         conn = studio.connections.create("openai", label, endpoint=server.url, auth_mode="api_key", api_key=API_KEY, models=[model], dialect="chat")
     if route:
-        studio.connections.set_route("interpretation", conn["connection_id"], "gpt-fake")
+        studio.connections.set_route("implementation", conn["connection_id"], "gpt-fake")
     return conn
 
 
@@ -381,7 +381,7 @@ def test_fallback_route_after_retries_are_exhausted(studio, servers, tmp_path):
     connect(studio, primary, label="Primary")
     b = connect(studio, backup, label="Backup", route=False)
     prim = [c for c in studio.connections.list() if c["label"] == "Primary"][0]
-    studio.connections.set_route("interpretation", prim["connection_id"], "gpt-fake", [{"connection": b["connection_id"], "model": "gpt-fake"}])
+    studio.connections.set_route("implementation", prim["connection_id"], "gpt-fake", [{"connection": b["connection_id"], "model": "gpt-fake"}])
     studio.ai._sleep = lambda s: None
     cid = make_case(studio, tmp_path, {"max_retries": 2})
     drain(studio)
@@ -520,7 +520,7 @@ def test_ladder_failover_inside_the_implement_loop_with_activity_feed(studio, se
     from rebuild_controller.providers.ladder import put_ladder
     s402, s404, sok = servers([Status(402, body=CREDITS_BODY)]), servers([Status(404, body=MISSING_BODY)]), servers([Reply(files_json(GOOD_MAIN))])
     c1, c2, c3 = (connect(studio, s, label=l, route=False) for s, l in ((s402, "Credits"), (s404, "Missing"), (sok, "Works")))
-    rev = put_ladder(studio.connections, "interpretation", [{"connection_id": c["connection_id"], "model": "gpt-fake"} for c in (c1, c2, c3)])["config_revision"]
+    rev = put_ladder(studio.connections, "implementation", [{"connection_id": c["connection_id"], "model": "gpt-fake"} for c in (c1, c2, c3)])["config_revision"]
     cid = make_case(studio, tmp_path, {})
     drain(studio)
     res = job(studio, cid, "implement_loop").result
@@ -531,7 +531,7 @@ def test_ladder_failover_inside_the_implement_loop_with_activity_feed(studio, se
     assert studio.connections.get(c1["connection_id"])["state"] == "no_credits"
     assert studio.budgets.get(f"case:{cid}")["spent_usd"] == pytest.approx(cost_of(1200, 800))          # the failures cost nothing
     texts = feed(studio, cid)
-    i = texts.index(next(t for t in texts if t.startswith("Interpreting pecli (attempt 1 of 3) with local model gpt-fake")))
+    i = texts.index(next(t for t in texts if t.startswith("Writing the implementation of pecli (attempt 1 of 3) with local model gpt-fake")))
     assert texts[i + 1] == "Credits has run out of credits for gpt-fake; trying gpt-fake (runs on this PC)"
     assert texts[i + 2] == "gpt-fake is not available on Missing (model not found); trying gpt-fake (runs on this PC)"
     assert texts[i + 3].startswith("gpt-fake answered (1200 tokens in, 800 out")
@@ -544,7 +544,7 @@ def test_every_ladder_option_failing_preserves_work_and_blocks_with_a_recovery_a
     from rebuild_controller.providers.ladder import put_ladder
     s402, s404 = servers([Status(402, body=CREDITS_BODY)]), servers([Status(404, body=MISSING_BODY)])
     c1, c2 = connect(studio, s402, label="Credits", route=False), connect(studio, s404, label="Missing", route=False)
-    put_ladder(studio.connections, "interpretation", [{"connection_id": c["connection_id"], "model": "gpt-fake"} for c in (c1, c2)])
+    put_ladder(studio.connections, "implementation", [{"connection_id": c["connection_id"], "model": "gpt-fake"} for c in (c1, c2)])
     cid = make_case(studio, tmp_path, {})
     drain(studio)
     res = job(studio, cid, "implement_loop").result
@@ -558,6 +558,57 @@ def test_every_ladder_option_failing_preserves_work_and_blocks_with_a_recovery_a
     d = job(studio, cid, "deliver")
     assert d.state == JobState.COMPLETED and d.result["scaffold_only"] is True                            # work preserved and delivered honestly
     assert any(t.startswith("Stopped before attempt 1 finished") and "To continue:" in t for t in feed(studio, cid))
+
+
+def test_stop_rule_blocks_the_case_with_a_plain_message_and_never_tries_the_next_rung(studio, servers, tmp_path):
+    from rebuild_controller.providers.ladder import put_ladder
+    s402, sok = servers([Status(402, body=CREDITS_BODY)]), servers([Reply(files_json(GOOD_MAIN))])
+    c1, c2 = connect(studio, s402, label="Credits", route=False), connect(studio, sok, label="Spare", route=False)
+    put_ladder(studio.connections, "implementation", [{"connection_id": c1["connection_id"], "model": "gpt-fake", "rules": {"credits_exhausted": "stop"}},
+                                                      {"connection_id": c2["connection_id"], "model": "gpt-fake"}])
+    cid = make_case(studio, tmp_path, {})
+    drain(studio)
+    res = job(studio, cid, "implement_loop").result
+    assert res["stop_reason"] == "stopped_by_rule" and res["verified"] is False and sok.requests == []
+    assert res["blocker"].startswith("Stopped and waiting for you: Credits has run out of credits") and "add credits to Credits" in res["blocker"]
+    impl = studio.plan.get_item(studio.plan.milestone_id(cid, "M-IMPL"))
+    assert impl["status"] == "blocked" and impl["blockers"][0] == res["blocker"]
+    assert studio.connections.cooldown(c1["connection_id"]) is not None
+
+
+class _StopAdvisor:
+    """A scripted advisor: never re-orders, advises STOP between attempts (as JeV would with high confidence)."""
+
+    def __init__(self):
+        self.calls: list[dict[str, Any]] = []
+
+    def advise(self, *a, **k):
+        return None
+
+    def reassess(self, task, **kw):
+        self.calls.append({"task": task, **kw})
+        return {"advice": "stop", "confidence": 0.91, "source": "jev"}
+
+
+def test_advisor_stop_between_repair_attempts_ends_the_loop_but_never_overrides_the_verifier(studio, servers, tmp_path):
+    srv = servers([Reply(files_json(BROKEN_MAIN)), Reply(files_json(GOOD_MAIN))])
+    connect(studio, srv)
+    adv = studio.ai.advisor = _StopAdvisor()
+    cid = make_case(studio, tmp_path, {})
+    drain(studio)
+    res = job(studio, cid, "implement_loop").result
+    assert res["stop_reason"] == "advisor_stop" and len(srv.requests) == 1 and "JeV advisor" in res["message"]
+    call = adv.calls[0]
+    assert call["attempt"] == 1 and call["build"] == "failed" and "prompt" not in call and set(call["current"]) == {"provider", "model", "locality"}
+    assert any("JeV advisor judged further repairs unlikely" in t for t in feed(studio, cid))
+    # a verified attempt never consults the advisor
+    srv2 = servers([Reply(files_json(GOOD_MAIN))])
+    studio.connections.delete(next(c["connection_id"] for c in studio.connections.list()))
+    connect(studio, srv2, label="Again")
+    adv2 = studio.ai.advisor = _StopAdvisor()
+    cid2 = make_case(studio, tmp_path / "two", {})
+    drain(studio)
+    assert job(studio, cid2, "implement_loop").result["stop_reason"] == "verified" and adv2.calls == []
 
 
 # ----------------------------------------------------------------------------------------- live (opt-in)
@@ -574,7 +625,7 @@ def test_live_provider_runs_the_same_loop_with_a_small_budget(studio, tmp_path):
     if os.environ.get("REBUILD_LIVE_PRICE_IN") and os.environ.get("REBUILD_LIVE_PRICE_OUT"):
         entry["price"] = {"input_per_mtok": float(os.environ["REBUILD_LIVE_PRICE_IN"]), "output_per_mtok": float(os.environ["REBUILD_LIVE_PRICE_OUT"])}
     conn = studio.connections.create(provider, "live", auth_mode="api_key", api_key=key, models=[entry])
-    studio.connections.set_route("interpretation", conn["connection_id"], model)
+    studio.connections.set_route("implementation", conn["connection_id"], model)
     budget = float(os.environ.get("REBUILD_LIVE_BUDGET_USD", "0.50"))
     cid = make_case(studio, tmp_path, {"budget_usd": budget, "max_attempts": 2, "max_output_tokens": 8000})
     drain(studio)

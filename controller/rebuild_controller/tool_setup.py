@@ -140,6 +140,19 @@ def _kill_tree(proc: subprocess.Popen) -> None:
         pass
 
 
+def _part_meta(part: Path) -> Path:
+    """Sidecar naming the pinned artifact a partial download belongs to (only such a .part is ever resumed)."""
+    return part.with_name(part.name + ".json")
+
+
+def _drop_part(part: Path) -> None:
+    for p in (part, _part_meta(part)):
+        try:
+            p.unlink()
+        except OSError:
+            pass
+
+
 def _fmt_mb(n: int | None) -> str:
     return f"{(n or 0) / 1_000_000:.0f} MB"
 
@@ -515,17 +528,24 @@ class ToolSetup:
         part = dl_dir / f"{art['name']}.part"
         staged = stage_root / f"{final.name}-{uuid.uuid4().hex[:8]}"
         old_backup: Path | None = None
+        keep_part = False
         try:
             for stale in stage_root.glob(f"{final.name}-*"):     # leftovers of a crashed run
                 _rmtree(stale)
-            if part.exists():
-                part.unlink()
-            self._progress(name, phase="downloading", done=0, total=int(art.get("size_bytes") or 0),
-                           message="Copying the file" if local else "Downloading", force_emit=True)
+            resume_from = self._resumable_bytes(part, art) if local is None else 0
+            if not resume_from:
+                _drop_part(part)
+            self._progress(name, phase="downloading", done=resume_from, total=int(art.get("size_bytes") or 0),
+                           message="Copying the file" if local else ("Resuming the download" if resume_from else "Downloading"),
+                           force_emit=True)
             if local is not None:
                 self._copy_local(name, local, part, art, cancel)
             else:
-                self._download(name, str(art["url"]), part, art, cancel)
+                try:
+                    self._download(name, str(art["url"]), part, art, cancel, resume_from=resume_from)
+                except ToolSetupError as e:     # a dropped connection keeps the verified-so-far bytes for the next try
+                    keep_part = e.retryable and e.code in ("offline", "download_failed") and part.is_file() and part.stat().st_size > 0
+                    raise
             self._verify_archive(name, part, art, local is not None)
             if cancel.is_set():
                 raise _Cancelled()
@@ -567,11 +587,8 @@ class ToolSetup:
                                      next_action="Close programs that may lock the tools folder and retry.") from e
             self._verified.clear()
         finally:
-            if part.exists():
-                try:
-                    part.unlink()
-                except OSError:
-                    pass
+            if not keep_part:
+                _drop_part(part)
             if staged.exists():
                 _rmtree(staged)
             if old_backup and old_backup.exists():
@@ -587,28 +604,54 @@ class ToolSetup:
             next_action=(f"Check your internet connection and retry. Or download {art.get('name')} on a computer that is online "
                          f"and choose it with 'Install from file…' (expected SHA-256 {art.get('sha256')})."))
 
-    def _download(self, name: str, url: str, part: Path, art: dict[str, Any], cancel: threading.Event) -> None:
+    def _resumable_bytes(self, part: Path, art: dict[str, Any]) -> int:
+        """Bytes of an interrupted download of exactly this pinned artifact that can be continued (0 = start over)."""
+        try:
+            meta = json.loads(_part_meta(part).read_text(encoding="utf-8"))
+            size = part.stat().st_size
+        except (OSError, ValueError):
+            return 0
+        expected = int(art.get("size_bytes") or 0)
+        same = meta.get("sha256") == str(art.get("sha256") or "").lower() and meta.get("url") == art.get("url")
+        return size if same and 0 < size < (expected or size + 1) else 0
+
+    def _download(self, name: str, url: str, part: Path, art: dict[str, Any], cancel: threading.Event, *, resume_from: int = 0) -> None:
         expected = int(art.get("size_bytes") or 0)
         sha512 = art.get("sha512_official")
         h256, h512 = hashlib.sha256(), (hashlib.sha512() if sha512 else None)
+        if resume_from:          # the kept bytes are hashed again here; the final checksum still covers the whole file
+            with open(part, "rb") as f:
+                for b in iter(lambda: f.read(CHUNK), b""):
+                    h256.update(b)
+                    if h512:
+                        h512.update(b)
         cur = url
         timeout = httpx.Timeout(30.0, read=60.0)
         try:
             with httpx.Client(timeout=timeout, follow_redirects=False, headers={"User-Agent": "RebuildStudio-ToolSetup/1"}) as client:
                 for _ in range(6):
                     self._check_url(cur)
-                    with client.stream("GET", cur) as r:
+                    with client.stream("GET", cur, headers={"Range": f"bytes={resume_from}-"} if resume_from else None) as r:
                         if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("location"):
                             cur = urljoin(cur, r.headers["location"])
                             continue
-                        if r.status_code != 200:
+                        resumed = bool(resume_from) and r.status_code == 206 and                             str(r.headers.get("content-range") or "").startswith(f"bytes {resume_from}-")
+                        if resume_from and not resumed:   # server ignored the range: start over from byte 0
+                            resume_from = 0
+                            h256, h512 = hashlib.sha256(), (hashlib.sha512() if sha512 else None)
+                            if r.status_code in (206, 416):
+                                _drop_part(part)
+                                continue
+                        if r.status_code != 200 and not resumed:
                             raise ToolSetupError("download_failed", f"The download server answered HTTP {r.status_code} for {url}.",
                                                  affected=url, retryable=r.status_code >= 500 or r.status_code in (408, 429), url=url,
                                                  next_action=f"Try again in a few minutes, or download {art.get('name')} elsewhere and use 'Install from file…'.")
-                        total = expected or int(r.headers.get("content-length") or 0)
-                        done = 0
-                        self._progress(name, total=total, done=0)
-                        with open(part, "wb") as f:
+                        done = resume_from if resumed else 0
+                        total = expected or (done + int(r.headers.get("content-length") or 0))
+                        self._progress(name, total=total, done=done)
+                        _part_meta(part).write_text(json.dumps({"url": art.get("url"), "sha256": str(art.get("sha256") or "").lower()}),
+                                                    encoding="utf-8")
+                        with open(part, "ab" if resumed else "wb") as f:
                             for chunk in r.iter_bytes(CHUNK):
                                 if cancel.is_set():
                                     raise _Cancelled()

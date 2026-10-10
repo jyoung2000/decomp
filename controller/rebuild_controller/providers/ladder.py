@@ -11,7 +11,7 @@ import json
 import re
 from typing import Any, Iterable, Mapping
 
-from .connections import TASKS, ConnectionStore, ConnectionStoreError, locality_of
+from .connections import LEGACY_TASKS, TASKS, ConnectionStore, ConnectionStoreError, locality_of, normalize_task
 from .pricing import PriceTable
 from .secrets import redact
 from ..events import EventLog
@@ -25,8 +25,82 @@ MAX_PRESET_ENTRIES = 4
 POLICY_HASH_FIELDS = ("mode", "ladder_overrides", "locality", "budget_usd", "approve_unknown_pricing", "max_attempts",
                       "max_output_tokens")
 
-TASK_VERB = {"interpretation": "Interpreting", "repair": "Repairing", "visual_review": "Reviewing screenshots of",
-             "verification_assist": "Assisting verification of", "knowledge": "Extracting reusable knowledge from"}
+TASK_VERB = {"implementation": "Writing the implementation of", "repair": "Repairing", "naming": "Naming functions and variables in",
+             "visual_review": "Reviewing screenshots of", "verification_assist": "Assisting verification of",
+             "knowledge": "Extracting reusable knowledge from", "interpretation": "Writing the implementation of"}
+CODE_TASKS = ("implementation", "repair")
+
+# ====================================================================================== per-rung failure rules (section 9)
+# failure kind -> (plain label, whether "wait and retry" makes sense for it)
+FAILURE_KINDS: dict[str, tuple[str, bool]] = {
+    "credits_exhausted": ("runs out of credits", True),
+    "usage_limit": ("hits its usage limit", True),
+    "rate_limit": ("is rate-limited", True),
+    "auth_failed": ("rejects the key", False),
+    "model_unavailable": ("does not have the model", False),
+    "capability_unsupported": ("cannot take this input", False),
+    "context_exceeded": ("the request does not fit its context window", False),
+    "unreachable": ("cannot be reached", True),
+    "unavailable": ("has a server error", True),
+}
+RULE_ACTIONS = ("next", "wait", "stop")
+MAX_RULE_WAIT_MINUTES = 240.0
+MAX_RULE_TRIES = 20
+DEFAULT_RULE = {"action": "next"}
+
+
+def validate_rules(rules: Any) -> dict[str, dict[str, Any]]:
+    """``{failure_kind: {action: next|wait|stop, wait_minutes, max_tries}}`` -> normalised; ``next`` entries are dropped
+    (it is the default). Raises ConnectionStoreError with a plain message."""
+    if rules in (None, {}):
+        return {}
+    if not isinstance(rules, Mapping):
+        raise ConnectionStoreError("rules must be an object {failure_kind: {action, wait_minutes, max_tries}}")
+    out: dict[str, dict[str, Any]] = {}
+    for kind, r in rules.items():
+        if kind not in FAILURE_KINDS:
+            raise ConnectionStoreError(f"unknown failure kind {kind!r}; expected one of {tuple(FAILURE_KINDS)}")
+        if isinstance(r, str):
+            r = {"action": r}
+        if not isinstance(r, Mapping):
+            raise ConnectionStoreError(f"rule for {kind} must be an object {{action, wait_minutes, max_tries}}")
+        action = r.get("action") or "next"
+        if action not in RULE_ACTIONS:
+            raise ConnectionStoreError(f"unknown action {action!r} for {kind}; expected one of {RULE_ACTIONS}")
+        if action == "next":
+            continue
+        if action == "stop":
+            out[kind] = {"action": "stop"}
+            continue
+        if not FAILURE_KINDS[kind][1]:
+            raise ConnectionStoreError(f"waiting does not help when a model {FAILURE_KINDS[kind][0]}; choose next or stop for {kind}")
+        try:
+            wait = float(r.get("wait_minutes", 5))
+            tries = int(r.get("max_tries", 3))
+        except (TypeError, ValueError):
+            raise ConnectionStoreError(f"wait_minutes and max_tries for {kind} must be numbers") from None
+        if not (0 < wait <= MAX_RULE_WAIT_MINUTES) or wait != wait:
+            raise ConnectionStoreError(f"wait_minutes for {kind} must be between 0 and {MAX_RULE_WAIT_MINUTES:g}")
+        if not (1 <= tries <= MAX_RULE_TRIES):
+            raise ConnectionStoreError(f"max_tries for {kind} must be between 1 and {MAX_RULE_TRIES}")
+        out[kind] = {"action": "wait", "wait_minutes": wait, "max_tries": tries}
+    return out
+
+
+def rule_text(kind: str, rule: Mapping[str, Any] | None) -> str:
+    what = FAILURE_KINDS.get(kind, (kind.replace("_", " "), False))[0]
+    r = rule or DEFAULT_RULE
+    if r.get("action") == "stop":
+        return f"if it {what}: stop and ask me"
+    if r.get("action") == "wait":
+        return f"if it {what}: wait {r.get('wait_minutes'):g} min and retry (up to {r.get('max_tries')} times), then the next rung"
+    return f"if it {what}: use the next rung"
+
+
+def rules_meta() -> dict[str, Any]:
+    return {"failure_kinds": [{"kind": k, "label": v[0], "wait_allowed": v[1]} for k, v in FAILURE_KINDS.items()],
+            "actions": list(RULE_ACTIONS), "default": dict(DEFAULT_RULE), "max_wait_minutes": MAX_RULE_WAIT_MINUTES,
+            "max_tries": MAX_RULE_TRIES}
 
 
 # ====================================================================================== per-entry facts
@@ -75,7 +149,18 @@ def price_view(prices: PriceTable, conn: Mapping[str, Any], model: str) -> tuple
 
 
 def entry_view(store: ConnectionStore, conn: Mapping[str, Any] | None, model: str, position: int,
-               connection_id: str | None = None) -> dict[str, Any]:
+               connection_id: str | None = None, task: str | None = None) -> dict[str, Any]:
+    out = _entry_view(store, conn, model, position, connection_id)
+    if task is not None:
+        out["rules"] = store.rules_for(task, out.get("connection_id"), model)
+    cool = store.cooldown(conn, model) if conn is not None else None
+    out["cooldown"] = ({**cool, "text": f"paused until {cool.get('until')} ({cool.get('outcome', '').replace('_', ' ')})"}
+                       if cool else None)
+    return out
+
+
+def _entry_view(store: ConnectionStore, conn: Mapping[str, Any] | None, model: str, position: int,
+                connection_id: str | None = None) -> dict[str, Any]:
     if conn is None:
         return {"position": position, "connection_id": connection_id, "connection_label": None, "provider": None, "model": model,
                 "locality": None, "availability": availability(None, model),
@@ -91,26 +176,53 @@ def entry_view(store: ConnectionStore, conn: Mapping[str, Any] | None, model: st
 # ====================================================================================== ladder views
 def task_ladder(store: ConnectionStore, task: str, entries: Iterable[tuple[str, str]] | None = None,
                 rationale: str | None = None) -> dict[str, Any]:
+    task = normalize_task(task)
     cands = store.ladder_candidates(task, None, entries)
-    return {"entries": [entry_view(store, c["conn"], c["model"], c["position"], c["connection_id"]) for c in cands],
-            "rationale": rationale or store.rationale(task)}
+    ents = [entry_view(store, c["conn"], c["model"], c["position"], c["connection_id"], task) for c in cands]
+    return {"entries": ents, "rationale": rationale or store.rationale(task), "chain": chain_text(ents)}
+
+
+def chain_text(entries: list[Mapping[str, Any]]) -> str:
+    """The fallback ladder in one sentence: "Use A; if A hits a limit or fails, use B; then local qwen2.5-coder"."""
+    if not entries:
+        return "No model: work that needs this task is skipped."
+    names = [f"{'local ' if e.get('locality') == 'local' else ''}{e.get('model')}"
+             + (f" ({e.get('connection_label')})" if e.get("locality") != "local" and e.get("connection_label") else "") for e in entries]
+    if len(names) == 1:
+        return f"Use {names[0]}; nothing else is tried if it fails."
+    out = f"Use {names[0]}; if it hits a limit or fails, use {names[1]}"
+    for n in names[2:]:
+        out += f"; then {n}"
+    return out + "."
 
 
 def ladder_view(store: ConnectionStore) -> dict[str, Any]:
-    return {"config_revision": store.config_revision(), "tasks": {t: task_ladder(store, t) for t in TASKS}}
+    return {"config_revision": store.config_revision(), "tasks": {t: task_ladder(store, t) for t in TASKS},
+            "task_ids": list(TASKS), "rules_meta": rules_meta(), "cooldowns": store.cooldowns()}
 
 
 def put_ladder(store: ConnectionStore, task: str, entries: list[Mapping[str, Any]], *, allow_unlisted: bool = True,
                rationale: str = "user") -> dict[str, Any]:
+    task = normalize_task(task)
     if task not in TASKS:
         raise ConnectionStoreError(f"unknown task {task!r}; expected one of {TASKS}")
     pairs = _pairs(entries)
+    # rules travel with the entries: when any entry carries "rules", every rung's rules are replaced (missing = defaults)
+    rules = None
+    if any(isinstance(e, Mapping) and "rules" in e for e in entries or []):
+        rules = {}
+        for e, pair in zip(entries, pairs):
+            rules[pair] = validate_rules(e.get("rules"))
     if not pairs:
-        if not store.delete_route(task, rationale=rationale):
-            store.bump_revision(f"ladder for {task} cleared", {task: rationale})
+        with store.db.transaction():
+            if rules is not None:
+                store.set_rules(task, {})
+            if not store.delete_route(task, rationale=rationale):
+                store.bump_revision(f"ladder for {task} cleared", {task: rationale})
     else:
         (pc, pm), rest = pairs[0], pairs[1:]
-        store.set_route(task, pc, pm, [{"connection": c, "model": m} for c, m in rest], allow_unlisted=allow_unlisted, rationale=rationale)
+        store.set_route(task, pc, pm, [{"connection": c, "model": m} for c, m in rest], allow_unlisted=allow_unlisted, rationale=rationale,
+                        rules=rules)
     return {"config_revision": store.config_revision(), "task": task, **task_ladder(store, task)}
 
 
@@ -151,6 +263,7 @@ def model_catalog(store: ConnectionStore, q: str | None = None, task: str | None
                 row["suitable"], row["suitability_note"] = _suitable(task, caps)
             out.append(row)
     if task:
+        task = normalize_task(task)
         out.sort(key=lambda r: (not r["suitable"], -_score(task, r["model"], r["capabilities"])))
     return out
 
@@ -181,7 +294,7 @@ def _size_b(model: str, details: Mapping[str, Any] | None = None) -> float:
 
 def _score(task: str, model: str, caps: Mapping[str, Any], details: Mapping[str, Any] | None = None) -> float:
     s = min(_size_b(model, details), 200.0) / 10.0
-    if task in ("interpretation", "repair") and _CODER.search(model):
+    if task in CODE_TASKS and _CODER.search(model):
         s += 5.0
     if task == "visual_review":
         s += 10.0 if caps.get("vision") else 0.0
@@ -195,7 +308,7 @@ def preset(store: ConnectionStore, name: str, *, apply: bool = False, tasks: Ite
     """Deterministic ladders from the available connections. ``apply=False`` is a preview (nothing stored)."""
     if name not in PRESETS:
         raise ConnectionStoreError(f"unknown preset {name!r}; expected one of {PRESETS}")
-    tasks = [t for t in (tasks or TASKS) if t in TASKS]
+    tasks = [normalize_task(t) for t in (tasks or TASKS) if normalize_task(t) in TASKS]
     pool: list[dict[str, Any]] = []
     for conn in store.list():
         if conn["auth_mode"] == "subscription_handoff" or conn["state"] in ("auth_failed",):
@@ -268,7 +381,12 @@ def normalize_policy(p: Mapping[str, Any] | None) -> dict[str, Any]:
     d["mode"] = str(d.get("mode") or "no_ai")
     d["locality"] = str(d.get("locality") or "any")
     ov = d.get("ladder_overrides")
-    d["ladder_overrides"] = dict(ov) if isinstance(ov, Mapping) else {}
+    ov = dict(ov) if isinstance(ov, Mapping) else {}
+    for old, new in LEGACY_TASKS.items():           # pre-R9 policies: interpretation -> implementation
+        if old in ov:
+            v = ov.pop(old)
+            ov.setdefault(new, v)
+    d["ladder_overrides"] = ov
     return d
 
 
@@ -287,7 +405,7 @@ def override_entries(p: Mapping[str, Any] | None, task: str) -> list[tuple[str, 
     n = normalize_policy(p)
     if n["mode"] == "inherit":
         return None
-    ov = n["ladder_overrides"].get(task)
+    ov = n["ladder_overrides"].get(normalize_task(task))
     if not ov:
         return None
     return _pairs(ov)
@@ -318,6 +436,7 @@ def validate_policy_update(store: ConnectionStore | None, current: Mapping[str, 
         raise ConnectionStoreError("ladder_overrides must be an object {task: [{connection_id, model}]}")
     clean: dict[str, list[dict[str, str]]] = {}
     for task, ents in ov.items():
+        task = normalize_task(task)
         if task not in TASKS:
             raise ConnectionStoreError(f"unknown task {task!r} in ladder_overrides; expected one of {TASKS}")
         pairs = _pairs(ents)

@@ -338,9 +338,11 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     @app.post("/cases")
     def create_case(body: CaseCreate):
         try:
-            return studio.create_case(**body.model_dump())
+            case = studio.create_case(**body.model_dump())
         except Exception as e:
             raise _err("case", str(e), 400, affected="project folders", next_action="choose non-overlapping, existing source and a writable output folder")
+        case["dependency_preflight"] = studio.dependency_health.on_case_created(case["case_id"])   # R10: checked on create
+        return case
 
     @app.get("/cases/{case_id}")
     def get_case(case_id: str):
@@ -366,7 +368,14 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         return describe_host()
 
     @app.post("/cases/{case_id}/start")
-    def start(case_id: str):
+    def start(case_id: str, preflight: int = 1):
+        if preflight:   # R10: block with one "install what's missing" action instead of failing mid-pipeline
+            from ..tool_setup import ToolSetupError
+            from .tools_routes import _raise
+            try:
+                studio.dependency_health.require_ready(case_id)
+            except ToolSetupError as e:
+                raise _raise(e) from e
         return studio.start_rebuild(case_id)
 
     @app.post("/cases/{case_id}/pause")
@@ -416,6 +425,31 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
         if not isinstance(fn, str) or not re.fullmatch(r"[A-Za-z0-9_.$?@:<>~\-]{1,200}|0x[0-9a-fA-F]{1,16}", fn):
             raise _err("validation", "function must be a symbol name or 0x-hex address", 400)
         return studio.get_function_briefing(case_id, module_id, fn)
+
+    # R1: packer check, consented unpack (pinned upx -d into the case work folder, never in place), cross-index search
+    def _native_op(op: str, case_id: str, module_id: str, **kw: Any) -> dict[str, Any]:
+        try:
+            b = studio.registry.get("rizin")
+        except KeyError:
+            raise _err("unavailable", "native analysis backend is not registered", 503)
+        res = b.call(op, studio, case_id=case_id, module_id=module_id, **kw)
+        if not res.ok:
+            raise _err("failed", str(res.error)[:500], 400)
+        return {**res.data, "evidence_ids": res.evidence_ids, "truncated": res.truncated}
+
+    @app.get("/cases/{case_id}/modules/{module_id}/packer")
+    def module_packer(case_id: str, module_id: str):
+        return _native_op("packer_report", case_id, module_id)
+
+    @app.post("/cases/{case_id}/modules/{module_id}/unpack")
+    def module_unpack(case_id: str, module_id: str, body: dict[str, Any]):
+        if (body or {}).get("confirm") is not True:
+            raise _err("consent_required", "unpacking runs the pinned upx -d on a copy in the case work folder; send confirm=true", 400)
+        return _native_op("unpack", case_id, module_id, confirm=True)
+
+    @app.get("/cases/{case_id}/modules/{module_id}/search")
+    def module_search(case_id: str, module_id: str, q: str, limit: int = 50):
+        return _native_op("search_index", case_id, module_id, query=q, limit=limit)
 
     @app.get("/cases/{case_id}/evidence")
     def evidence(case_id: str, kind: str | None = None, module_id: str | None = None):
@@ -706,6 +740,8 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     from .tools_routes import mount_tools_routes; mount_tools_routes(app, studio)  # guided tool setup
     from .scenario_routes import mount_scenario_routes; mount_scenario_routes(app, studio)  # user-declared scenarios
     from .local_ai_routes import mount_local_ai_routes; mount_local_ai_routes(app, studio)  # local AI detection + model downloads
+    from .ai_control_routes import mount_ai_control_routes; mount_ai_control_routes(app, studio)  # R9: JeV, cooldowns, rules, dry run
+    from .health_routes import mount_health_routes; mount_health_routes(app, studio)  # R10 dependency health + install queue
     return app
 
 
@@ -758,6 +794,8 @@ def serve(port: int = 0, data_dir: str | None = None, token: str | None = None, 
     write_controller_info(settings.data_dir, port, token)
     if os.environ.get("REBUILD_NO_LOCAL_DETECT") != "1" and studio.connections is not None:
         app.state.local_ai.detect_async()      # loopback-only probe of Ollama / LM Studio / llama.cpp; never blocks startup
+    if os.environ.get("REBUILD_NO_DEP_STARTUP") != "1":
+        app.state.dependency_health.startup_async()   # clean leftovers, report/resume an interrupted install, cache the health
     print(json.dumps({"port": port, "controller_json": str(settings.data_dir / "controller.json")}), flush=True)
     try:
         uvicorn.run(app, host=host, port=port, log_level="warning", ws_ping_interval=10, ws_ping_timeout=20)
