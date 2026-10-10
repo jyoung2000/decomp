@@ -267,7 +267,11 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
 
     # ---------------------------------------------------------------- health / events
     @app.get("/health")
-    def health():
+    def health(request: Request):
+        # Liveness stays open (the Cutter plugin probes it before it has a token); details need the bearer token so other local
+        # processes cannot read the pid, version, data paths or error text.
+        if not secrets.compare_digest(request.headers.get("authorization", ""), f"Bearer {token}"):
+            return {"ok": True}
         return {"ok": True, "version": __version__, "pid": os.getpid(), "heartbeat_seconds": studio.settings.limits.lease_timeout_seconds,
                 "latest_seq": studio.events.latest_seq(), "started_at": started_at, "optional_errors": getattr(studio, "optional_errors", {})}
 

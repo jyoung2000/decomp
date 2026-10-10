@@ -267,7 +267,8 @@ def _msvc_available() -> bool:
 
 @pytest.fixture(scope="module")
 def built_c_row(tmp_path_factory):
-    """Rebuild the C row with its PDB (MSVC, /Brepro: the exe is byte-identical to the committed one)."""
+    """Rebuild the C row with its PDB. The tests only need a matching exe+PDB pair; the exe is byte-identical to the committed
+    row only with the recorded MSVC version (19.29.30159), so another toolset (e.g. the CI runner's) still gives a valid pair."""
     if not _msvc_available():
         pytest.skip("MSVC Build Tools not installed")
     import sys
@@ -276,7 +277,6 @@ def built_c_row(tmp_path_factory):
     work = tmp_path_factory.mktemp("pdbrow")
     res = build_bench.build_row("c_msvc_x64_o2", work)
     exe = Path(res["binary"])
-    assert _sha(exe) == _sha(C64)
     return exe, exe.with_suffix(".pdb")
 
 

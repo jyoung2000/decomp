@@ -75,10 +75,14 @@ try {
     Check 'health_ok' ([bool]($health -and $health.ok)) $(if ($health) { "version $($health.version), pid $($health.pid)" } else { 'no /health answer' })
     $ev.health = $health
     if ($c) {
-        # The token must be required.
+        # The token must be required for every API route; /health without it is liveness only ({"ok":true}, no pid/version/errors).
         $code = 0
-        try { $null = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$($c.port)/health" -TimeoutSec 5; $code = 200 } catch { if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode } }
-        Check 'unauthenticated_refused' ($code -in @(401, 403)) "HTTP $code without token"
+        try { $null = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$($c.port)/cases" -TimeoutSec 5; $code = 200 } catch { if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode } }
+        Check 'unauthenticated_refused' ($code -in @(401, 403)) "GET /cases: HTTP $code without token"
+        $anon = $null
+        try { $anon = Invoke-RestMethod -Uri "http://127.0.0.1:$($c.port)/health" -TimeoutSec 5 } catch { $anon = $null }
+        $anonKeys = if ($anon) { @($anon.PSObject.Properties.Name) } else { @() }
+        Check 'unauthenticated_health_is_liveness_only' (($anonKeys.Count -eq 1) -and ($anonKeys -contains 'ok')) "GET /health without token returned: $($anonKeys -join ',')"
         $cp = Get-Process -Id ([int]$c.pid) -ErrorAction SilentlyContinue
         $ev.controller_pid = $c.pid
         if ($cp) { $ev.controller_path = $cp.Path }

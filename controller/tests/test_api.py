@@ -93,3 +93,15 @@ def test_websocket_replay_and_live(client, src_out):
     with pytest.raises(Exception):
         with c.websocket_connect(f"/ws?token=bad&since=0") as ws:
             ws.receive_text()
+
+
+def test_health_without_token_is_liveness_only_and_api_routes_need_the_token(client):
+    """Windows CI's launch check found /health answering 200 without a token with pid/version/error text. Liveness stays open
+    (the Cutter plugin probes it before it has a token) but reveals nothing else; real routes still need the token."""
+    c, _ = client
+    anon = {"Authorization": "", "Origin": "http://localhost:5173"}
+    r = c.get("/health", headers=anon)
+    assert r.status_code == 200 and r.json() == {"ok": True}
+    full = c.get("/health").json()
+    assert full["ok"] and "pid" in full and "version" in full
+    assert c.get("/cases", headers=anon).status_code == 401
