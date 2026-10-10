@@ -413,7 +413,8 @@ def test_wrong_remake_and_garbage_are_rejected_whatever_the_model_claims(studio,
     assert res["verified"] is False and res["stop_reason"] == "attempts_exhausted" and len(res["attempts"]) == 3
     a1, a2, a3 = attempts(studio, cid)
     assert a1["build"]["status"] == "no_files" and a1["candidate_id"] is None
-    assert a2["verdict"]["state"] == "failed" and a2["verdict"]["passed"] == 0 and a3["verdict"]["state"] == "failed"
+    assert a2["verdict"]["state"] == "failed" and a2["verdict"]["passed"] == 0
+    assert a3["build"]["status"] == "unchanged" and a3["candidate_id"] is None      # same wrong files again: not rebuilt
     assert "unusable_response" in srv.user_text(1) and "scenario_mismatches" in srv.user_text(2)
     out = case_outcome(studio, cid)
     assert out["state"] in ("tested", "partially_matched") and out["can_claim_complete"] is False and out["verification"]["passed"] == 0
@@ -650,3 +651,30 @@ def test_builtin_crates_are_dropped_from_model_cargo_toml():
     assert dropped == ["std", "core"]
     assert 'serde_json = "1"' in fixed and "std = []" in fixed and 'std = "1.0"' not in fixed and "core =" not in fixed
     assert drop_builtin_crates('[package]\nname = "a"\n') == ('[package]\nname = "a"\n', [])
+
+
+def test_repeated_identical_answer_is_not_rebuilt_then_varied_then_switched(studio, servers, tmp_path):
+    """Found on the genuine install: qwen2.5-coder:14b returned a byte-identical main.rs for repairs 2-5 and every one was rebuilt.
+    Now: an unchanged answer is not rebuilt, the next request asks for variety (temperature), a second repeat moves to the next rung."""
+    primary = servers([Reply(files_json(BROKEN_MAIN)), Reply(files_json(BROKEN_MAIN)), Reply(files_json(BROKEN_MAIN))])
+    backup = servers([Reply(files_json(GOOD_MAIN))])
+    connect(studio, primary, label="Primary")
+    b = connect(studio, backup, label="Backup", route=False)
+    prim = [c for c in studio.connections.list() if c["label"] == "Primary"][0]
+    studio.connections.set_route("implementation", prim["connection_id"], "gpt-fake", [{"connection": b["connection_id"], "model": "gpt-fake"}])
+    studio.connections.set_route("repair", prim["connection_id"], "gpt-fake", [{"connection": b["connection_id"], "model": "gpt-fake"}])
+    cid = make_case(studio, tmp_path, {"max_attempts": 4})
+    drain(studio)
+    j = job(studio, cid, "implement_loop")
+    res = j.result
+    a = attempts(studio, cid)
+    assert res is not None, (j.state, j.error, j.blocker)
+    assert a[0]["build"]["status"] == "failed"
+    assert a[1]["build"]["status"] == "unchanged" and a[1]["candidate_id"] is None
+    assert a[2]["build"]["status"] == "unchanged" and a[2]["candidate_id"] is None
+    assert "temperature" not in primary.requests[1] and primary.requests[2].get("temperature") == 0.8
+    assert "IDENTICAL" in primary.user_text(2)
+    assert len(primary.requests) == 3 and len(backup.requests) == 1                     # second repeat: the next rung answers
+    assert res["verified"] is True and len(res["attempts"]) == 4
+    builds = [c for c in studio.candidates.list(cid) if (c.get("meta") or {}).get("origin") == "ai_attempt"]
+    assert len(builds) == 2                                                             # attempts 1 and 4 only

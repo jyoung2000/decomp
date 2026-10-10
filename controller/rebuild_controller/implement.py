@@ -436,7 +436,8 @@ def ensure_case_budget(st: Any, case_id: str, limit_usd: float) -> str:
 
 
 def ask_model(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, *, task: str, system: str, prompt: str, key: str,
-              persist: Any = None, activity: dict[str, Any] | None = None, demote: list[tuple[str, str]] | None = None) -> dict[str, Any]:
+              persist: Any = None, activity: dict[str, Any] | None = None, demote: list[tuple[str, str]] | None = None,
+              temperature: float | None = None) -> dict[str, Any]:
     """Single budgeted, retried, fallback-aware model call. Raises ImplementStop for user-fixable conditions.
     Returns {text, usage, cost_usd, cost_known, provider, model, connection_id, call_id, prompt_sha256, router_attempts, stop_reason}."""
     from .budget import BudgetExhausted, DuplicateReservation
@@ -448,7 +449,7 @@ def ask_model(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy,
         raise ImplementStop(rs["code"], rs["message"])
     bid = ensure_case_budget(st, case["case_id"], pol.budget_usd)
     req = Request(model="", messages=[Message.user(prompt)], system=system, max_output_tokens=pol.max_output_tokens, stream=False,
-                  timeout_s=pol.request_timeout_s, metadata={"output_format": "json_file_map"})
+                  timeout_s=pol.request_timeout_s, metadata={"output_format": "json_file_map"}, temperature=temperature)
     sha = req.fingerprint()
 
     def do() -> dict[str, Any]:
@@ -511,6 +512,8 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
     prev_id, feedback, history = scaffold_id, None, []
     verified = False
     demote: list[tuple[str, str]] | None = None
+    temperature: float | None = None
+    repeats = 0                                    # consecutive answers identical to the previous attempt
     ctx.log(f"AI implementation: up to {pol.max_attempts} attempts, budget ${pol.budget_usd:.2f}"
             + (f"; resuming after {len(records)} recorded attempt(s)" if records else ""))
     n = 0
@@ -522,7 +525,7 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
             if rec is None:
                 ctx.log(f"AI attempt {n} of {pol.max_attempts}: asking the model for the code" + (" (fixing what the last attempt got wrong)" if n > 1 else "") + "…")
                 rec = _run_attempt(st, ctx, case, pol, n=n, loop_id=loop_id, prev_id=prev_id, scaffold_id=scaffold_id, packet=packet,
-                                   feedback=feedback, history=history, has_baseline=has_baseline, demote=demote)
+                                   feedback=feedback, history=history, has_baseline=has_baseline, demote=demote, temperature=temperature)
                 records[n] = rec
         except ImplementStop as s:
             stop = (s.code, s.message)
@@ -560,8 +563,18 @@ def implement_loop(ctx: StageContext) -> dict[str, Any]:
             demote = None
             if adv.get("advice") == "switch" and (rec.get("call") or {}).get("connection_id"):
                 demote = [(rec["call"]["connection_id"], rec["call"]["model"])]
+            repeats = repeats + 1 if rec.get("unchanged") else 0
+            temperature = UNCHANGED_TEMPERATURE if repeats else None
+            if repeats >= 2 and (rec.get("call") or {}).get("connection_id"):
+                pair = (rec["call"]["connection_id"], rec["call"]["model"])
+                demote = (demote or []) + ([pair] if pair not in (demote or []) else [])
+                _act(st, ctx, case, f"{rec['call']['model']} repeated the same answer {repeats} times; the next attempt goes to the next model in the ladder",
+                     "next", origin="deterministic", outcome="switch_on_repeat", plan_item_id=st.plan.milestone_id(case_id, "M-FIX"))
+            elif repeats:
+                _act(st, ctx, case, "The answer did not change; the next attempt asks for a different fix with more sampling variety",
+                     "next", origin="deterministic", outcome="vary_on_repeat", plan_item_id=st.plan.milestone_id(case_id, "M-FIX"))
             _act(st, ctx, case, f"Next: repair attempt {n + 1} of {pol.max_attempts}"
-                 + (f" (JeV advised switching away from {rec['call']['model']}, confidence {adv['confidence']:.2f})" if demote else ""),
+                 + (f" (JeV advised switching away from {rec['call']['model']}, confidence {adv['confidence']:.2f})" if adv.get("advice") == "switch" and demote else ""),
                  "next", origin="deterministic", outcome="repair",
                  plan_item_id=st.plan.milestone_id(case_id, "M-FIX"), candidate_id=rec.get("candidate_id"))
     stop = stop or ("attempts_exhausted", f"Stopped after {pol.max_attempts} attempts without a verified match.")
@@ -630,8 +643,31 @@ def drop_builtin_crates(cargo_toml: str) -> tuple[str, list[str]]:
     return "".join(out), dropped
 
 
+UNCHANGED_TEMPERATURE = 0.8      # sampling temperature after an answer repeated the previous attempt
+
+
+def _same_as_previous(st: Any, prev_id: str, files: dict[str, Any]) -> bool:
+    """True when every file in the answer already has exactly this content in the previous candidate (line endings ignored)."""
+    try:
+        src = Path(st.candidates.get(prev_id)["source_dir"])
+    except Exception:  # noqa: BLE001 - no previous candidate: nothing to compare with
+        return False
+    for rel, text in files.items():
+        if not isinstance(text, str):
+            return False
+        p = src / rel
+        try:
+            old = p.read_text("utf-8")
+        except (OSError, UnicodeDecodeError):
+            return False
+        if old.replace("\r\n", "\n") != text.replace("\r\n", "\n"):
+            return False
+    return bool(files)
+
+
 def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPolicy, *, n: int, loop_id: str, prev_id: str, scaffold_id: str, packet: dict[str, Any],
-                 feedback: dict[str, Any] | None, history: list[str], has_baseline: bool, demote: list[tuple[str, str]] | None = None) -> dict[str, Any]:
+                 feedback: dict[str, Any] | None, history: list[str], has_baseline: bool, demote: list[tuple[str, str]] | None = None,
+                 temperature: float | None = None) -> dict[str, Any]:
     case_id = case["case_id"]
     started = _now()
     key = f"{loop_id}:a{n}"
@@ -662,7 +698,7 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
         subject = (f"{case['name']} (attempt {n} of {pol.max_attempts})" if n == 1
                    else f"{case['name']} from candidate r{st.candidates.get(prev_id).get('revision', '?')} (attempt {n} of {pol.max_attempts})")
         resp = ask_model(st, ctx, case, pol, task=task, system=SYSTEM_PROMPT, prompt=prompt, key=key, persist=persist,
-                         activity={"plan_item_id": plan_item, "subject": subject, "origin": "model_proposed"}, demote=demote)
+                         activity={"plan_item_id": plan_item, "subject": subject, "origin": "model_proposed"}, demote=demote, temperature=temperature)
         resp = {**resp, "evidence_id": resp.get("evidence_id")}
     ctx.heartbeat(force=True)
     rec: dict[str, Any] = {"loop_id": loop_id, "attempt": n, "task": task, "started_at": started,
@@ -688,6 +724,18 @@ def _run_attempt(st: Any, ctx: StageContext, case: dict[str, Any], pol: LoopPoli
             files = {**files, "Cargo.toml": fixed}
             _act(st, ctx, case, f"Removed {', '.join(dropped)} from {mname}'s Cargo.toml dependencies: they are part of Rust itself, "
                  f"not packages (cargo fails with 'no matching package named `std`')", "proposal", origin="deterministic", outcome="sanitized", **act_base)
+    if n > 1 and _same_as_previous(st, prev_id, files):
+        # Found on the genuine install: qwen2.5-coder:14b returned a byte-identical main.rs for repairs 2-5, and each one was rebuilt
+        # (minutes) only to fail the same way. Skip the build, keep the last error in front of the model, and let the loop change tack.
+        _act(st, ctx, case, f"{mname}'s answer is identical to the previous attempt; not rebuilding it", "proposal", origin="deterministic",
+             outcome="unchanged", evidence_ids=resp_ev, **act_base)
+        rec["build"] = {"status": "unchanged", "note": "identical to the previous attempt"}
+        rec["unchanged"] = True
+        rec["feedback_for_next"] = {"kind": "unchanged_response",
+                                    "instruction": "Your last answer was IDENTICAL to the attempt before it, which failed as shown below. "
+                                                   "Change the code to fix that error; do not return the same files again.",
+                                    "previous_feedback": feedback}
+        return _store_attempt(st, case_id, loop_id, n, rec)
     cand = st.candidates.propose(case_id, files, note=f"AI attempt {n}", author="model", base_candidate=prev_id, plan_revision=st.plan.current_revision(case_id))
     cid = cand["candidate_id"]
     src = Path(cand["source_dir"])
