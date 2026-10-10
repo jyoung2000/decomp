@@ -1,0 +1,350 @@
+{
+ "schema": "rebuild-studio.bench-truth/1",
+ "row": "dotnet_renamed",
+ "kind": "dotnet",
+ "language": "C#",
+ "what": "dotnet_plain with ConfuserEx-style identifier renaming (fixtures/bench/tools/dotnet_rename.py)",
+ "binary": {
+  "path": "bin/benchnet.dll",
+  "sha256": "748477c87f1cba369179a9a3322289646fead16f3dc2eea67b799074aea17b0e",
+  "size": 11264
+ },
+ "truth_source": "ECMA-335 metadata of the unobfuscated build",
+ "packed": false,
+ "packer": null,
+ "strings": [
+  "benchnet 1.0 - Rebuild Studio benchmark fixture",
+  "expected task:priority[:dep,dep]",
+  "unknown priority '",
+  "dependency cycle at '",
+  "benchnet: bad spec '"
+ ],
+ "dotnet": {
+  "types": [
+   {
+    "name": "BenchNet.Priority",
+    "kind": "enum",
+    "nested": false
+   },
+   {
+    "name": "BenchNet.ITaskSource",
+    "kind": "interface",
+    "nested": false
+   },
+   {
+    "name": "BenchNet.WorkItem",
+    "kind": "class",
+    "nested": false
+   },
+   {
+    "name": "BenchNet.ParseException",
+    "kind": "class",
+    "nested": false
+   },
+   {
+    "name": "BenchNet.ArgumentTaskSource",
+    "kind": "class",
+    "nested": false
+   },
+   {
+    "name": "BenchNet.Scheduler",
+    "kind": "class",
+    "nested": false
+   },
+   {
+    "name": "BenchNet.Report",
+    "kind": "class",
+    "nested": false
+   },
+   {
+    "name": "BenchNet.Program",
+    "kind": "class",
+    "nested": false
+   },
+   {
+    "name": "BenchNet.ArgumentTaskSource.<>O",
+    "kind": "class",
+    "nested": true
+   },
+   {
+    "name": "BenchNet.Scheduler.CycleException",
+    "kind": "class",
+    "nested": true
+   },
+   {
+    "name": "BenchNet.Scheduler.<>c",
+    "kind": "class",
+    "nested": true
+   },
+   {
+    "name": "BenchNet.Report.<>c",
+    "kind": "class",
+    "nested": true
+   }
+  ],
+  "methods": [
+   {
+    "type": "BenchNet.ITaskSource",
+    "name": "Load",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.WorkItem",
+    "name": "get_Name",
+    "special_name": true,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.WorkItem",
+    "name": "get_Priority",
+    "special_name": true,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.WorkItem",
+    "name": "get_DependsOn",
+    "special_name": true,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.WorkItem",
+    "name": ".ctor",
+    "special_name": true,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.WorkItem",
+    "name": "ToString",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.ParseException",
+    "name": "get_Spec",
+    "special_name": true,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.ParseException",
+    "name": ".ctor",
+    "special_name": true,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.ArgumentTaskSource",
+    "name": ".ctor",
+    "special_name": true,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.ArgumentTaskSource",
+    "name": "Load",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.ArgumentTaskSource",
+    "name": "ParseSpec",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.Scheduler",
+    "name": ".ctor",
+    "special_name": true,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.Scheduler",
+    "name": "TopologicalOrder",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.Scheduler",
+    "name": "Visit",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.Scheduler",
+    "name": "PriorityPlan",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.Report",
+    "name": "Stats",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.Report",
+    "name": "Join",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.Program",
+    "name": "Main",
+    "special_name": false,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.Scheduler.CycleException",
+    "name": ".ctor",
+    "special_name": true,
+    "compiler_generated": false
+   },
+   {
+    "type": "BenchNet.Scheduler.<>c",
+    "name": ".cctor",
+    "special_name": true,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Scheduler.<>c",
+    "name": ".ctor",
+    "special_name": true,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Scheduler.<>c",
+    "name": "<TopologicalOrder>b__3_0",
+    "special_name": false,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Scheduler.<>c",
+    "name": "<PriorityPlan>b__5_0",
+    "special_name": false,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Scheduler.<>c",
+    "name": "<PriorityPlan>b__5_1",
+    "special_name": false,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Report.<>c",
+    "name": ".cctor",
+    "special_name": true,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Report.<>c",
+    "name": ".ctor",
+    "special_name": true,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Report.<>c",
+    "name": "<Stats>b__0_0",
+    "special_name": false,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Report.<>c",
+    "name": "<Stats>b__0_1",
+    "special_name": false,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Report.<>c",
+    "name": "<Stats>b__0_2",
+    "special_name": false,
+    "compiler_generated": true
+   },
+   {
+    "type": "BenchNet.Report.<>c",
+    "name": "<Join>b__1_0",
+    "special_name": false,
+    "compiler_generated": true
+   }
+  ],
+  "assembly": {
+   "name": "benchnet",
+   "version": "1.0.0.0",
+   "culture": "neutral",
+   "public_key_token": "",
+   "flags": 0
+  }
+ },
+ "rename_report": {
+  "renamed": {
+   "priority": "RCBYVSha",
+   "Priority": "dEwlVaSb",
+   "get_Priority": "(renamed through its shared suffix)",
+   "Report": "elQgMc",
+   "Visit": "AhmDd",
+   "BenchNet": "xIppenFe",
+   "Stats": "FTsvf",
+   "items": "xMKrg",
+   "args": "rcbh",
+   "specs": "SUoYi",
+   "_specs": "(renamed through its shared suffix)",
+   "Scheduler": "zKENouDaj",
+   "order": "wqmvk",
+   "TopologicalOrder": "BSRMsVtcEKARtKxl",
+   "CycleException": "dDeXpPxuCIYWNm",
+   "Main": "llhn",
+   "PriorityPlan": "DNmPsKtbCVYo",
+   "DependsOn": "wPQXWhYop",
+   "get_DependsOn": "(renamed through its shared suffix)",
+   "WorkItem": "vwMbasNq",
+   "Program": "rJGpver",
+   "i": "s",
+   "state": "SaHwt",
+   "name": "LUeu",
+   "Name": "hxYv",
+   "_byName": "(renamed through its shared suffix)",
+   "get_Name": "qRkRBYJw",
+   "message": "FRhnwLx",
+   "Usage": "MbSby",
+   "ArgumentTaskSource": "BjalXpFSqfcZWSWAMz",
+   "ITaskSource": "RawuKqmJzrA",
+   "Load": "ZgjB",
+   "spec": "LrVC",
+   "Spec": "btMD",
+   "ParseSpec": "(renamed through its shared suffix)",
+   "get_Spec": "UxSPKbJE"
+  },
+  "skipped": {
+   "at": "suffix of an external reference name",
+   ".cctor": "special or compiler-generated name",
+   ".ctor": "also names an external reference",
+   "n": "suffix of an external reference name",
+   "ParseException": "heap entry shared with another string (suffix sharing)",
+   "Join": "also names an external reference",
+   "g": "suffix of an external reference name",
+   "ToString": "also names an external reference",
+   "<Priority>k__BackingField": "special or compiler-generated name",
+   "<DependsOn>k__BackingField": "special or compiler-generated name",
+   "<Name>k__BackingField": "special or compiler-generated name",
+   "<Spec>k__BackingField": "special or compiler-generated name",
+   "<0>__ParseSpec": "special or compiler-generated name",
+   "<>c": "special or compiler-generated name",
+   "<>O": "special or compiler-generated name",
+   "<Module>": "special or compiler-generated name",
+   "<>9": "special or compiler-generated name",
+   "<Stats>b__0_2": "special or compiler-generated name",
+   "<>9__0_2": "special or compiler-generated name",
+   "<PriorityPlan>b__5_1": "special or compiler-generated name",
+   "<>9__5_1": "special or compiler-generated name",
+   "<Stats>b__0_1": "special or compiler-generated name",
+   "<>9__0_1": "special or compiler-generated name",
+   "<PriorityPlan>b__5_0": "special or compiler-generated name",
+   "<>9__5_0": "special or compiler-generated name",
+   "<TopologicalOrder>b__3_0": "special or compiler-generated name",
+   "<>9__3_0": "special or compiler-generated name",
+   "<Join>b__1_0": "special or compiler-generated name",
+   "<>9__1_0": "special or compiler-generated name",
+   "<Stats>b__0_0": "special or compiler-generated name",
+   "<>9__0_0": "special or compiler-generated name"
+  },
+  "renamed_count": 36,
+  "skipped_count": 31
+ }
+}

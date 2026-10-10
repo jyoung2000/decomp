@@ -1,0 +1,2158 @@
+{
+ "schema": "rebuild-studio.bench-truth/1",
+ "row": "cpp_msvc_x64_o2",
+ "kind": "native_pe_x64",
+ "language": "C++",
+ "what": "C++17 classes, vtables, RTTI, exceptions, templates; MSVC /O2 /EHsc /GR, x64",
+ "binary": {
+  "path": "bin/benchcpp.exe",
+  "sha256": "7141fcfdfdb7a7c989792cdb1e8f5b991c0b42d22d6f3346d4a50e9fa5cb4c95",
+  "size": 29696
+ },
+ "truth_source": "benchcpp.pdb (MSF 7.00, read by tools/pdb_truth.py)",
+ "packed": false,
+ "packer": null,
+ "strings": [
+  "benchcpp 1.0 - Rebuild Studio benchmark fixture",
+  "circle radius must be positive",
+  "rectangle sides must be positive",
+  "triangle inequality violated",
+  "benchcpp: invalid shape: %s",
+  "shapes=%zu mean_area=%.3f max_area=%.3f",
+  "%s area=%.3f perimeter=%.3f",
+  "  (square perimeter %.1f)"
+ ],
+ "image_base": "0x140000000",
+ "machine": "0x8664",
+ "code_ranges": [
+  [
+   "0x140001000",
+   "0x140005200"
+  ]
+ ],
+ "imports": [
+  {
+   "lib": "msvcp140.dll",
+   "name": "?_Xout_of_range@std@@YAXPEBD@Z"
+  },
+  {
+   "lib": "msvcp140.dll",
+   "name": "?_Xlength_error@std@@YAXPEBD@Z"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "IsProcessorFeaturePresent"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetModuleHandleW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "RtlCaptureContext"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "RtlLookupFunctionEntry"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "RtlVirtualUnwind"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "UnhandledExceptionFilter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "SetUnhandledExceptionFilter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentProcess"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "TerminateProcess"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "InitializeSListHead"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "QueryPerformanceCounter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentProcessId"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentThreadId"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetSystemTimeAsFileTime"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "IsDebuggerPresent"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__std_exception_copy"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__std_exception_destroy"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "_CxxThrowException"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__current_exception_context"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__RTDynamicCast"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memchr"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memcmp"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memcpy"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memmove"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memset"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__C_specific_handler"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__current_exception"
+  },
+  {
+   "lib": "vcruntime140_1.dll",
+   "name": "__CxxFrameHandler4"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_set_app_type"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_seh_filter_exe"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_configure_narrow_argv"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_invalid_parameter_noinfo_noreturn"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_get_initial_narrow_environment"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initterm"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initterm_e"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initialize_narrow_environment"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "__p___argc"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "__p___argv"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_cexit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_c_exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_register_thread_local_exe_atexit_callback"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "terminate"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_crt_atexit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initialize_onexit_table"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_register_onexit_function"
+  },
+  {
+   "lib": "api-ms-win-crt-convert-l1-1-0.dll",
+   "name": "strtod"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__stdio_common_vfprintf"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__stdio_common_vsprintf"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__p__commode"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "puts"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__acrt_iob_func"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__stdio_common_vsprintf_s"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "_set_fmode"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fputs"
+  },
+  {
+   "lib": "api-ms-win-crt-math-l1-1-0.dll",
+   "name": "__setusermatherr"
+  },
+  {
+   "lib": "api-ms-win-crt-math-l1-1-0.dll",
+   "name": "sqrt"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "malloc"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "_callnewh"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "free"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "_set_new_mode"
+  },
+  {
+   "lib": "api-ms-win-crt-locale-l1-1-0.dll",
+   "name": "_configthreadlocale"
+  }
+ ],
+ "functions": [
+  {
+   "name": "std::operator+<char,std::char_traits<char>,std::allocator<char> >",
+   "aliases": [
+    "??$?HDU?$char_traits@D@std@@V?$allocator@D@1@@std@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@0@$$QEAV10@QEBD@Z"
+   ],
+   "start": "0x140001000",
+   "size": 200,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::operator+<char,std::char_traits<char>,std::allocator<char> >",
+   "aliases": [
+    "??$?HDU?$char_traits@D@std@@V?$allocator@D@1@@std@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@0@QEBDAEBV10@@Z"
+   ],
+   "start": "0x1400010d0",
+   "size": 326,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::vector<double,std::allocator<double> >::_Emplace_reallocate<double const &>",
+   "aliases": [
+    "??$_Emplace_reallocate@AEBN@?$vector@NV?$allocator@N@std@@@std@@QEAAPEANQEANAEBN@Z"
+   ],
+   "start": "0x140001220",
+   "size": 416,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::vector<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> >,std::allocator<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> > > >::_Emplace_reallocate<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> > >",
+   "aliases": [
+    "??$_Emplace_reallocate@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@@?$vector@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@V?$allocator@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@@2@@std@@QEAAPEAV?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@1@QEAV21@$$QEAV21@@Z"
+   ],
+   "start": "0x1400013c0",
+   "size": 581,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::_Tree_val<std::_Tree_simple_types<std::pair<std::basic_string<char,std::char_traits<char>,std::allocator<char> > const ,int> > >::_Erase_tree<std::allocator<std::_Tree_node<std::pair<std::basic_string<char,std::char_traits<char>,std::allocator<char> > const ,int>,void *> > >",
+   "aliases": [
+    "??$_Erase_tree@V?$allocator@U?$_Tree_node@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@PEAX@std@@@std@@@?$_Tree_val@U?$_Tree_simple_types@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@@std@@@std@@QEAAXAEAV?$allocator@U?$_Tree_node@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@PEAX@std@@@1@PEAU?$_Tree_node@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@PEAX@1@@Z"
+   ],
+   "start": "0x140001610",
+   "size": 192,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::basic_string<char,std::char_traits<char>,std::allocator<char> >::_Reallocate_grow_by<<lambda_65e615be2a453ca0576c979606f46740>,char const *,unsigned __int64>",
+   "aliases": [
+    "??$_Reallocate_grow_by@V<lambda_65e615be2a453ca0576c979606f46740>@@PEBD_K@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@AEAAAEAV01@_KV<lambda_65e615be2a453ca0576c979606f46740>@@PEBD_K@Z"
+   ],
+   "start": "0x1400016d0",
+   "size": 391,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::basic_string<char,std::char_traits<char>,std::allocator<char> >::_Reallocate_grow_by<<lambda_f3a66ab6a0570788f31503db83886f49>,unsigned __int64,char const *,unsigned __int64>",
+   "aliases": [
+    "??$_Reallocate_grow_by@V<lambda_f3a66ab6a0570788f31503db83886f49>@@_KPEBD_K@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@AEAAAEAV01@_KV<lambda_f3a66ab6a0570788f31503db83886f49>@@_KPEBD2@Z"
+   ],
+   "start": "0x140001860",
+   "size": 427,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::basic_string<char,std::char_traits<char>,std::allocator<char> >::basic_string<char,std::char_traits<char>,std::allocator<char> >",
+   "aliases": [
+    "??0?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@QEAA@QEBD@Z"
+   ],
+   "start": "0x140001a10",
+   "size": 56,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::basic_string<char,std::char_traits<char>,std::allocator<char> >::basic_string<char,std::char_traits<char>,std::allocator<char> >",
+   "aliases": [
+    "??0?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@QEAA@U_String_constructor_concat_tag@1@AEAV01@1@Z"
+   ],
+   "start": "0x140001a50",
+   "size": 419,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "bench::Circle::Circle",
+   "aliases": [
+    "??0Circle@bench@@QEAA@N@Z"
+   ],
+   "start": "0x140001c00",
+   "size": 115,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Rect::Rect",
+   "aliases": [
+    "??0Rect@bench@@QEAA@NN@Z"
+   ],
+   "start": "0x140001c80",
+   "size": 126,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::ShapeError::ShapeError",
+   "aliases": [
+    "??0ShapeError@bench@@QEAA@AEBV01@@Z"
+   ],
+   "start": "0x140001d00",
+   "size": 60,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::ShapeError::ShapeError",
+   "aliases": [
+    "??0ShapeError@bench@@QEAA@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z"
+   ],
+   "start": "0x140001d40",
+   "size": 81,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Square::Square",
+   "aliases": [
+    "??0Square@bench@@QEAA@N@Z"
+   ],
+   "start": "0x140001da0",
+   "size": 36,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Triangle::Triangle",
+   "aliases": [
+    "??0Triangle@bench@@QEAA@NNN@Z"
+   ],
+   "start": "0x140001dd0",
+   "size": 173,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "std::bad_alloc::bad_alloc",
+   "aliases": [
+    "??0bad_alloc@std@@QEAA@AEBV01@@Z"
+   ],
+   "start": "0x140001e80",
+   "size": 60,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::bad_array_new_length::bad_array_new_length",
+   "aliases": [
+    "??0bad_array_new_length@std@@QEAA@AEBV01@@Z"
+   ],
+   "start": "0x140001ec0",
+   "size": 60,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::bad_array_new_length::bad_array_new_length",
+   "aliases": [
+    "??0bad_array_new_length@std@@QEAA@XZ"
+   ],
+   "start": "0x140001f00",
+   "size": 33,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::exception::exception",
+   "aliases": [
+    "??0exception@std@@QEAA@AEBV01@@Z"
+   ],
+   "start": "0x140001f30",
+   "size": 50,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::runtime_error::runtime_error",
+   "aliases": [
+    "??0runtime_error@std@@QEAA@AEBV01@@Z"
+   ],
+   "start": "0x140001f70",
+   "size": 60,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "bench::Stats<double>::~Stats<double>",
+   "aliases": [
+    "std::vector<double,std::allocator<double> >::~vector<double,std::allocator<double> >",
+    "??1?$Stats@N@bench@@QEAA@XZ",
+    "??1?$vector@NV?$allocator@N@std@@@std@@QEAA@XZ"
+   ],
+   "start": "0x140001fb0",
+   "size": 92,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "std::_Alloc_construct_ptr<std::allocator<std::_Tree_node<std::pair<std::basic_string<char,std::char_traits<char>,std::allocator<char> > const ,int>,void *> > >::~_Alloc_construct_ptr<std::allocator<std::_Tree_node<std::pair<std::basic_string<char,std::char_traits<char>,std::allocator<char> > const ,int>,void *> > >",
+   "aliases": [
+    "??1?$_Alloc_construct_ptr@V?$allocator@U?$_Tree_node@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@PEAX@std@@@std@@@std@@QEAA@XZ"
+   ],
+   "start": "0x140002010",
+   "size": 20,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::basic_string<char,std::char_traits<char>,std::allocator<char> >::~basic_string<char,std::char_traits<char>,std::allocator<char> >",
+   "aliases": [
+    "??1?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@QEAA@XZ"
+   ],
+   "start": "0x140002030",
+   "size": 95,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,int,std::less<std::basic_string<char,std::char_traits<char>,std::allocator<char> > >,std::allocator<std::pair<std::basic_string<char,std::char_traits<char>,std::allocator<char> > const ,int> > >::~map<std::basic_string<char,std::char_traits<char>,std::allocator<char> >,int,std::less<std::basic_string<char,std::char_traits<char>,std::allocator<char> > >,std::allocator<std::pair<std::basic_string<char,std::char_traits<char>,std::allocator<char> > const ,int> > >",
+   "aliases": [
+    "??1?$map@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@HU?$less@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@V?$allocator@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@@2@@std@@QEAA@XZ"
+   ],
+   "start": "0x140002090",
+   "size": 42,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> >::~unique_ptr<bench::Shape,std::default_delete<bench::Shape> >",
+   "aliases": [
+    "??1?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@QEAA@XZ"
+   ],
+   "start": "0x1400020c0",
+   "size": 20,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::vector<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> >,std::allocator<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> > > >::~vector<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> >,std::allocator<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> > > >",
+   "aliases": [
+    "??1?$vector@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@V?$allocator@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@@2@@std@@QEAA@XZ"
+   ],
+   "start": "0x1400020e0",
+   "size": 153,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "bench::ShapeError::~ShapeError",
+   "aliases": [
+    "std::bad_alloc::~bad_alloc",
+    "std::bad_array_new_length::~bad_array_new_length",
+    "??1bad_array_new_length@std@@UEAA@XZ",
+    "??1bad_alloc@std@@UEAA@XZ",
+    "??1ShapeError@bench@@UEAA@XZ"
+   ],
+   "start": "0x140002180",
+   "size": 19,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Circle::`scalar deleting destructor'",
+   "aliases": [
+    "??_ECircle@bench@@UEAAPEAXI@Z",
+    "??_GCircle@bench@@UEAAPEAXI@Z"
+   ],
+   "start": "0x1400021a0",
+   "size": 33,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Rect::`scalar deleting destructor'",
+   "aliases": [
+    "bench::Square::`scalar deleting destructor'",
+    "??_GSquare@bench@@UEAAPEAXI@Z",
+    "??_ERect@bench@@UEAAPEAXI@Z",
+    "??_GRect@bench@@UEAAPEAXI@Z",
+    "??_ESquare@bench@@UEAAPEAXI@Z"
+   ],
+   "start": "0x1400021d0",
+   "size": 33,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::ShapeError::`scalar deleting destructor'",
+   "aliases": [
+    "std::bad_alloc::`scalar deleting destructor'",
+    "std::bad_array_new_length::`scalar deleting destructor'",
+    "std::exception::`scalar deleting destructor'",
+    "std::runtime_error::`scalar deleting destructor'",
+    "??_Gbad_array_new_length@std@@UEAAPEAXI@Z",
+    "??_Eexception@std@@UEAAPEAXI@Z",
+    "??_Gruntime_error@std@@UEAAPEAXI@Z",
+    "??_Gexception@std@@UEAAPEAXI@Z",
+    "??_GShapeError@bench@@UEAAPEAXI@Z",
+    "??_Ebad_array_new_length@std@@UEAAPEAXI@Z",
+    "??_Gbad_alloc@std@@UEAAPEAXI@Z",
+    "??_Ebad_alloc@std@@UEAAPEAXI@Z",
+    "??_EShapeError@bench@@UEAAPEAXI@Z",
+    "??_Eruntime_error@std@@UEAAPEAXI@Z"
+   ],
+   "start": "0x140002200",
+   "size": 66,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Triangle::`scalar deleting destructor'",
+   "aliases": [
+    "??_GTriangle@bench@@UEAAPEAXI@Z",
+    "??_ETriangle@bench@@UEAAPEAXI@Z"
+   ],
+   "start": "0x140002250",
+   "size": 33,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "std::vector<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> >,std::allocator<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> > > >::_Destroy",
+   "aliases": [
+    "?_Destroy@?$vector@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@V?$allocator@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@@2@@std@@AEAAXPEAV?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@2@0@Z"
+   ],
+   "start": "0x140002280",
+   "size": 59,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::_Tree_val<std::_Tree_simple_types<std::pair<std::basic_string<char,std::char_traits<char>,std::allocator<char> > const ,int> > >::_Insert_node",
+   "aliases": [
+    "?_Insert_node@?$_Tree_val@U?$_Tree_simple_types@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@@std@@@std@@QEAAPEAU?$_Tree_node@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@PEAX@2@U?$_Tree_id@PEAU?$_Tree_node@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@PEAX@std@@@2@QEAU32@@Z"
+   ],
+   "start": "0x1400022c0",
+   "size": 637,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::_Throw_bad_array_new_length",
+   "aliases": [
+    "__scrt_throw_std_bad_array_new_length",
+    "?__scrt_throw_std_bad_array_new_length@@YAXXZ",
+    "?_Throw_bad_array_new_length@std@@YAXXZ"
+   ],
+   "start": "0x140002540",
+   "size": 32,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::_Throw_tree_length_error",
+   "aliases": [
+    "?_Throw_tree_length_error@std@@YAXXZ"
+   ],
+   "start": "0x140002560",
+   "size": 17,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::_Xlen_string",
+   "aliases": [
+    "?_Xlen_string@std@@YAXXZ"
+   ],
+   "start": "0x140002580",
+   "size": 17,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::vector<double,std::allocator<double> >::_Xlength",
+   "aliases": [
+    "std::vector<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> >,std::allocator<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> > > >::_Xlength",
+    "?_Xlength@?$vector@NV?$allocator@N@std@@@std@@CAXXZ",
+    "?_Xlength@?$vector@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@V?$allocator@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@@2@@std@@CAXXZ"
+   ],
+   "start": "0x1400025a0",
+   "size": 17,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::_String_val<std::_Simple_types<char> >::_Xran",
+   "aliases": [
+    "?_Xran@?$_String_val@U?$_Simple_types@D@std@@@std@@SAXXZ"
+   ],
+   "start": "0x1400025c0",
+   "size": 17,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "bench::Stats<double>::add",
+   "aliases": [
+    "?add@?$Stats@N@bench@@QEAAXN@Z"
+   ],
+   "start": "0x1400025e0",
+   "size": 84,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "std::allocator<char>::allocate",
+   "aliases": [
+    "?allocate@?$allocator@D@std@@QEAAPEAD_K@Z"
+   ],
+   "start": "0x140002640",
+   "size": 89,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "bench::Circle::area",
+   "aliases": [
+    "?area@Circle@bench@@UEBANXZ"
+   ],
+   "start": "0x1400026a0",
+   "size": 19,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Rect::area",
+   "aliases": [
+    "?area@Rect@bench@@UEBANXZ"
+   ],
+   "start": "0x1400026c0",
+   "size": 11,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Triangle::area",
+   "aliases": [
+    "?area@Triangle@bench@@UEBANXZ"
+   ],
+   "start": "0x1400026d0",
+   "size": 78,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "std::basic_string<char,std::char_traits<char>,std::allocator<char> >::assign",
+   "aliases": [
+    "?assign@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@QEAAAEAV12@QEBD_K@Z"
+   ],
+   "start": "0x140002720",
+   "size": 349,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::basic_string<char,std::char_traits<char>,std::allocator<char> >::assign",
+   "aliases": [
+    "?assign@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@QEAAAEAV12@_KD@Z"
+   ],
+   "start": "0x140002880",
+   "size": 356,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::allocator<double>::deallocate",
+   "aliases": [
+    "std::allocator<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> > >::deallocate",
+    "?deallocate@?$allocator@V?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@@std@@QEAAXQEAV?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@2@_K@Z",
+    "?deallocate@?$allocator@N@std@@QEAAXQEAN_K@Z"
+   ],
+   "start": "0x1400029f0",
+   "size": 67,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "bench::Shape::describe",
+   "aliases": [
+    "?describe@Shape@bench@@UEBA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ"
+   ],
+   "start": "0x140002a40",
+   "size": 219,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Square::describe",
+   "aliases": [
+    "?describe@Square@bench@@UEBA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ"
+   ],
+   "start": "0x140002b20",
+   "size": 865,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Circle::kind",
+   "aliases": [
+    "?kind@Circle@bench@@UEBAPEBDXZ"
+   ],
+   "start": "0x140002e90",
+   "size": 8,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Rect::kind",
+   "aliases": [
+    "?kind@Rect@bench@@UEBAPEBDXZ"
+   ],
+   "start": "0x140002ea0",
+   "size": 8,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Square::kind",
+   "aliases": [
+    "?kind@Square@bench@@UEBAPEBDXZ"
+   ],
+   "start": "0x140002eb0",
+   "size": 8,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Triangle::kind",
+   "aliases": [
+    "?kind@Triangle@bench@@UEBAPEBDXZ"
+   ],
+   "start": "0x140002ec0",
+   "size": 8,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::make_shape",
+   "aliases": [
+    "?make_shape@bench@@YA?AV?$unique_ptr@VShape@bench@@U?$default_delete@VShape@bench@@@std@@@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@3@@Z"
+   ],
+   "start": "0x140002ed0",
+   "size": 1169,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Stats<double>::maximum",
+   "aliases": [
+    "?maximum@?$Stats@N@bench@@QEBANXZ"
+   ],
+   "start": "0x140003370",
+   "size": 53,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Stats<double>::mean",
+   "aliases": [
+    "?mean@?$Stats@N@bench@@QEBANXZ"
+   ],
+   "start": "0x1400033b0",
+   "size": 77,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::parse_numbers",
+   "aliases": [
+    "?parse_numbers@bench@@YA?AV?$vector@NV?$allocator@N@std@@@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@3@_K@Z"
+   ],
+   "start": "0x140003400",
+   "size": 598,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Circle::perimeter",
+   "aliases": [
+    "?perimeter@Circle@bench@@UEBANXZ"
+   ],
+   "start": "0x140003660",
+   "size": 14,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Rect::perimeter",
+   "aliases": [
+    "?perimeter@Rect@bench@@UEBANXZ"
+   ],
+   "start": "0x140003670",
+   "size": 15,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::Triangle::perimeter",
+   "aliases": [
+    "?perimeter@Triangle@bench@@UEBANXZ"
+   ],
+   "start": "0x140003680",
+   "size": 16,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench::print_summary",
+   "aliases": [
+    "?print_summary@bench@@YAXAEBV?$map@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@HU?$less@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@V?$allocator@U?$pair@$$CBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@std@@@2@@std@@AEBV?$Stats@N@1@@Z"
+   ],
+   "start": "0x140003690",
+   "size": 229,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "std::exception::what",
+   "aliases": [
+    "?what@exception@std@@UEBAPEBDXZ"
+   ],
+   "start": "0x140003780",
+   "size": 19,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__local_stdio_printf_options",
+   "aliases": [],
+   "start": "0x1400037a0",
+   "size": 8,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_scprintf",
+   "aliases": [],
+   "start": "0x1400037b0",
+   "size": 91,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "fprintf",
+   "aliases": [],
+   "start": "0x140003810",
+   "size": 69,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "main",
+   "aliases": [],
+   "start": "0x140003860",
+   "size": 1799,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "printf",
+   "aliases": [],
+   "start": "0x140003f70",
+   "size": 82,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "snprintf",
+   "aliases": [],
+   "start": "0x140003fd0",
+   "size": 92,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "sprintf_s",
+   "aliases": [],
+   "start": "0x140004030",
+   "size": 88,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "?_Xlength_error@std@@YAXPEBD@Z",
+   "aliases": [],
+   "start": "0x140004088",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "?_Xout_of_range@std@@YAXPEBD@Z",
+   "aliases": [],
+   "start": "0x14000408e",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "operator new",
+   "aliases": [
+    "??2@YAPEAX_K@Z"
+   ],
+   "start": "0x140004094",
+   "size": 60,
+   "module": "new_scalar.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "operator delete",
+   "aliases": [
+    "??3@YAXPEAX_K@Z"
+   ],
+   "start": "0x1400040d0",
+   "size": 5,
+   "module": "delete_scalar_size.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__GSHandlerCheck",
+   "aliases": [],
+   "start": "0x1400040d8",
+   "size": 29,
+   "module": "gshandler.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__GSHandlerCheckCommon",
+   "aliases": [],
+   "start": "0x1400040f8",
+   "size": 91,
+   "module": "gshandler.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__GSHandlerCheck_EH4",
+   "aliases": [],
+   "start": "0x140004154",
+   "size": 127,
+   "module": "gshandlereh4.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__security_check_cookie",
+   "aliases": [],
+   "start": "0x1400041f0",
+   "size": 30,
+   "module": "amdsecgs.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "type_info::`scalar deleting destructor'",
+   "aliases": [
+    "??_Gtype_info@@UEAAPEAXI@Z",
+    "??_Etype_info@@UEAAPEAXI@Z"
+   ],
+   "start": "0x140004210",
+   "size": 43,
+   "module": "std_type_info_static.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "pre_c_initialization",
+   "aliases": [],
+   "start": "0x14000423c",
+   "size": 182,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "post_pgo_initialization",
+   "aliases": [],
+   "start": "0x1400042f4",
+   "size": 16,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "pre_cpp_initialization",
+   "aliases": [],
+   "start": "0x140004304",
+   "size": 25,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_common_main_seh",
+   "aliases": [],
+   "start": "0x140004320",
+   "size": 380,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "mainCRTStartup",
+   "aliases": [],
+   "start": "0x14000449c",
+   "size": 18,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::bad_alloc::bad_alloc",
+   "aliases": [
+    "??0bad_alloc@std@@QEAA@XZ"
+   ],
+   "start": "0x1400044b0",
+   "size": 30,
+   "module": "throw_bad_alloc.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_throw_std_bad_alloc",
+   "aliases": [
+    "?__scrt_throw_std_bad_alloc@@YAXXZ"
+   ],
+   "start": "0x1400044d0",
+   "size": 32,
+   "module": "throw_bad_alloc.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "operator delete",
+   "aliases": [
+    "??3@YAXPEAX@Z"
+   ],
+   "start": "0x1400044f0",
+   "size": 5,
+   "module": "delete_scalar.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__raise_securityfailure",
+   "aliases": [],
+   "start": "0x1400044f8",
+   "size": 52,
+   "module": "gs_report.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__report_gsfailure",
+   "aliases": [],
+   "start": "0x14000452c",
+   "size": 210,
+   "module": "gs_report.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "capture_previous_context",
+   "aliases": [],
+   "start": "0x140004600",
+   "size": 113,
+   "module": "gs_report.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_acquire_startup_lock",
+   "aliases": [],
+   "start": "0x140004674",
+   "size": 57,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_crt",
+   "aliases": [],
+   "start": "0x1400046b0",
+   "size": 73,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_onexit_tables",
+   "aliases": [],
+   "start": "0x1400046fc",
+   "size": 139,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_nonwritable_in_current_image",
+   "aliases": [],
+   "start": "0x140004788",
+   "size": 152,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_release_startup_lock",
+   "aliases": [],
+   "start": "0x140004820",
+   "size": 36,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_uninitialize_crt",
+   "aliases": [],
+   "start": "0x140004844",
+   "size": 41,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_onexit",
+   "aliases": [],
+   "start": "0x140004870",
+   "size": 58,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "atexit",
+   "aliases": [],
+   "start": "0x1400048ac",
+   "size": 23,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__security_init_cookie",
+   "aliases": [],
+   "start": "0x1400048c4",
+   "size": 172,
+   "module": "gs_support.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_matherr",
+   "aliases": [
+    "_get_startup_commit_mode",
+    "_get_startup_new_mode",
+    "_get_startup_thread_locale_mode",
+    "__scrt_initialize_winrt",
+    "__scrt_stub_for_initialize_mta",
+    "__scrt_exe_initialize_mta"
+   ],
+   "start": "0x140004970",
+   "size": 3,
+   "module": "matherr.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_get_startup_argv_mode",
+   "aliases": [],
+   "start": "0x140004974",
+   "size": 6,
+   "module": "argv_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_get_startup_file_mode",
+   "aliases": [],
+   "start": "0x14000497c",
+   "size": 6,
+   "module": "file_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_type_info",
+   "aliases": [
+    "?__scrt_initialize_type_info@@YAXXZ"
+   ],
+   "start": "0x140004984",
+   "size": 14,
+   "module": "tncleanup.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_should_initialize_environment",
+   "aliases": [
+    "__scrt_stub_for_acrt_initialize",
+    "__scrt_stub_for_acrt_uninitialize",
+    "__vcrt_uninitialize",
+    "__acrt_uninitialize",
+    "__acrt_initialize",
+    "__vcrt_initialize"
+   ],
+   "start": "0x140004994",
+   "size": 3,
+   "module": "env_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_initialize_invalid_parameter_handler",
+   "aliases": [
+    "_initialize_denormal_control",
+    "_guard_check_icall_nop"
+   ],
+   "start": "0x140004998",
+   "size": 3,
+   "module": "invalid_parameter_handler.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__local_stdio_scanf_options",
+   "aliases": [],
+   "start": "0x14000499c",
+   "size": 8,
+   "module": "default_local_stdio_options.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_default_local_stdio_options",
+   "aliases": [],
+   "start": "0x1400049a4",
+   "size": 27,
+   "module": "default_local_stdio_options.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_user_matherr_present",
+   "aliases": [],
+   "start": "0x1400049c0",
+   "size": 12,
+   "module": "matherr_detection.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_get_dyn_tls_init_callback",
+   "aliases": [],
+   "start": "0x1400049cc",
+   "size": 8,
+   "module": "dyn_tls_init.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_get_dyn_tls_dtor_callback",
+   "aliases": [],
+   "start": "0x1400049d4",
+   "size": 8,
+   "module": "dyn_tls_dtor.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__crt_debugger_hook",
+   "aliases": [],
+   "start": "0x1400049dc",
+   "size": 8,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_fastfail",
+   "aliases": [],
+   "start": "0x1400049e4",
+   "size": 331,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_mta",
+   "aliases": [],
+   "start": "0x140004b30",
+   "size": 5,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_managed_app",
+   "aliases": [],
+   "start": "0x140004b38",
+   "size": 82,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_set_unhandled_exception_filter",
+   "aliases": [],
+   "start": "0x140004b8c",
+   "size": 14,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_unhandled_exception_filter",
+   "aliases": [],
+   "start": "0x140004b9c",
+   "size": 91,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_RTC_Initialize",
+   "aliases": [],
+   "start": "0x140004bf8",
+   "size": 60,
+   "module": "initsect.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_RTC_Terminate",
+   "aliases": [],
+   "start": "0x140004c34",
+   "size": 60,
+   "module": "initsect.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__isa_available_init",
+   "aliases": [],
+   "start": "0x140004c70",
+   "size": 417,
+   "module": "cpu_disp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_ucrt_dll_in_use",
+   "aliases": [],
+   "start": "0x140004e14",
+   "size": 12,
+   "module": "ucrt_detection.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__std_exception_copy",
+   "aliases": [],
+   "start": "0x140004e20",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__std_exception_destroy",
+   "aliases": [],
+   "start": "0x140004e26",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_CxxThrowException",
+   "aliases": [],
+   "start": "0x140004e2c",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__CxxFrameHandler4",
+   "aliases": [],
+   "start": "0x140004e32",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__RTDynamicCast",
+   "aliases": [],
+   "start": "0x140004e38",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "memchr",
+   "aliases": [],
+   "start": "0x140004e3e",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "memcmp",
+   "aliases": [],
+   "start": "0x140004e44",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "memcpy",
+   "aliases": [],
+   "start": "0x140004e4a",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "memmove",
+   "aliases": [],
+   "start": "0x140004e50",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "memset",
+   "aliases": [],
+   "start": "0x140004e56",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__C_specific_handler",
+   "aliases": [],
+   "start": "0x140004e5c",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__current_exception",
+   "aliases": [],
+   "start": "0x140004e62",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__current_exception_context",
+   "aliases": [],
+   "start": "0x140004e68",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "sqrt",
+   "aliases": [],
+   "start": "0x140004e6e",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_callnewh",
+   "aliases": [],
+   "start": "0x140004e74",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "malloc",
+   "aliases": [],
+   "start": "0x140004e7a",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_seh_filter_exe",
+   "aliases": [],
+   "start": "0x140004e80",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_set_app_type",
+   "aliases": [],
+   "start": "0x140004e86",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__setusermatherr",
+   "aliases": [],
+   "start": "0x140004e8c",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_configure_narrow_argv",
+   "aliases": [],
+   "start": "0x140004e92",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initialize_narrow_environment",
+   "aliases": [],
+   "start": "0x140004e98",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_get_initial_narrow_environment",
+   "aliases": [],
+   "start": "0x140004e9e",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initterm",
+   "aliases": [],
+   "start": "0x140004ea4",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initterm_e",
+   "aliases": [],
+   "start": "0x140004eaa",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "exit",
+   "aliases": [],
+   "start": "0x140004eb0",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_exit",
+   "aliases": [],
+   "start": "0x140004eb6",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_set_fmode",
+   "aliases": [],
+   "start": "0x140004ebc",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__p___argc",
+   "aliases": [],
+   "start": "0x140004ec2",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__p___argv",
+   "aliases": [],
+   "start": "0x140004ec8",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_cexit",
+   "aliases": [],
+   "start": "0x140004ece",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_c_exit",
+   "aliases": [],
+   "start": "0x140004ed4",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_register_thread_local_exe_atexit_callback",
+   "aliases": [],
+   "start": "0x140004eda",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_configthreadlocale",
+   "aliases": [],
+   "start": "0x140004ee0",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_set_new_mode",
+   "aliases": [],
+   "start": "0x140004ee6",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__p__commode",
+   "aliases": [],
+   "start": "0x140004eec",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "free",
+   "aliases": [],
+   "start": "0x140004ef2",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initialize_onexit_table",
+   "aliases": [],
+   "start": "0x140004ef8",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_register_onexit_function",
+   "aliases": [],
+   "start": "0x140004efe",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_crt_atexit",
+   "aliases": [],
+   "start": "0x140004f04",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "terminate",
+   "aliases": [],
+   "start": "0x140004f0a",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_guard_dispatch_icall_nop",
+   "aliases": [],
+   "start": "0x140004f20",
+   "size": 2,
+   "module": "guard_dispatch.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_guard_xfg_dispatch_icall_nop",
+   "aliases": [],
+   "start": "0x140004f40",
+   "size": 6,
+   "module": "guard_xfg_dispatch.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`std::vector<double,std::allocator<double> >::_Emplace_reallocate<double const &>'::`1'::catch$0",
+   "aliases": [],
+   "start": "0x140004f50",
+   "size": 40,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`std::vector<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> >,std::allocator<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> > > >::_Emplace_reallocate<std::unique_ptr<bench::Shape,std::default_delete<bench::Shape> > >'::`1'::catch$0",
+   "aliases": [],
+   "start": "0x140004f80",
+   "size": 70,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::Circle::Circle'::`1'::dtor$0",
+   "aliases": [
+    "`bench::Rect::Rect'::`1'::dtor$0",
+    "`bench::Triangle::Triangle'::`1'::dtor$0"
+   ],
+   "start": "0x140004fd0",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::Square::describe'::`1'::dtor$0",
+   "aliases": [],
+   "start": "0x140004fe0",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::Square::describe'::`1'::dtor$1",
+   "aliases": [],
+   "start": "0x140004ff0",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::Square::describe'::`1'::dtor$2",
+   "aliases": [],
+   "start": "0x140005000",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::Square::describe'::`1'::dtor$3",
+   "aliases": [],
+   "start": "0x140005010",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::make_shape'::`1'::dtor$0",
+   "aliases": [
+    "`bench::make_shape'::`1'::dtor$10",
+    "`bench::parse_numbers'::`1'::dtor$3"
+   ],
+   "start": "0x140005020",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::make_shape'::`1'::dtor$1",
+   "aliases": [
+    "`bench::make_shape'::`1'::dtor$9",
+    "`bench::parse_numbers'::`1'::dtor$2"
+   ],
+   "start": "0x140005030",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::make_shape'::`1'::dtor$2",
+   "aliases": [
+    "`bench::parse_numbers'::`1'::dtor$1"
+   ],
+   "start": "0x140005040",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::make_shape'::`1'::dtor$3",
+   "aliases": [],
+   "start": "0x140005050",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::make_shape'::`1'::dtor$16",
+   "aliases": [],
+   "start": "0x140005060",
+   "size": 29,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::make_shape'::`1'::dtor$19",
+   "aliases": [
+    "`bench::make_shape'::`1'::dtor$22"
+   ],
+   "start": "0x140005080",
+   "size": 29,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::make_shape'::`1'::dtor$25",
+   "aliases": [],
+   "start": "0x1400050a0",
+   "size": 29,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`bench::parse_numbers'::`1'::dtor$0",
+   "aliases": [],
+   "start": "0x1400050c0",
+   "size": 38,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "main$dtor$0",
+   "aliases": [],
+   "start": "0x1400050f0",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "main$dtor$1",
+   "aliases": [],
+   "start": "0x140005100",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "main$dtor$2",
+   "aliases": [],
+   "start": "0x140005110",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "main$dtor$3",
+   "aliases": [
+    "main$dtor$6"
+   ],
+   "start": "0x140005120",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "main$dtor$4",
+   "aliases": [],
+   "start": "0x140005130",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "main$dtor$19",
+   "aliases": [],
+   "start": "0x140005140",
+   "size": 12,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "main$catch$30",
+   "aliases": [],
+   "start": "0x140005150",
+   "size": 78,
+   "module": "benchcpp.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "`__scrt_common_main_seh'::`1'::filt$0",
+   "aliases": [],
+   "start": "0x14000519e",
+   "size": 30,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_nonwritable_in_current_image$filt$0",
+   "aliases": [],
+   "start": "0x1400051bc",
+   "size": 24,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  }
+ ],
+ "counts": {
+  "functions": 184,
+  "own_functions": 38,
+  "imports": 65
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "row": "dotnet_renamed",
+ "what": "dotnet_plain with ConfuserEx-style identifier renaming (fixtures/bench/tools/dotnet_rename.py)",
+ "toolchain": "dotnet SDK 8.0.424",
+ "commands": [
+  "dotnet build benchnet.csproj -c Release (Deterministic, Optimize, DebugType=none)",
+  "python fixtures/bench/tools/dotnet_rename.py benchnet.dll <out>/benchnet.dll"
+ ],
+ "stripped_how": "identifiers renamed in the #Strings heap (36 renamed, 31 kept)",
+ "binary_sha256": "748477c87f1cba369179a9a3322289646fead16f3dc2eea67b799074aea17b0e",
+ "binary_size": 11264,
+ "source": "dotnet_plain/src",
+ "reproduce": "python fixtures/bench/build_bench.py --rows dotnet_renamed"
+}

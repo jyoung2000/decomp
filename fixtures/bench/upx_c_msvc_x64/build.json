@@ -1,0 +1,15 @@
+{
+ "row": "upx_c_msvc_x64",
+ "what": "c_msvc_x64_o2 packed with UPX 5.2.1 --best (truth = the unpacked build)",
+ "toolchain": "MSVC cl 19.29.30159 (x64), VC tools 14.29.30133, Windows SDK 10.0.19041.0; upx 5.2.1 (sha256 d20ebe0b7b22b6be...)",
+ "commands": [
+  "cl /nologo /O2 /MD /W3 /GS /Zi /Brepro /DNDEBUG /utf-8 /c benchc.c",
+  "link /nologo /DEBUG:FULL /PDB:benchc.pdb /PDBALTPATH:benchc.pdb /OPT:REF /OPT:ICF /INCREMENTAL:NO /Brepro /SUBSYSTEM:CONSOLE /OUT:benchc.exe benchc.obj",
+  "upx --best --no-color -q -o benchc_upx.exe benchc.exe"
+ ],
+ "stripped_how": "packed: original sections compressed into UPX0/UPX1; truth is the unpacked build's PDB",
+ "binary_sha256": "ce95f751f9e3c96e2bd9a7ce70e340b888a975b432e5716e8e4af6653ec41af0",
+ "binary_size": 10240,
+ "source": "c_msvc_x64_o2/src/benchc.c",
+ "reproduce": "python fixtures/bench/build_bench.py --rows upx_c_msvc_x64"
+}

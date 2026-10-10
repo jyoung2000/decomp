@@ -1,0 +1,14 @@
+{
+ "row": "cpp_msvc_x64_o2",
+ "what": "C++17 classes, vtables, RTTI, exceptions, templates; MSVC /O2 /EHsc /GR, x64",
+ "toolchain": "MSVC cl 19.29.30159 (x64), VC tools 14.29.30133, Windows SDK 10.0.19041.0",
+ "commands": [
+  "cl /nologo /O2 /MD /W3 /GS /Zi /Brepro /DNDEBUG /utf-8 /EHsc /GR /std:c++17 /c benchcpp.cpp",
+  "link /nologo /DEBUG:FULL /PDB:benchcpp.pdb /PDBALTPATH:benchcpp.pdb /OPT:REF /OPT:ICF /INCREMENTAL:NO /Brepro /SUBSYSTEM:CONSOLE /OUT:benchcpp.exe benchcpp.obj"
+ ],
+ "stripped_how": "the PDB is not shipped; the exe only names it (PDBALTPATH) and carries no symbol table",
+ "binary_sha256": "7141fcfdfdb7a7c989792cdb1e8f5b991c0b42d22d6f3346d4a50e9fa5cb4c95",
+ "binary_size": 29696,
+ "source": "cpp_msvc_x64_o2/src/benchcpp.cpp",
+ "reproduce": "python fixtures/bench/build_bench.py --rows cpp_msvc_x64_o2"
+}

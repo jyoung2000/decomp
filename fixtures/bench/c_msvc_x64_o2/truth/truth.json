@@ -1,0 +1,1146 @@
+{
+ "schema": "rebuild-studio.bench-truth/1",
+ "row": "c_msvc_x64_o2",
+ "kind": "native_pe_x64",
+ "language": "C",
+ "what": "C CLI, MSVC /O2, x64, PDB not shipped (stripped)",
+ "binary": {
+  "path": "bin/benchc.exe",
+  "sha256": "06dd1b329db40f0c1bbb48e1c3bd3e5614cb339a62cb65b236a3a84af701cfa1",
+  "size": 15872
+ },
+ "truth_source": "benchc.pdb (MSF 7.00, read by tools/pdb_truth.py)",
+ "packed": false,
+ "packer": null,
+ "strings": [
+  "benchc 1.0 - Rebuild Studio benchmark fixture",
+  "usage: benchc <wc|crc|rle|b64|hist|sort|rev> <file>",
+  "benchc: cannot open '%s'",
+  "benchc: input larger than %u bytes",
+  "lines=%lu words=%lu bytes=%lu longest=%lu",
+  "crc32=%08lx size=%lu",
+  "rle: %lu -> %lu bytes, ratio %.3f",
+  "benchc: not a number: '%s'",
+  "count=%d min=%ld max=%ld sum=%ld mean=%.2f",
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+ ],
+ "image_base": "0x140000000",
+ "machine": "0x8664",
+ "code_ranges": [
+  [
+   "0x140001000",
+   "0x140002c00"
+  ]
+ ],
+ "imports": [
+  {
+   "lib": "kernel32.dll",
+   "name": "RtlCaptureContext"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "RtlLookupFunctionEntry"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "RtlVirtualUnwind"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "UnhandledExceptionFilter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "SetUnhandledExceptionFilter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentProcess"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "TerminateProcess"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "IsProcessorFeaturePresent"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "QueryPerformanceCounter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentProcessId"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentThreadId"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetSystemTimeAsFileTime"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "InitializeSListHead"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "IsDebuggerPresent"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetModuleHandleW"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "strchr"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__C_specific_handler"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__current_exception"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__current_exception_context"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memset"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__p__commode"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fputc"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__stdio_common_vfprintf"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fopen"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fputs"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fread"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "puts"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "_set_fmode"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__acrt_iob_func"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fclose"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "malloc"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "free"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "_set_new_mode"
+  },
+  {
+   "lib": "api-ms-win-crt-utility-l1-1-0.dll",
+   "name": "qsort"
+  },
+  {
+   "lib": "api-ms-win-crt-convert-l1-1-0.dll",
+   "name": "strtol"
+  },
+  {
+   "lib": "api-ms-win-crt-string-l1-1-0.dll",
+   "name": "tolower"
+  },
+  {
+   "lib": "api-ms-win-crt-string-l1-1-0.dll",
+   "name": "isspace"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_crt_atexit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_register_onexit_function"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_seh_filter_exe"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_set_app_type"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_c_exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_configure_narrow_argv"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initialize_narrow_environment"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_get_initial_narrow_environment"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initterm"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initterm_e"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "terminate"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "__p___argc"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "__p___argv"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_cexit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initialize_onexit_table"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_register_thread_local_exe_atexit_callback"
+  },
+  {
+   "lib": "api-ms-win-crt-math-l1-1-0.dll",
+   "name": "__setusermatherr"
+  },
+  {
+   "lib": "api-ms-win-crt-locale-l1-1-0.dll",
+   "name": "_configthreadlocale"
+  }
+ ],
+ "functions": [
+  {
+   "name": "__local_stdio_printf_options",
+   "aliases": [],
+   "start": "0x140001000",
+   "size": 8,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench_base64",
+   "aliases": [],
+   "start": "0x140001010",
+   "size": 282,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench_count",
+   "aliases": [],
+   "start": "0x140001130",
+   "size": 168,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench_crc32",
+   "aliases": [],
+   "start": "0x1400011e0",
+   "size": 90,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench_rle_encode",
+   "aliases": [],
+   "start": "0x140001240",
+   "size": 113,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_b64",
+   "aliases": [],
+   "start": "0x1400012c0",
+   "size": 96,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_crc",
+   "aliases": [],
+   "start": "0x140001320",
+   "size": 44,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_hist",
+   "aliases": [],
+   "start": "0x140001350",
+   "size": 279,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_rev",
+   "aliases": [],
+   "start": "0x140001470",
+   "size": 116,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_rle",
+   "aliases": [],
+   "start": "0x1400014f0",
+   "size": 186,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_sort",
+   "aliases": [],
+   "start": "0x1400015b0",
+   "size": 139,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_stats",
+   "aliases": [],
+   "start": "0x140001640",
+   "size": 279,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_wc",
+   "aliases": [],
+   "start": "0x140001760",
+   "size": 76,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "compare_lines",
+   "aliases": [],
+   "start": "0x1400017b0",
+   "size": 41,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "crc_init",
+   "aliases": [],
+   "start": "0x1400017e0",
+   "size": 197,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "fprintf",
+   "aliases": [],
+   "start": "0x1400018b0",
+   "size": 69,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "main",
+   "aliases": [],
+   "start": "0x140001900",
+   "size": 632,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "printf",
+   "aliases": [],
+   "start": "0x140001b80",
+   "size": 85,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "read_file",
+   "aliases": [],
+   "start": "0x140001be0",
+   "size": 273,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "reverse_in_place",
+   "aliases": [],
+   "start": "0x140001d00",
+   "size": 60,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "split_lines",
+   "aliases": [],
+   "start": "0x140001d40",
+   "size": 120,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "usage",
+   "aliases": [],
+   "start": "0x140001dc0",
+   "size": 93,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "__GSHandlerCheck",
+   "aliases": [],
+   "start": "0x140001e20",
+   "size": 29,
+   "module": "gshandler.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__GSHandlerCheckCommon",
+   "aliases": [],
+   "start": "0x140001e40",
+   "size": 91,
+   "module": "gshandler.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__security_check_cookie",
+   "aliases": [],
+   "start": "0x140001eb0",
+   "size": 30,
+   "module": "amdsecgs.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "pre_c_initialization",
+   "aliases": [],
+   "start": "0x140001ed0",
+   "size": 182,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "post_pgo_initialization",
+   "aliases": [],
+   "start": "0x140001f88",
+   "size": 16,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "pre_cpp_initialization",
+   "aliases": [],
+   "start": "0x140001f98",
+   "size": 25,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_common_main_seh",
+   "aliases": [],
+   "start": "0x140001fb4",
+   "size": 380,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "mainCRTStartup",
+   "aliases": [],
+   "start": "0x140002130",
+   "size": 18,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__raise_securityfailure",
+   "aliases": [],
+   "start": "0x140002144",
+   "size": 52,
+   "module": "gs_report.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__report_gsfailure",
+   "aliases": [],
+   "start": "0x140002178",
+   "size": 210,
+   "module": "gs_report.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "capture_previous_context",
+   "aliases": [],
+   "start": "0x14000224c",
+   "size": 113,
+   "module": "gs_report.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_acquire_startup_lock",
+   "aliases": [],
+   "start": "0x1400022c0",
+   "size": 57,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_crt",
+   "aliases": [],
+   "start": "0x1400022fc",
+   "size": 73,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_onexit_tables",
+   "aliases": [],
+   "start": "0x140002348",
+   "size": 139,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_nonwritable_in_current_image",
+   "aliases": [],
+   "start": "0x1400023d4",
+   "size": 152,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_release_startup_lock",
+   "aliases": [],
+   "start": "0x14000246c",
+   "size": 36,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_uninitialize_crt",
+   "aliases": [],
+   "start": "0x140002490",
+   "size": 41,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_onexit",
+   "aliases": [],
+   "start": "0x1400024bc",
+   "size": 58,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "atexit",
+   "aliases": [],
+   "start": "0x1400024f8",
+   "size": 23,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__security_init_cookie",
+   "aliases": [],
+   "start": "0x140002510",
+   "size": 172,
+   "module": "gs_support.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_matherr",
+   "aliases": [
+    "_get_startup_commit_mode",
+    "_get_startup_new_mode",
+    "_get_startup_thread_locale_mode",
+    "__scrt_initialize_winrt",
+    "__scrt_stub_for_initialize_mta",
+    "__scrt_exe_initialize_mta"
+   ],
+   "start": "0x1400025bc",
+   "size": 3,
+   "module": "matherr.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_get_startup_argv_mode",
+   "aliases": [],
+   "start": "0x1400025c0",
+   "size": 6,
+   "module": "argv_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_get_startup_file_mode",
+   "aliases": [],
+   "start": "0x1400025c8",
+   "size": 6,
+   "module": "file_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_type_info",
+   "aliases": [
+    "?__scrt_initialize_type_info@@YAXXZ"
+   ],
+   "start": "0x1400025d0",
+   "size": 14,
+   "module": "tncleanup.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_should_initialize_environment",
+   "aliases": [
+    "__scrt_stub_for_acrt_initialize",
+    "__scrt_stub_for_acrt_uninitialize",
+    "__vcrt_uninitialize",
+    "__acrt_uninitialize",
+    "__acrt_initialize",
+    "__vcrt_initialize"
+   ],
+   "start": "0x1400025e0",
+   "size": 3,
+   "module": "env_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_initialize_invalid_parameter_handler",
+   "aliases": [
+    "_initialize_denormal_control",
+    "_guard_check_icall_nop"
+   ],
+   "start": "0x1400025e4",
+   "size": 3,
+   "module": "invalid_parameter_handler.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__local_stdio_scanf_options",
+   "aliases": [],
+   "start": "0x1400025e8",
+   "size": 8,
+   "module": "default_local_stdio_options.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_default_local_stdio_options",
+   "aliases": [],
+   "start": "0x1400025f0",
+   "size": 27,
+   "module": "default_local_stdio_options.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_user_matherr_present",
+   "aliases": [],
+   "start": "0x14000260c",
+   "size": 12,
+   "module": "matherr_detection.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_get_dyn_tls_init_callback",
+   "aliases": [],
+   "start": "0x140002618",
+   "size": 8,
+   "module": "dyn_tls_init.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_get_dyn_tls_dtor_callback",
+   "aliases": [],
+   "start": "0x140002620",
+   "size": 8,
+   "module": "dyn_tls_dtor.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__crt_debugger_hook",
+   "aliases": [],
+   "start": "0x140002628",
+   "size": 8,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_fastfail",
+   "aliases": [],
+   "start": "0x140002630",
+   "size": 331,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_mta",
+   "aliases": [],
+   "start": "0x14000277c",
+   "size": 5,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_managed_app",
+   "aliases": [],
+   "start": "0x140002784",
+   "size": 82,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_set_unhandled_exception_filter",
+   "aliases": [],
+   "start": "0x1400027d8",
+   "size": 14,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_unhandled_exception_filter",
+   "aliases": [],
+   "start": "0x1400027e8",
+   "size": 91,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_RTC_Initialize",
+   "aliases": [],
+   "start": "0x140002844",
+   "size": 60,
+   "module": "initsect.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_RTC_Terminate",
+   "aliases": [],
+   "start": "0x140002880",
+   "size": 60,
+   "module": "initsect.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__isa_available_init",
+   "aliases": [],
+   "start": "0x1400028bc",
+   "size": 417,
+   "module": "cpu_disp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_ucrt_dll_in_use",
+   "aliases": [],
+   "start": "0x140002a60",
+   "size": 12,
+   "module": "ucrt_detection.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "strchr",
+   "aliases": [],
+   "start": "0x140002a70",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__C_specific_handler",
+   "aliases": [],
+   "start": "0x140002a76",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__current_exception",
+   "aliases": [],
+   "start": "0x140002a7c",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__current_exception_context",
+   "aliases": [],
+   "start": "0x140002a82",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "memset",
+   "aliases": [],
+   "start": "0x140002a88",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_seh_filter_exe",
+   "aliases": [],
+   "start": "0x140002a8e",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_set_app_type",
+   "aliases": [],
+   "start": "0x140002a94",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__setusermatherr",
+   "aliases": [],
+   "start": "0x140002a9a",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_configure_narrow_argv",
+   "aliases": [],
+   "start": "0x140002aa0",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initialize_narrow_environment",
+   "aliases": [],
+   "start": "0x140002aa6",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_get_initial_narrow_environment",
+   "aliases": [],
+   "start": "0x140002aac",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initterm",
+   "aliases": [],
+   "start": "0x140002ab2",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initterm_e",
+   "aliases": [],
+   "start": "0x140002ab8",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "exit",
+   "aliases": [],
+   "start": "0x140002abe",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_exit",
+   "aliases": [],
+   "start": "0x140002ac4",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_set_fmode",
+   "aliases": [],
+   "start": "0x140002aca",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__p___argc",
+   "aliases": [],
+   "start": "0x140002ad0",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__p___argv",
+   "aliases": [],
+   "start": "0x140002ad6",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_cexit",
+   "aliases": [],
+   "start": "0x140002adc",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_c_exit",
+   "aliases": [],
+   "start": "0x140002ae2",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_register_thread_local_exe_atexit_callback",
+   "aliases": [],
+   "start": "0x140002ae8",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_configthreadlocale",
+   "aliases": [],
+   "start": "0x140002aee",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_set_new_mode",
+   "aliases": [],
+   "start": "0x140002af4",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__p__commode",
+   "aliases": [],
+   "start": "0x140002afa",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initialize_onexit_table",
+   "aliases": [],
+   "start": "0x140002b00",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_register_onexit_function",
+   "aliases": [],
+   "start": "0x140002b06",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_crt_atexit",
+   "aliases": [],
+   "start": "0x140002b0c",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "terminate",
+   "aliases": [],
+   "start": "0x140002b12",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_guard_dispatch_icall_nop",
+   "aliases": [],
+   "start": "0x140002b30",
+   "size": 2,
+   "module": "guard_dispatch.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_guard_xfg_dispatch_icall_nop",
+   "aliases": [],
+   "start": "0x140002b50",
+   "size": 6,
+   "module": "guard_xfg_dispatch.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`__scrt_common_main_seh'::`1'::filt$0",
+   "aliases": [],
+   "start": "0x140002b56",
+   "size": 30,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_nonwritable_in_current_image$filt$0",
+   "aliases": [],
+   "start": "0x140002b74",
+   "size": 24,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  }
+ ],
+ "counts": {
+  "functions": 95,
+  "own_functions": 22,
+  "imports": 57
+ }
+}

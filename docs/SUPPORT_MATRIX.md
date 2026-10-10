@@ -23,6 +23,10 @@
 | Cutter plugin | – | Cutter Python plugin + stdlib client | cutter commit d7f11b22 (2.5.0 dev) | 20 client tests vs real controller; Qt dock smoke offscreen | gate: load inside Cutter on Windows |
 | Windows packaging | – | PowerShell scripts + NSIS + PyInstaller | pwsh 7.5.4 parse; pyinstaller pinned in scripts/windows | parse/dry-run/actionlint only | gates W1–W20 (docs/WINDOWS_RELEASE_GATES.md) |
 
+## Measured analysis quality (R0 benchmark)
+
+Numbers, not adjectives: [`reports/benchmark.md`](../reports/benchmark.md) scores the no-AI analysis (rizin 0.9.1 + rz-ghidra for native code, ILSpy for .NET) against ground truth from our own sources in `fixtures/bench/` (MSVC C/C++ x64/x86, Go PE + stripped ELF, Rust, UPX-packed PE, .NET plain + renamed): function-boundary recall/precision, named-function recall, real-decompiler coverage, imports/strings recall, packed detection, per-stage time. Rows the build host could not produce (mingw, gcc ELF, Unity IL2CPP, GameMaker) are listed there as "not run". Regenerate with `python scripts/benchmark.py`.
+
 ## Input kinds: what is promised, per kind
 
 Rebuild Studio does **not** promise full source recovery for arbitrary apps. For every input kind the detection result carries a

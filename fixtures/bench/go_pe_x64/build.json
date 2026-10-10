@@ -1,0 +1,14 @@
+{
+ "row": "go_pe_x64",
+ "what": "Go windows/amd64, -ldflags '-s -w' (symbol table and DWARF stripped)",
+ "toolchain": "go version go1.27.0 windows/amd64",
+ "commands": [
+  "GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o benchgo.exe .",
+  "(truth build) go build -trimpath -buildvcs=false -ldflags=-buildid= -o sym_benchgo.exe ."
+ ],
+ "stripped_how": "-ldflags '-s -w' removes the symbol table and DWARF (pclntab remains, as in every Go binary)",
+ "binary_sha256": "21f80550484b981ce47a64c751a57842938318a501bd72d8e48f0147a330dae2",
+ "binary_size": 2760192,
+ "source": "go_pe_x64/src",
+ "reproduce": "python fixtures/bench/build_bench.py --rows go_pe_x64"
+}

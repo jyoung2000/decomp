@@ -1,0 +1,14 @@
+{
+ "row": "c_msvc_x86_o2",
+ "what": "same C source, MSVC /O2, 32-bit PE (x86), PDB not shipped",
+ "toolchain": "MSVC cl 19.29.30159 (x86), VC tools 14.29.30133, Windows SDK 10.0.19041.0",
+ "commands": [
+  "cl /nologo /O2 /MD /W3 /GS /Zi /Brepro /DNDEBUG /utf-8 /c benchc.c",
+  "link /nologo /DEBUG:FULL /PDB:benchc32.pdb /PDBALTPATH:benchc32.pdb /OPT:REF /OPT:ICF /INCREMENTAL:NO /Brepro /SUBSYSTEM:CONSOLE /OUT:benchc32.exe benchc.obj"
+ ],
+ "stripped_how": "the PDB is not shipped; the exe only names it (PDBALTPATH) and carries no symbol table",
+ "binary_sha256": "05f9dccd75e219c4223411b1f0edfc691f123d5694ad0705136c0f29560465be",
+ "binary_size": 12800,
+ "source": "c_msvc_x64_o2/src/benchc.c",
+ "reproduce": "python fixtures/bench/build_bench.py --rows c_msvc_x86_o2"
+}

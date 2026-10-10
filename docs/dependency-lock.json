@@ -371,6 +371,35 @@
       "minimum_version": "14.38.0.0"
     }
   },
+  "fixture_build_tools": {
+    "$comment": "Tools used only to build test/benchmark fixtures (fixtures/bench/build_bench.py); never installed by Setup-Dependencies or the Tools page. R1 may promote upx to 'tools' for consented 'upx -d'.",
+    "upx": {
+      "version": "5.2.1",
+      "role": "Packs the upx_c_msvc_x64 benchmark row (upx --best). Fixture build only.",
+      "license": "GPL-2.0-or-later with the UPX exception (see COPYING/LICENSE in the archive)",
+      "source": {
+        "repo": "https://github.com/upx/upx",
+        "tag": "v5.2.1"
+      },
+      "artifact": {
+        "name": "upx-5.2.1-win64.zip",
+        "url": "https://github.com/upx/upx/releases/download/v5.2.1/upx-5.2.1-win64.zip",
+        "size_bytes": 680290,
+        "sha256": "eabc6792a347d45e945be7748423e7868fd01b0d2bcaa2f4b1031fd71ff69bda",
+        "verify_required": true,
+        "hash_provenance": "2026-10-10 on Windows 11: downloaded from the official GitHub release (published 2026-08-27); sha256 computed locally equals the GitHub release asset digest (sha256:eabc6792...)."
+      },
+      "layout": {
+        "archive_root": "upx-5.2.1-win64",
+        "entry": "upx.exe",
+        "entry_sha256": "d20ebe0b7b22b6be968c8c34be61f94ddea12cb11462e2cec27f548ef9574df8",
+        "version_args": [
+          "--version"
+        ]
+      },
+      "install_dir": "upx"
+    }
+  },
   "build_toolchain": {
     "rust": {
       "toolchain": "1.97.0",

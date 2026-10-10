@@ -1,0 +1,4192 @@
+{
+ "schema": "rebuild-studio.bench-truth/1",
+ "row": "rust_msvc_x64",
+ "kind": "native_pe_x64",
+ "language": "Rust",
+ "what": "Rust release (opt-level 3), x86_64-pc-windows-msvc, PDB not shipped",
+ "binary": {
+  "path": "bin/benchrs.exe",
+  "sha256": "79ade84727af733b9f92a969e9a37c9aea5c01c94bb1eac645d53f12c3ec525d",
+  "size": 159744
+ },
+ "truth_source": "benchrs.pdb (MSF 7.00, read by tools/pdb_truth.py)",
+ "packed": false,
+ "packer": null,
+ "strings": [
+  "benchrs 1.0 - Rebuild Studio benchmark fixture",
+  "benchrs: cannot parse '",
+  "matrix n=",
+  "trace(m^3)=",
+  "primes<="
+ ],
+ "image_base": "0x140000000",
+ "machine": "0x8664",
+ "code_ranges": [
+  [
+   "0x140001000",
+   "0x14001be00"
+  ]
+ ],
+ "imports": [
+  {
+   "lib": "api-ms-win-core-synch-l1-2-0.dll",
+   "name": "WakeByAddressAll"
+  },
+  {
+   "lib": "api-ms-win-core-synch-l1-2-0.dll",
+   "name": "WaitOnAddress"
+  },
+  {
+   "lib": "api-ms-win-core-synch-l1-2-0.dll",
+   "name": "WakeByAddressSingle"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "FlsSetValue"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "SetUnhandledExceptionFilter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "UnhandledExceptionFilter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "IsDebuggerPresent"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "InitializeSListHead"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetLastError"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "CloseHandle"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "WaitForSingleObject"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "SetLastError"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentThreadId"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetStdHandle"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentProcess"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetProcessHeap"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "HeapFree"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "HeapReAlloc"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "QueryPerformanceCounter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentProcessId"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "RtlCaptureContext"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "RtlLookupFunctionEntry"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "RtlVirtualUnwind"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "AddVectoredExceptionHandler"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "SetThreadStackGuarantee"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentThread"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentDirectoryW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCommandLineW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "lstrlenW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "ExitProcess"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetProcAddress"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "WideCharToMultiByte"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "WaitForSingleObjectEx"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "LoadLibraryA"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "CreateMutexA"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "ReleaseMutex"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetEnvironmentVariableW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "HeapAlloc"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetModuleFileNameW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "MultiByteToWideChar"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "WriteConsoleW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetConsoleMode"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetConsoleOutputCP"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "FlsFree"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "FlsAlloc"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetModuleHandleExW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetModuleHandleW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "IsProcessorFeaturePresent"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "IsThreadAFiber"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "FormatMessageW"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetModuleHandleA"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetSystemTimeAsFileTime"
+  },
+  {
+   "lib": "ntdll.dll",
+   "name": "NtWriteFile"
+  },
+  {
+   "lib": "ntdll.dll",
+   "name": "RtlNtStatusToDosError"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memset"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__current_exception_context"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__CxxFrameHandler3"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "_CxxThrowException"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__C_specific_handler"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__current_exception"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memmove"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memcmp"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memcpy"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initialize_narrow_environment"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_get_initial_narrow_environment"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initterm"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_configure_narrow_argv"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_set_app_type"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "__p___argc"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "__p___argv"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_cexit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_c_exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_register_thread_local_exe_atexit_callback"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "terminate"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_seh_filter_exe"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initterm_e"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initialize_onexit_table"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_register_onexit_function"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_crt_atexit"
+  },
+  {
+   "lib": "api-ms-win-crt-math-l1-1-0.dll",
+   "name": "__setusermatherr"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "_set_fmode"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__p__commode"
+  },
+  {
+   "lib": "api-ms-win-crt-locale-l1-1-0.dll",
+   "name": "_configthreadlocale"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "free"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "_set_new_mode"
+  }
+ ],
+ "functions": [
+  {
+   "name": "core::ptr::drop_glue<alloc::vec::Vec<alloc::string::String,alloc::alloc::Global> >",
+   "aliases": [],
+   "start": "0x140001000",
+   "size": 115,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<core::iter::adapters::skip::Skip<std::env::Args> >",
+   "aliases": [],
+   "start": "0x140001080",
+   "size": 124,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<alloc::collections::btree::map::BTreeMap<alloc::string::String,usize,alloc::alloc::Global> >",
+   "aliases": [],
+   "start": "0x140001100",
+   "size": 219,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<alloc::collections::btree::map::IntoIter<alloc::string::String,usize,alloc::alloc::Global> >",
+   "aliases": [],
+   "start": "0x1400011e0",
+   "size": 120,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::backtrace::__rust_begin_short_backtrace<void (*)(),tuple$<> >",
+   "aliases": [],
+   "start": "0x140001260",
+   "size": 12,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::rt::lang_start::closure$0<tuple$<> >",
+   "aliases": [
+    "core::ops::function::FnOnce::call_once<std::rt::lang_start::closure_env$0<tuple$<> >,tuple$<> >"
+   ],
+   "start": "0x140001270",
+   "size": 19,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "benchrs::parse_usize",
+   "aliases": [],
+   "start": "0x140001290",
+   "size": 330,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "benchrs::word_frequencies",
+   "aliases": [],
+   "start": "0x1400013e0",
+   "size": 4999,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "benchrs::run",
+   "aliases": [],
+   "start": "0x140002770",
+   "size": 1543,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "benchrs::main",
+   "aliases": [
+    "_RNvCsiDumyBMkl8M_7benchrs4main"
+   ],
+   "start": "0x140002d80",
+   "size": 1383,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "benchrs::sieve",
+   "aliases": [],
+   "start": "0x1400032f0",
+   "size": 545,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "benchrs::Matrix::identity_plus",
+   "aliases": [],
+   "start": "0x140003520",
+   "size": 391,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "benchrs::Matrix::trace",
+   "aliases": [],
+   "start": "0x1400036b0",
+   "size": 93,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "benchrs::Matrix::multiply",
+   "aliases": [],
+   "start": "0x140003710",
+   "size": 1087,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "alloc::collections::btree::map::IntoIter<alloc::string::String,usize,alloc::alloc::Global>::dying_next<alloc::string::String,usize,alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x140003b50",
+   "size": 969,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "benchrs::impl$0::fmt",
+   "aliases": [],
+   "start": "0x140003f20",
+   "size": 121,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "core::fmt::impl$80::fmt<ref$<usize> >",
+   "aliases": [],
+   "start": "0x140003fa0",
+   "size": 36,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$82::fmt<alloc::string::String>",
+   "aliases": [],
+   "start": "0x140003fd0",
+   "size": 19,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$82::fmt<str$>",
+   "aliases": [],
+   "start": "0x140003ff0",
+   "size": 18,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::option::impl$55::fmt<ref$<usize> >",
+   "aliases": [],
+   "start": "0x140004010",
+   "size": 87,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::string::impl$28::fmt",
+   "aliases": [],
+   "start": "0x140004070",
+   "size": 19,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::iter::traits::iterator::Iterator::nth<std::env::Args>",
+   "aliases": [],
+   "start": "0x140004090",
+   "size": 119,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "main",
+   "aliases": [],
+   "start": "0x140004110",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvCs1njKG4L9aB3_7___rustc12___rust_alloc",
+   "aliases": [],
+   "start": "0x140004150",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvCs1njKG4L9aB3_7___rustc14___rust_dealloc",
+   "aliases": [],
+   "start": "0x140004160",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvCs1njKG4L9aB3_7___rustc14___rust_realloc",
+   "aliases": [],
+   "start": "0x140004170",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvCs1njKG4L9aB3_7___rustc19___rust_alloc_zeroed",
+   "aliases": [],
+   "start": "0x140004180",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvCs1njKG4L9aB3_7___rustc35___rust_no_alloc_shim_is_unstable_v2",
+   "aliases": [],
+   "start": "0x140004190",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "alloc::vec::Vec::extend_desugared<u16,alloc::alloc::Global,std::os::windows::ffi::EncodeWide>",
+   "aliases": [],
+   "start": "0x1400041a0",
+   "size": 376,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<enum2$<core::result::Result<tuple$<>,core::io::error::Error> > >",
+   "aliases": [],
+   "start": "0x140004320",
+   "size": 63,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<alloc::vec::Vec<std::ffi::os_str::OsString,alloc::alloc::Global> >",
+   "aliases": [],
+   "start": "0x140004360",
+   "size": 129,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<alloc::vec::Vec<u8,alloc::alloc::Global> >",
+   "aliases": [
+    "core::ptr::drop_glue<alloc::string::String>",
+    "core::ptr::drop_glue<std::ffi::os_str::OsString>"
+   ],
+   "start": "0x1400043f0",
+   "size": 24,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<alloc::sync::Arc<std::sync::poison::mutex::Mutex<alloc::vec::Vec<u8,alloc::alloc::Global> >,alloc::alloc::Global> >",
+   "aliases": [],
+   "start": "0x140004410",
+   "size": 15,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<std::sync::reentrant_lock::ReentrantLockGuard<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > > >",
+   "aliases": [],
+   "start": "0x140004420",
+   "size": 33,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> >",
+   "aliases": [],
+   "start": "0x140004450",
+   "size": 180,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<std::sync::poison::mutex::MutexGuard<alloc::vec::Vec<u8,alloc::alloc::Global> > >",
+   "aliases": [],
+   "start": "0x140004510",
+   "size": 80,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<std::sync::nonpoison::rwlock::RwLockReadGuard<enum2$<std::panicking::Hook> > >",
+   "aliases": [],
+   "start": "0x140004560",
+   "size": 27,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<std::io::default_write_fmt::Adapter<alloc::vec::Vec<u8,alloc::alloc::Global> > >",
+   "aliases": [],
+   "start": "0x140004580",
+   "size": 64,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<std::sys::backtrace::_print_fmt::closure_env$0>",
+   "aliases": [
+    "core::ptr::drop_glue<std::panicking::panic_handler::FormatStringPayload>"
+   ],
+   "start": "0x1400045c0",
+   "size": 24,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<core::io::error::Error>",
+   "aliases": [],
+   "start": "0x1400045e0",
+   "size": 58,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<std::io::buffered::bufwriter::impl$1::flush_buf::BufGuard>",
+   "aliases": [],
+   "start": "0x140004620",
+   "size": 85,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::rt::handle_rt_panic<isize>",
+   "aliases": [],
+   "start": "0x140004680",
+   "size": 60,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::backtrace::__rust_end_short_backtrace<std::alloc::rust_oom::closure_env$0,never$>",
+   "aliases": [
+    "_RINvNtNtCse0R8cuyqEa_3std3sys9backtrace26___rust_end_short_backtraceNCNvNtB6_5alloc8rust_oom0zEB6_"
+   ],
+   "start": "0x1400046c0",
+   "size": 17,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::backtrace::__rust_end_short_backtrace<std::panicking::panic_handler::closure_env$0,never$>",
+   "aliases": [
+    "_RINvNtNtCse0R8cuyqEa_3std3sys9backtrace26___rust_end_short_backtraceNCNvNtB6_9panicking13panic_handler0zEB6_"
+   ],
+   "start": "0x1400046e0",
+   "size": 17,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::thread_local::native::eager::destroy<core::cell::Cell<enum2$<core::option::Option<alloc::sync::Arc<std::sync::poison::mutex::Mutex<alloc::vec::Vec<u8,alloc::alloc::Global> >,alloc::alloc::Global> > > > >",
+   "aliases": [],
+   "start": "0x140004700",
+   "size": 24,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sync::once::impl$2::call_once_force::closure$0<std::sync::once_lock::impl$0::initialize::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::sync::once_lock::impl$0::get_or_init::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::io::stdio::stdout::closure_env$0>,never$> >",
+   "aliases": [
+    "core::ops::function::FnOnce::call_once<std::sync::once::impl$2::call_once_force::closure_env$0<std::sync::once_lock::impl$0::initialize::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::sync::once_lock::impl$0::get_or_init::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::io::stdio::stdout::closure_env$0>,never$> >,tuple$<ref$<std::sync::once::OnceState> > >"
+   ],
+   "start": "0x140004720",
+   "size": 153,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sync::once::impl$2::call_once_force::closure$0<std::sync::once_lock::impl$0::initialize::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::sync::once_lock::impl$0::get_or_init::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::io::stdio::cleanup::closure_env$0>,never$> >",
+   "aliases": [
+    "core::ops::function::FnOnce::call_once<std::sync::once::impl$2::call_once_force::closure_env$0<std::sync::once_lock::impl$0::initialize::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::sync::once_lock::impl$0::get_or_init::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::io::stdio::cleanup::closure_env$0>,never$> >,tuple$<ref$<std::sync::once::OnceState> > >"
+   ],
+   "start": "0x1400047c0",
+   "size": 125,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sync::once::impl$2::call_once::closure$0<std::rt::cleanup::closure_env$0>",
+   "aliases": [],
+   "start": "0x140004840",
+   "size": 577,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::thread::current::with_current_name::closure$0<std::panicking::default_hook::closure$0::closure_env$0,tuple$<> >",
+   "aliases": [],
+   "start": "0x140004a90",
+   "size": 938,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::thread::current::with_current_name::closure$0<std::sys::pal::windows::stack_overflow::vectored_handler::closure_env$0,tuple$<> >",
+   "aliases": [],
+   "start": "0x140004e40",
+   "size": 481,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::backtrace::_print_fmt::closure$1::closure$0",
+   "aliases": [],
+   "start": "0x140005030",
+   "size": 717,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::alloc::rust_oom::closure$0",
+   "aliases": [],
+   "start": "0x140005300",
+   "size": 53,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::default_hook::closure$0",
+   "aliases": [],
+   "start": "0x140005335",
+   "size": 364,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_handler::closure$0",
+   "aliases": [],
+   "start": "0x1400054b0",
+   "size": 189,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::backtrace::_print_fmt::closure$0",
+   "aliases": [],
+   "start": "0x140005570",
+   "size": 30,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ops::function::FnOnce::call_once<std::sync::once::impl$2::call_once::closure_env$0<std::rt::cleanup::closure_env$0>,tuple$<ref$<std::sync::once::OnceState> > >",
+   "aliases": [],
+   "start": "0x140005590",
+   "size": 33,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ops::function::FnOnce::call_once<std::sys::backtrace::_print_fmt::closure$1::closure_env$0,tuple$<ref$<std::backtrace_rs::symbolize::Symbol> > >",
+   "aliases": [],
+   "start": "0x1400055c0",
+   "size": 5,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ops::function::FnOnce::call_once<std::sys::backtrace::_print_fmt::closure_env$0,tuple$<ref_mut$<core::fmt::Formatter>,enum2$<std::backtrace_rs::types::BytesOrWideString> > >",
+   "aliases": [],
+   "start": "0x1400055d0",
+   "size": 181,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::rust_panic",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc10rust_panic"
+   ],
+   "start": "0x140005690",
+   "size": 85,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::alloc::__default_lib_allocator::__rdl_alloc",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc11___rdl_alloc"
+   ],
+   "start": "0x1400056f0",
+   "size": 93,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::alloc::__default_lib_allocator::__rdl_dealloc",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc13___rdl_dealloc"
+   ],
+   "start": "0x140005750",
+   "size": 51,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::alloc::__default_lib_allocator::__rdl_realloc",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc13___rdl_realloc"
+   ],
+   "start": "0x140005790",
+   "size": 174,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::__rust_drop_panic",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc17___rust_drop_panic"
+   ],
+   "start": "0x140005840",
+   "size": 133,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_handler",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc17rust_begin_unwind"
+   ],
+   "start": "0x1400058d0",
+   "size": 32,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::alloc::__default_lib_allocator::__rdl_alloc_zeroed",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc18___rdl_alloc_zeroed"
+   ],
+   "start": "0x1400058f0",
+   "size": 97,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::__rust_foreign_exception",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc24___rust_foreign_exception"
+   ],
+   "start": "0x140005960",
+   "size": 133,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::alloc::_::__rust_alloc_error_handler",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc26___rust_alloc_error_handler"
+   ],
+   "start": "0x1400059f0",
+   "size": 26,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::path::Path::is_absolute",
+   "aliases": [
+    "_RNvMs16_NtCse0R8cuyqEa_3std4pathNtB6_4Path11is_absolute"
+   ],
+   "start": "0x140005a10",
+   "size": 326,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::path::Path::_strip_prefix",
+   "aliases": [
+    "_RNvMs16_NtCse0R8cuyqEa_3std4pathNtB6_4Path13__strip_prefix"
+   ],
+   "start": "0x140005b60",
+   "size": 1144,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sync::poison::mutex::Mutex::lock<alloc::vec::Vec<u8,alloc::alloc::Global> >",
+   "aliases": [],
+   "start": "0x140005fe0",
+   "size": 130,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::pal::windows::handle::Handle::synchronous_write",
+   "aliases": [],
+   "start": "0x140006070",
+   "size": 281,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::path::Components::include_cur_dir",
+   "aliases": [],
+   "start": "0x140006190",
+   "size": 274,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::path::Components::parse_next_component_back",
+   "aliases": [],
+   "start": "0x1400062b0",
+   "size": 475,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::path::Components::as_path",
+   "aliases": [
+    "_RNvMs8_NtCse0R8cuyqEa_3std4pathNtB5_10Components7as_path"
+   ],
+   "start": "0x140006490",
+   "size": 822,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::backtrace_rs::print::BacktraceFrameFmt::print_raw_with_column",
+   "aliases": [],
+   "start": "0x1400067d0",
+   "size": 921,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::buffered::bufwriter::BufWriter::flush_buf<std::io::stdio::StdoutRaw>",
+   "aliases": [],
+   "start": "0x140006b70",
+   "size": 708,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::sync::Arc::drop_slow<std::sync::poison::mutex::Mutex<alloc::vec::Vec<u8,alloc::alloc::Global> >,alloc::alloc::Global>",
+   "aliases": [
+    "_RNvMsn_NtCsfQUUnEvlYZE_5alloc4syncINtB5_3ArcINtNtNtNtCse0R8cuyqEa_3std4sync6poison5mutex5MutexINtNtB7_3vec3VechEEE9drop_slowBP_"
+   ],
+   "start": "0x140006e40",
+   "size": 83,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::sync::Arc::drop_slow<std::thread::thread::Inner,std::alloc::System>",
+   "aliases": [
+    "_RNvMsn_NtCsfQUUnEvlYZE_5alloc4syncINtB5_3ArcNtNtNtCse0R8cuyqEa_3std6thread6thread5InnerNtNtBM_5alloc6SystemE9drop_slowBM_"
+   ],
+   "start": "0x140006ea0",
+   "size": 93,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::rt::lang_start_internal",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std2rt19lang_start_internal"
+   ],
+   "start": "0x140006f00",
+   "size": 742,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::rt::cleanup",
+   "aliases": [],
+   "start": "0x1400071f0",
+   "size": 82,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::env::current_dir",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std3env11current_dir"
+   ],
+   "start": "0x140007250",
+   "size": 767,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::env::args",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std3env4args"
+   ],
+   "start": "0x140007550",
+   "size": 5,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::env::args_os",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std3env7args_os"
+   ],
+   "start": "0x140007560",
+   "size": 2224,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::alloc::default_alloc_error_hook",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std5alloc24default_alloc_error_hook"
+   ],
+   "start": "0x140007e10",
+   "size": 397,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::alloc::rust_oom",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std5alloc8rust_oom"
+   ],
+   "start": "0x140007fa0",
+   "size": 29,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panic::get_backtrace_style",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std5panic19get_backtrace_style"
+   ],
+   "start": "0x140007fc0",
+   "size": 205,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::process::exit",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std7process4exit"
+   ],
+   "start": "0x140008090",
+   "size": 27,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::default_hook",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std9panicking12default_hook"
+   ],
+   "start": "0x1400080ab",
+   "size": 398,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::payload_as_str",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std9panicking14payload_as_str"
+   ],
+   "start": "0x140008240",
+   "size": 132,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_with_hook",
+   "aliases": [
+    "_RNvNtCse0R8cuyqEa_3std9panicking15panic_with_hook"
+   ],
+   "start": "0x1400082c4",
+   "size": 563,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::backtrace_rs::dbghelp::enum_loaded_modules_callback",
+   "aliases": [],
+   "start": "0x140008500",
+   "size": 544,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::stdio::try_set_output_capture",
+   "aliases": [
+    "_RNvNtNtCse0R8cuyqEa_3std2io5stdio22try_set_output_capture"
+   ],
+   "start": "0x140008720",
+   "size": 223,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::stdio::print_to_buffer_if_capture_used",
+   "aliases": [],
+   "start": "0x140008800",
+   "size": 626,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::stdio::_print",
+   "aliases": [
+    "_RNvNtNtCse0R8cuyqEa_3std2io5stdio6__print"
+   ],
+   "start": "0x140008a80",
+   "size": 226,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::stdio::_eprint",
+   "aliases": [
+    "_RNvNtNtCse0R8cuyqEa_3std2io5stdio7__eprint"
+   ],
+   "start": "0x140008b70",
+   "size": 210,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::exit::exit",
+   "aliases": [],
+   "start": "0x140008c50",
+   "size": 18,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::backtrace::output_filename",
+   "aliases": [],
+   "start": "0x140008c70",
+   "size": 415,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::backtrace::lock",
+   "aliases": [
+    "_RNvNtNtCse0R8cuyqEa_3std3sys9backtrace4lock"
+   ],
+   "start": "0x140008e10",
+   "size": 100,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_count::increase",
+   "aliases": [
+    "_RNvNtNtCse0R8cuyqEa_3std9panicking11panic_count8increase"
+   ],
+   "start": "0x140008e80",
+   "size": 59,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::backtrace_rs::symbolize::dbghelp::resolve_with_inline",
+   "aliases": [],
+   "start": "0x140008ec0",
+   "size": 1063,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::backtrace_rs::symbolize::dbghelp::resolve",
+   "aliases": [
+    "_RNvNtNtNtCse0R8cuyqEa_3std12backtrace_rs9symbolize7dbghelp7resolve"
+   ],
+   "start": "0x1400092f0",
+   "size": 1512,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::env::windows::getenv",
+   "aliases": [
+    "_RNvNtNtNtCse0R8cuyqEa_3std3sys3env7windows6getenv"
+   ],
+   "start": "0x1400098e0",
+   "size": 1007,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::path::windows_prefix::parse_prefix",
+   "aliases": [
+    "_RNvNtNtNtCse0R8cuyqEa_3std3sys4path14windows_prefix12parse_prefix"
+   ],
+   "start": "0x140009cd0",
+   "size": 1067,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::alloc::windows::process_heap_alloc",
+   "aliases": [
+    "_RNvNtNtNtCse0R8cuyqEa_3std3sys5alloc7windows18process_heap_alloc"
+   ],
+   "start": "0x14000a100",
+   "size": 60,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::paths::windows::current_exe",
+   "aliases": [],
+   "start": "0x14000a140",
+   "size": 767,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::stdio::windows::write_valid_utf8_to_console",
+   "aliases": [],
+   "start": "0x14000a440",
+   "size": 672,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::stdio::windows::write",
+   "aliases": [],
+   "start": "0x14000a6e0",
+   "size": 892,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::thread_local::guard::windows::free_fls_key_at_exit",
+   "aliases": [],
+   "start": "0x14000aa60",
+   "size": 51,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::thread_local::guard::windows::enable",
+   "aliases": [],
+   "start": "0x14000aaa0",
+   "size": 463,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::thread_local::guard::windows::cleanup",
+   "aliases": [],
+   "start": "0x14000ac70",
+   "size": 327,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::io::error::windows::error_string",
+   "aliases": [
+    "_RNvNtNtNtNtCse0R8cuyqEa_3std3sys2io5error7windows12error_string"
+   ],
+   "start": "0x14000adc0",
+   "size": 629,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::io::error::windows::is_interrupted",
+   "aliases": [
+    "std::sys::stdio::windows::impl$7::flush",
+    "std::io::impls::impl$11::flush<alloc::alloc::Global>",
+    "core::panic::PanicPayload::as_str<std::panicking::begin_panic::Payload<ref$<str$> > >",
+    "std::io::Write::is_write_vectored<std::sys::stdio::windows::Stderr>",
+    "core::ops::function::FnOnce::call_once<core::io::error::impl$7::DEFAULT::closure_env$0,tuple$<i32,ref_mut$<core::fmt::Formatter> > >",
+    "core::ops::function::FnOnce::call_once<core::io::error::impl$7::DEFAULT::closure_env$2,tuple$<i32> >"
+   ],
+   "start": "0x14000b040",
+   "size": 3,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::io::error::windows::decode_error_kind",
+   "aliases": [],
+   "start": "0x14000b050",
+   "size": 467,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::pal::windows::stack_overflow::vectored_handler",
+   "aliases": [],
+   "start": "0x14000b230",
+   "size": 133,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::pal::windows::c::SetThreadDescription::load",
+   "aliases": [],
+   "start": "0x14000b2c0",
+   "size": 98,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::pal::windows::c::SetThreadDescription::fallback",
+   "aliases": [],
+   "start": "0x14000b330",
+   "size": 32,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::pal::windows::to_u16s::inner",
+   "aliases": [],
+   "start": "0x14000b350",
+   "size": 594,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::any::impl$0::type_id<alloc::string::String>",
+   "aliases": [],
+   "start": "0x14000b5b0",
+   "size": 14,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::any::impl$0::type_id<ref$<str$> >",
+   "aliases": [],
+   "start": "0x14000b5c0",
+   "size": 14,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::backtrace::impl$0::print::impl$0::fmt",
+   "aliases": [
+    "_RNvXNvMNtNtCse0R8cuyqEa_3std3sys9backtraceNtB5_13BacktraceLock5printNtB2_16DisplayBacktraceNtNtCs8xEFJqa6dYS_4core3fmt7Display3fmt"
+   ],
+   "start": "0x14000b5d0",
+   "size": 1192,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::default_write_fmt::impl$0::write_str<alloc::vec::Vec<u8,alloc::alloc::Global> >",
+   "aliases": [],
+   "start": "0x14000ba80",
+   "size": 117,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::default_write_fmt::impl$0::write_str<core::io::cursor::Cursor<ref_mut$<slice2$<u8> > > >",
+   "aliases": [],
+   "start": "0x14000bb00",
+   "size": 245,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::default_write_fmt::impl$0::write_str<std::io::stdio::StderrLock>",
+   "aliases": [],
+   "start": "0x14000bc00",
+   "size": 302,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::default_write_fmt::impl$0::write_str<std::io::stdio::StdoutLock>",
+   "aliases": [],
+   "start": "0x14000bd30",
+   "size": 162,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::default_write_fmt::impl$0::write_str<std::sys::stdio::windows::Stderr>",
+   "aliases": [],
+   "start": "0x14000bde0",
+   "size": 162,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_handler::impl$2::fmt",
+   "aliases": [
+    "_RNvXs0_NvNtCse0R8cuyqEa_3std9panicking13panic_handlerNtB5_19FormatStringPayloadNtNtCs8xEFJqa6dYS_4core3fmt7Display3fmt"
+   ],
+   "start": "0x14000be90",
+   "size": 51,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::path::impl$124::eq",
+   "aliases": [],
+   "start": "0x14000bed0",
+   "size": 203,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::os_str::wtf8::impl$3::fmt",
+   "aliases": [
+    "_RNvXs1_NtNtNtCse0R8cuyqEa_3std3sys6os_str4wtf8NtB5_3BufNtNtCs8xEFJqa6dYS_4core3fmt5Debug3fmt",
+    "_RNvXs7_NtNtCse0R8cuyqEa_3std3ffi6os_strNtB5_8OsStringNtNtCs8xEFJqa6dYS_4core3fmt5Debug3fmt",
+    "_RNvXsG_NtCse0R8cuyqEa_3std4pathNtB5_7PathBufNtNtCs8xEFJqa6dYS_4core3fmt5Debug3fmt"
+   ],
+   "start": "0x14000bfa0",
+   "size": 19,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_handler::impl$3::get",
+   "aliases": [],
+   "start": "0x14000bfc0",
+   "size": 11,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_handler::impl$3::as_str",
+   "aliases": [],
+   "start": "0x14000bfd0",
+   "size": 8,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_handler::impl$3::take_box",
+   "aliases": [
+    "_RNvXs1_NvNtCse0R8cuyqEa_3std9panicking13panic_handlerNtB5_16StaticStrPayloadNtNtCs8xEFJqa6dYS_4core5panic12PanicPayload8take_box"
+   ],
+   "start": "0x14000bfe0",
+   "size": 83,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$80::fmt<enum2$<core::option::Option<u8> > >",
+   "aliases": [],
+   "start": "0x14000c040",
+   "size": 98,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$80::fmt<core::num::error::IntErrorKind>",
+   "aliases": [],
+   "start": "0x14000c0b0",
+   "size": 42,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$80::fmt<u8>",
+   "aliases": [],
+   "start": "0x14000c0e0",
+   "size": 33,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$82::fmt<core::panic::location::Location>",
+   "aliases": [],
+   "start": "0x14000c110",
+   "size": 100,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$83::fmt<dyn$<core::panic::PanicPayload> >",
+   "aliases": [
+    "core::fmt::impl$80::fmt<dyn$<core::fmt::Debug> >"
+   ],
+   "start": "0x14000c180",
+   "size": 17,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::backtrace_rs::symbolize::impl$4::fmt",
+   "aliases": [
+    "_RNvXs2_NtNtCse0R8cuyqEa_3std12backtrace_rs9symbolizeNtB5_10SymbolNameNtNtCs8xEFJqa6dYS_4core3fmt7Display3fmt"
+   ],
+   "start": "0x14000c1a0",
+   "size": 236,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_handler::impl$4::fmt",
+   "aliases": [
+    "_RNvXs2_NvNtCse0R8cuyqEa_3std9panicking13panic_handlerNtB5_16StaticStrPayloadNtNtCs8xEFJqa6dYS_4core3fmt7Display3fmt"
+   ],
+   "start": "0x14000c290",
+   "size": 18,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::stdio::windows::impl$7::write",
+   "aliases": [
+    "_RNvXs5_NtNtNtCse0R8cuyqEa_3std3sys5stdio7windowsNtB5_6StderrNtNtBb_2io5Write5write"
+   ],
+   "start": "0x14000c2b0",
+   "size": 13,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::num::error::impl$8::fmt",
+   "aliases": [],
+   "start": "0x14000c2c0",
+   "size": 61,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::str::error::impl$11::fmt",
+   "aliases": [],
+   "start": "0x14000c300",
+   "size": 124,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::impls::impl$11::write_vectored<alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14000c380",
+   "size": 365,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::impls::impl$11::is_write_vectored<alloc::alloc::Global>",
+   "aliases": [
+    "_should_initialize_environment",
+    "__scrt_stub_for_acrt_initialize",
+    "__scrt_stub_for_acrt_uninitialize",
+    "__vcrt_uninitialize",
+    "__acrt_uninitialize",
+    "__acrt_initialize",
+    "__vcrt_initialize"
+   ],
+   "start": "0x14000c4f0",
+   "size": 3,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::impls::impl$11::write_all_vectored<alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14000c500",
+   "size": 336,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::impls::impl$11::write<alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14000c650",
+   "size": 120,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::impls::impl$11::write_all<alloc::alloc::Global>",
+   "aliases": [
+    "alloc::string::impl$63::write_str"
+   ],
+   "start": "0x14000c6d0",
+   "size": 117,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::string::impl$63::write_char",
+   "aliases": [],
+   "start": "0x14000c750",
+   "size": 277,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::impl$63::fmt",
+   "aliases": [],
+   "start": "0x14000c870",
+   "size": 30,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_handler::impl$1::get",
+   "aliases": [
+    "_RNvXs_NvNtCse0R8cuyqEa_3std9panicking13panic_handlerNtB4_19FormatStringPayloadNtNtCs8xEFJqa6dYS_4core5panic12PanicPayload3get"
+   ],
+   "start": "0x14000c890",
+   "size": 175,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_handler::impl$1::take_box",
+   "aliases": [
+    "_RNvXs_NvNtCse0R8cuyqEa_3std9panicking13panic_handlerNtB4_19FormatStringPayloadNtNtCs8xEFJqa6dYS_4core5panic12PanicPayload8take_box"
+   ],
+   "start": "0x14000c940",
+   "size": 355,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::env::impl$14::next",
+   "aliases": [
+    "_RNvXsc_NtCse0R8cuyqEa_3std3envNtB5_4ArgsNtNtNtNtCs8xEFJqa6dYS_4core4iter6traits8iterator8Iterator4next"
+   ],
+   "start": "0x14000cab0",
+   "size": 274,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::stdio::impl$16::write_fmt",
+   "aliases": [
+    "_RNvXse_NtNtCse0R8cuyqEa_3std2io5stdioRNtB5_6StdoutNtB7_5Write9write_fmt"
+   ],
+   "start": "0x14000cbd0",
+   "size": 520,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::stdio::impl$19::write_all",
+   "aliases": [
+    "_RNvXsh_NtNtCse0R8cuyqEa_3std2io5stdioNtB5_10StdoutLockNtB7_5Write9write_all"
+   ],
+   "start": "0x14000cde0",
+   "size": 558,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::path::impl$20::next",
+   "aliases": [
+    "_RNvXsi_NtCse0R8cuyqEa_3std4pathNtB5_10ComponentsNtNtNtNtCs8xEFJqa6dYS_4core4iter6traits8iterator8Iterator4next"
+   ],
+   "start": "0x14000d010",
+   "size": 993,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::stdio::impl$26::write_fmt",
+   "aliases": [
+    "_RNvXso_NtNtCse0R8cuyqEa_3std2io5stdioRNtB5_6StderrNtB7_5Write9write_fmt"
+   ],
+   "start": "0x14000d400",
+   "size": 520,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$28::fmt<core::ffi::c_void>",
+   "aliases": [],
+   "start": "0x14000d610",
+   "size": 8,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::str::pattern::impl$31::is_contained_in",
+   "aliases": [],
+   "start": "0x14000d620",
+   "size": 1804,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::Write::write_fmt<alloc::vec::Vec<u8,alloc::alloc::Global> >",
+   "aliases": [],
+   "start": "0x14000dd30",
+   "size": 190,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_char<std::io::default_write_fmt::Adapter<alloc::vec::Vec<u8,alloc::alloc::Global> > >",
+   "aliases": [],
+   "start": "0x14000ddf0",
+   "size": 245,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_fmt<std::io::default_write_fmt::Adapter<alloc::vec::Vec<u8,alloc::alloc::Global> > >",
+   "aliases": [],
+   "start": "0x14000def0",
+   "size": 18,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_char<std::io::default_write_fmt::Adapter<core::io::cursor::Cursor<ref_mut$<slice2$<u8> > > > >",
+   "aliases": [],
+   "start": "0x14000df10",
+   "size": 373,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_fmt<std::io::default_write_fmt::Adapter<core::io::cursor::Cursor<ref_mut$<slice2$<u8> > > > >",
+   "aliases": [],
+   "start": "0x14000e090",
+   "size": 18,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_char<std::io::default_write_fmt::Adapter<std::io::stdio::StderrLock> >",
+   "aliases": [],
+   "start": "0x14000e0b0",
+   "size": 172,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_fmt<std::io::default_write_fmt::Adapter<std::io::stdio::StderrLock> >",
+   "aliases": [],
+   "start": "0x14000e160",
+   "size": 18,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_char<std::io::default_write_fmt::Adapter<std::io::stdio::StdoutLock> >",
+   "aliases": [],
+   "start": "0x14000e180",
+   "size": 306,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_fmt<std::io::default_write_fmt::Adapter<std::io::stdio::StdoutLock> >",
+   "aliases": [],
+   "start": "0x14000e2c0",
+   "size": 18,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_char<std::io::default_write_fmt::Adapter<std::sys::stdio::windows::Stderr> >",
+   "aliases": [],
+   "start": "0x14000e2e0",
+   "size": 306,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_fmt<std::io::default_write_fmt::Adapter<std::sys::stdio::windows::Stderr> >",
+   "aliases": [],
+   "start": "0x14000e420",
+   "size": 18,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ops::function::FnOnce::call_once<std::io::error::impl$0::from_raw_os_error::FUNCTIONS::closure_env$0,tuple$<i32,ref_mut$<core::fmt::Formatter> > >",
+   "aliases": [],
+   "start": "0x14000e440",
+   "size": 145,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_fmt<alloc::string::String>",
+   "aliases": [],
+   "start": "0x14000e4e0",
+   "size": 18,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::Write::write_vectored<std::sys::stdio::windows::Stderr>",
+   "aliases": [],
+   "start": "0x14000e500",
+   "size": 71,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::Write::write_all_vectored<std::sys::stdio::windows::Stderr>",
+   "aliases": [],
+   "start": "0x14000e550",
+   "size": 683,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::Write::write_all<std::sys::stdio::windows::Stderr>",
+   "aliases": [],
+   "start": "0x14000e800",
+   "size": 363,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::Write::write_fmt<std::sys::stdio::windows::Stderr>",
+   "aliases": [],
+   "start": "0x14000e970",
+   "size": 190,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::Write::write_all<std::sys::stdio::windows::Stdout>",
+   "aliases": [],
+   "start": "0x14000ea30",
+   "size": 363,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ptr::drop_glue<alloc::boxed::Box<dyn$<core::any::Any,core::marker::Send>,alloc::alloc::Global> >",
+   "aliases": [],
+   "start": "0x14000eba0",
+   "size": 131,
+   "module": "panic_unwind-d45f266e54626acb.panic_unwind.772da25958b8bb98-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "panic_unwind::__rust_start_panic",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc18___rust_start_panic"
+   ],
+   "start": "0x14000ec30",
+   "size": 23,
+   "module": "panic_unwind-d45f266e54626acb.panic_unwind.772da25958b8bb98-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "panic_unwind::__rust_panic_cleanup",
+   "aliases": [
+    "_RNvCs1njKG4L9aB3_7___rustc20___rust_panic_cleanup"
+   ],
+   "start": "0x14000ec50",
+   "size": 117,
+   "module": "panic_unwind-d45f266e54626acb.panic_unwind.772da25958b8bb98-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "panic_unwind::imp::exception_copy",
+   "aliases": [],
+   "start": "0x14000ecd0",
+   "size": 19,
+   "module": "panic_unwind-d45f266e54626acb.panic_unwind.772da25958b8bb98-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "panic_unwind::imp::throw_exception",
+   "aliases": [],
+   "start": "0x14000ecf0",
+   "size": 127,
+   "module": "panic_unwind-d45f266e54626acb.panic_unwind.772da25958b8bb98-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "panic_unwind::imp::exception_cleanup",
+   "aliases": [],
+   "start": "0x14000ed70",
+   "size": 85,
+   "module": "panic_unwind-d45f266e54626acb.panic_unwind.772da25958b8bb98-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_RINvMNtCs8xEFJqa6dYS_4core3stre18trim_start_matchesReECseL4M8JimfzJ_14rustc_demangle",
+   "aliases": [],
+   "start": "0x14000edc8",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvCseL4M8JimfzJ_14rustc_demangle12try_demangle",
+   "aliases": [],
+   "start": "0x14000ff97",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvCseL4M8JimfzJ_14rustc_demangle8demangle",
+   "aliases": [],
+   "start": "0x14000ffeb",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXNtCseL4M8JimfzJ_14rustc_demangle6legacyNtB2_8DemangleNtNtCs8xEFJqa6dYS_4core3fmt7Display3fmt",
+   "aliases": [],
+   "start": "0x140012d73",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXs0_CseL4M8JimfzJ_14rustc_demangleINtB5_21SizeLimitedFmtAdapterQNtNtCs8xEFJqa6dYS_4core3fmt9FormatterENtB15_5Write9write_strB5_",
+   "aliases": [],
+   "start": "0x140013c0c",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXs0_NtCseL4M8JimfzJ_14rustc_demangle2v0NtB5_5IdentNtNtCs8xEFJqa6dYS_4core3fmt7Display3fmt",
+   "aliases": [],
+   "start": "0x140013c3e",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXs1_CseL4M8JimfzJ_14rustc_demangleNtB5_8DemangleNtNtCs8xEFJqa6dYS_4core3fmt7Display3fmt",
+   "aliases": [],
+   "start": "0x140014074",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXs1g_NtCs8xEFJqa6dYS_4core3fmtRNtNtNtB8_3num5error12IntErrorKindNtB6_5Debug3fmtCseL4M8JimfzJ_14rustc_demangle",
+   "aliases": [],
+   "start": "0x14001417d",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXs1g_NtCs8xEFJqa6dYS_4core3fmtReNtB6_5Debug3fmtCseL4M8JimfzJ_14rustc_demangle",
+   "aliases": [],
+   "start": "0x1400141a7",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXs1g_NtCs8xEFJqa6dYS_4core3fmtRhNtB6_5Debug3fmtCseL4M8JimfzJ_14rustc_demangle",
+   "aliases": [],
+   "start": "0x1400141b9",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXs1h_NtCs8xEFJqa6dYS_4core3fmtQShNtB6_5Debug3fmtCseL4M8JimfzJ_14rustc_demangle",
+   "aliases": [],
+   "start": "0x1400141d8",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXs1i_NtCs8xEFJqa6dYS_4core3fmtRNtCseL4M8JimfzJ_14rustc_demangle13DemangleStyleNtB6_7Display3fmtBy_",
+   "aliases": [],
+   "start": "0x1400141ea",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXs_CseL4M8JimfzJ_14rustc_demangleNtB4_13DemangleStyleNtNtCs8xEFJqa6dYS_4core3fmt7Display3fmt",
+   "aliases": [],
+   "start": "0x14001421c",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvXsr_NtCs8xEFJqa6dYS_4core3fmtShNtB5_5Debug3fmtCseL4M8JimfzJ_14rustc_demangle",
+   "aliases": [],
+   "start": "0x1400142b4",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvYINtCseL4M8JimfzJ_14rustc_demangle21SizeLimitedFmtAdapterQNtNtCs8xEFJqa6dYS_4core3fmt9FormatterENtBZ_5Write10write_charB5_",
+   "aliases": [],
+   "start": "0x14001465a",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_RNvYINtCseL4M8JimfzJ_14rustc_demangle21SizeLimitedFmtAdapterQNtNtCs8xEFJqa6dYS_4core3fmt9FormatterENtBZ_5Write9write_fmtB5_",
+   "aliases": [],
+   "start": "0x140014706",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "alloc::string::String::from_utf16",
+   "aliases": [
+    "_RNvMNtCsfQUUnEvlYZE_5alloc6stringNtB2_6String10from_utf16"
+   ],
+   "start": "0x140014720",
+   "size": 707,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::wtf8::Wtf8Buf::into_string",
+   "aliases": [
+    "_RNvMs2_NtCsfQUUnEvlYZE_5alloc4wtf8NtB5_7Wtf8Buf11into_string"
+   ],
+   "start": "0x1400149f0",
+   "size": 194,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::wtf8::Wtf8Buf::from_wide",
+   "aliases": [
+    "_RNvMs2_NtCsfQUUnEvlYZE_5alloc4wtf8NtB5_7Wtf8Buf9from_wide"
+   ],
+   "start": "0x140014ac0",
+   "size": 739,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::fmt::format::format_inner",
+   "aliases": [
+    "_RNvNvNtCsfQUUnEvlYZE_5alloc3fmt6format12format_inner"
+   ],
+   "start": "0x140014db0",
+   "size": 475,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$48::fmt",
+   "aliases": [],
+   "start": "0x140014f90",
+   "size": 21,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::string::impl$63::write_char",
+   "aliases": [],
+   "start": "0x140014fb0",
+   "size": 262,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::string::impl$63::write_str",
+   "aliases": [],
+   "start": "0x1400150c0",
+   "size": 102,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_fmt<alloc::string::String>",
+   "aliases": [],
+   "start": "0x140015130",
+   "size": 18,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::char::methods::impl$0::is_assigned",
+   "aliases": [],
+   "start": "0x140015150",
+   "size": 133,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::char::methods::impl$0::escape_debug_ext",
+   "aliases": [],
+   "start": "0x1400151e0",
+   "size": 588,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::builders::DebugStruct::field",
+   "aliases": [
+    "_RNvMs1_NtNtCs8xEFJqa6dYS_4core3fmt8buildersNtB5_11DebugStruct5field"
+   ],
+   "start": "0x140015430",
+   "size": 389,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::builders::DebugSet::entry",
+   "aliases": [
+    "_RNvMs5_NtNtCs8xEFJqa6dYS_4core3fmt8buildersNtB5_9DebugList5entry",
+    "_RNvMs4_NtNtCs8xEFJqa6dYS_4core3fmt8buildersNtB5_8DebugSet5entry"
+   ],
+   "start": "0x1400155c0",
+   "size": 277,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::builders::DebugList::finish",
+   "aliases": [
+    "_RNvMs5_NtNtCs8xEFJqa6dYS_4core3fmt8buildersNtB5_9DebugList6finish"
+   ],
+   "start": "0x1400156e0",
+   "size": 58,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Formatter::debug_list",
+   "aliases": [
+    "_RNvMsa_NtCs8xEFJqa6dYS_4core3fmtNtB5_9Formatter10debug_list"
+   ],
+   "start": "0x140015720",
+   "size": 62,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Formatter::pad_integral",
+   "aliases": [
+    "_RNvMsa_NtCs8xEFJqa6dYS_4core3fmtNtB5_9Formatter12pad_integral"
+   ],
+   "start": "0x140015760",
+   "size": 1238,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Formatter::debug_tuple_field1_finish",
+   "aliases": [
+    "_RNvMsa_NtCs8xEFJqa6dYS_4core3fmtNtB5_9Formatter25debug_tuple_field1_finish"
+   ],
+   "start": "0x140015c40",
+   "size": 316,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Formatter::debug_struct_field1_finish",
+   "aliases": [
+    "_RNvMsa_NtCs8xEFJqa6dYS_4core3fmtNtB5_9Formatter26debug_struct_field1_finish"
+   ],
+   "start": "0x140015d80",
+   "size": 172,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Formatter::debug_struct_field2_finish",
+   "aliases": [
+    "_RNvMsa_NtCs8xEFJqa6dYS_4core3fmtNtB5_9Formatter26debug_struct_field2_finish"
+   ],
+   "start": "0x140015e30",
+   "size": 230,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Formatter::pad",
+   "aliases": [
+    "_RNvMsa_NtCs8xEFJqa6dYS_4core3fmtNtB5_9Formatter3pad"
+   ],
+   "start": "0x140015f20",
+   "size": 1077,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Formatter::write_str",
+   "aliases": [
+    "_RNvMsa_NtCs8xEFJqa6dYS_4core3fmtNtB5_9Formatter9write_str",
+    "_RNvXsb_NtCs8xEFJqa6dYS_4core3fmtNtB5_9FormatterNtB5_5Write9write_str"
+   ],
+   "start": "0x140016360",
+   "size": 17,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::imp::impl$17::_fmt_inner",
+   "aliases": [],
+   "start": "0x140016380",
+   "size": 413,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::str::pattern::StrSearcher::new",
+   "aliases": [
+    "_RNvMsu_NtNtCs8xEFJqa6dYS_4core3str7patternNtB5_11StrSearcher3new"
+   ],
+   "start": "0x140016520",
+   "size": 1400,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::pointer_fmt_inner",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core3fmt17pointer_fmt_inner"
+   ],
+   "start": "0x140016aa0",
+   "size": 161,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::write",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core3fmt5write"
+   ],
+   "start": "0x140016b50",
+   "size": 440,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::str::slice_error_fail_rt",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core3str19slice_error_fail_rt"
+   ],
+   "start": "0x140016d10",
+   "size": 1010,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::str::count::do_count_chars",
+   "aliases": [
+    "_RNvNtNtCs8xEFJqa6dYS_4core3str5count14do_count_chars"
+   ],
+   "start": "0x140017110",
+   "size": 1562,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::str::count::char_count_general_case",
+   "aliases": [
+    "_RNvNtNtCs8xEFJqa6dYS_4core3str5count23char_count_general_case"
+   ],
+   "start": "0x140017730",
+   "size": 190,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::str::converts::from_utf8",
+   "aliases": [
+    "_RNvNtNtCs8xEFJqa6dYS_4core3str8converts9from_utf8"
+   ],
+   "start": "0x1400177f0",
+   "size": 521,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::slice::memchr::memchr_aligned",
+   "aliases": [
+    "_RNvNtNtCs8xEFJqa6dYS_4core5slice6memchr14memchr_aligned"
+   ],
+   "start": "0x140017a00",
+   "size": 229,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::slice::memchr::memrchr",
+   "aliases": [
+    "_RNvNtNtCs8xEFJqa6dYS_4core5slice6memchr7memrchr"
+   ],
+   "start": "0x140017af0",
+   "size": 289,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::io::error::os_functions::get_os_functions",
+   "aliases": [
+    "_RNvNtNtNtCs8xEFJqa6dYS_4core2io5error12os_functions16get_os_functions"
+   ],
+   "start": "0x140017c20",
+   "size": 8,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::unicode::unicode_data::alphabetic::lookup_slow",
+   "aliases": [
+    "_RNvNtNtNtCs8xEFJqa6dYS_4core7unicode12unicode_data10alphabetic11lookup_slow"
+   ],
+   "start": "0x140017c30",
+   "size": 251,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::unicode::unicode_data::conversions::lookup",
+   "aliases": [],
+   "start": "0x140017d30",
+   "size": 285,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::unicode::unicode_data::conversions::to_lower",
+   "aliases": [
+    "_RNvNtNtNtCs8xEFJqa6dYS_4core7unicode12unicode_data11conversions8to_lower"
+   ],
+   "start": "0x140017e50",
+   "size": 108,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::unicode::unicode_data::white_space::lookup",
+   "aliases": [],
+   "start": "0x140017ec0",
+   "size": 92,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::unicode::unicode_data::cn_planes_0_3::lookup_slow",
+   "aliases": [
+    "_RNvNtNtNtCs8xEFJqa6dYS_4core7unicode12unicode_data13cn_planes_0_311lookup_slow"
+   ],
+   "start": "0x140017f20",
+   "size": 251,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::unicode::unicode_data::grapheme_extend::lookup_slow",
+   "aliases": [
+    "_RNvNtNtNtCs8xEFJqa6dYS_4core7unicode12unicode_data15grapheme_extend11lookup_slow"
+   ],
+   "start": "0x140018020",
+   "size": 267,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::unicode::unicode_data::n::lookup_slow",
+   "aliases": [
+    "_RNvNtNtNtCs8xEFJqa6dYS_4core7unicode12unicode_data1n11lookup_slow"
+   ],
+   "start": "0x140018130",
+   "size": 251,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::unicode::unicode_data::default_ignorable_code_point::lookup_slow",
+   "aliases": [
+    "_RNvNtNtNtCs8xEFJqa6dYS_4core7unicode12unicode_data28default_ignorable_code_point11lookup_slow"
+   ],
+   "start": "0x140018230",
+   "size": 219,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::unicode::unicode_data::cf::lookup_slow",
+   "aliases": [
+    "_RNvNtNtNtCs8xEFJqa6dYS_4core7unicode12unicode_data2cf11lookup_slow"
+   ],
+   "start": "0x140018310",
+   "size": 235,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$12::pad_integral::write_prefix",
+   "aliases": [],
+   "start": "0x140018400",
+   "size": 96,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::wtf8::impl$3::fmt::write_str_escaped",
+   "aliases": [],
+   "start": "0x140018460",
+   "size": 491,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::imp::impl$0::fmt",
+   "aliases": [
+    "_RNvXNtNtNtCs8xEFJqa6dYS_4core3fmt3num3imphNtB6_7Display3fmt"
+   ],
+   "start": "0x140018650",
+   "size": 168,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::builders::impl$2::write_char",
+   "aliases": [
+    "_RNvXs0_NtNtCs8xEFJqa6dYS_4core3fmt8buildersNtB5_10PadAdapterNtB7_5Write10write_char"
+   ],
+   "start": "0x140018700",
+   "size": 102,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::builders::impl$2::write_str",
+   "aliases": [
+    "_RNvXs0_NtNtCs8xEFJqa6dYS_4core3fmt8buildersNtB5_10PadAdapterNtB7_5Write9write_str"
+   ],
+   "start": "0x140018770",
+   "size": 650,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::wtf8::impl$3::fmt",
+   "aliases": [
+    "_RNvXs1_NtCs8xEFJqa6dYS_4core4wtf8NtB5_4Wtf8NtNtB7_3fmt5Debug3fmt"
+   ],
+   "start": "0x140018a00",
+   "size": 502,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$80::fmt<usize>",
+   "aliases": [],
+   "start": "0x140018c00",
+   "size": 242,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$82::fmt<str$>",
+   "aliases": [],
+   "start": "0x140018d00",
+   "size": 18,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::wtf8::impl$4::fmt",
+   "aliases": [
+    "_RNvXs2_NtCs8xEFJqa6dYS_4core4wtf8NtB5_4Wtf8NtNtB7_3fmt7Display3fmt"
+   ],
+   "start": "0x140018d20",
+   "size": 445,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::io::error::impl$5::fmt",
+   "aliases": [
+    "_RNvXs3_NtNtCs8xEFJqa6dYS_4core2io5errorNtB5_5ErrorNtNtB9_3fmt7Display3fmt"
+   ],
+   "start": "0x140018ee0",
+   "size": 225,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::impl$8::fmt",
+   "aliases": [
+    "_RNvXs6_NtNtCs8xEFJqa6dYS_4core3fmt3numjNtB7_8LowerHex3fmt",
+    "_RNvXsC_NtNtCs8xEFJqa6dYS_4core3fmt3numyNtB7_8LowerHex3fmt"
+   ],
+   "start": "0x140018fd0",
+   "size": 108,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$10::fmt",
+   "aliases": [
+    "_RNvXs8_NtCs8xEFJqa6dYS_4core3fmtNtB5_9ArgumentsNtB5_7Display3fmt"
+   ],
+   "start": "0x140019040",
+   "size": 22,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::impl$10::fmt",
+   "aliases": [
+    "_RNvXs8_NtNtCs8xEFJqa6dYS_4core3fmt3numjNtB7_8UpperHex3fmt",
+    "_RNvXsE_NtNtCs8xEFJqa6dYS_4core3fmt3numyNtB7_8UpperHex3fmt"
+   ],
+   "start": "0x140019060",
+   "size": 108,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::builders::impl$10::fmt<core::io::error::impl$4::fmt::closure$0::closure_env$0>",
+   "aliases": [],
+   "start": "0x1400190d0",
+   "size": 18,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::imp::impl$10::fmt",
+   "aliases": [
+    "_RNvXs8_NtNtNtCs8xEFJqa6dYS_4core3fmt3num3impmNtB9_7Display3fmt"
+   ],
+   "start": "0x1400190f0",
+   "size": 261,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::imp::impl$11::fmt",
+   "aliases": [
+    "_RNvXs9_NtNtNtCs8xEFJqa6dYS_4core3fmt3num3implNtB9_7Display3fmt"
+   ],
+   "start": "0x140019200",
+   "size": 291,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ops::range::impl$1::fmt<usize>",
+   "aliases": [],
+   "start": "0x140019330",
+   "size": 518,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$13::write_char",
+   "aliases": [
+    "_RNvXsb_NtCs8xEFJqa6dYS_4core3fmtNtB5_9FormatterNtB5_5Write10write_char"
+   ],
+   "start": "0x140019540",
+   "size": 17,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::io::error::impl$15::drop",
+   "aliases": [
+    "_RNvXsd_NtNtCs8xEFJqa6dYS_4core2io5errorNtB5_11CustomOwnerNtNtNtB9_3ops4drop4Drop4drop"
+   ],
+   "start": "0x140019560",
+   "size": 7,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::imp::impl$15::fmt",
+   "aliases": [
+    "_RNvXsi_NtNtNtCs8xEFJqa6dYS_4core3fmt3num3impjNtB9_7Display3fmt",
+    "_RNvXsd_NtNtNtCs8xEFJqa6dYS_4core3fmt3num3impyNtB9_7Display3fmt"
+   ],
+   "start": "0x140019570",
+   "size": 86,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::impl$16::fmt",
+   "aliases": [
+    "_RNvXse_NtNtCs8xEFJqa6dYS_4core3fmt3numhNtB7_8LowerHex3fmt"
+   ],
+   "start": "0x1400195d0",
+   "size": 107,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::imp::impl$16::fmt",
+   "aliases": [
+    "_RNvXsj_NtNtNtCs8xEFJqa6dYS_4core3fmt3num3impiNtB9_7Display3fmt",
+    "_RNvXse_NtNtNtCs8xEFJqa6dYS_4core3fmt3num3impxNtB9_7Display3fmt"
+   ],
+   "start": "0x140019640",
+   "size": 104,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::impl$18::fmt",
+   "aliases": [
+    "_RNvXsg_NtNtCs8xEFJqa6dYS_4core3fmt3numhNtB7_8UpperHex3fmt"
+   ],
+   "start": "0x1400196b0",
+   "size": 107,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$19::fmt",
+   "aliases": [
+    "_RNvXsh_NtCs8xEFJqa6dYS_4core3fmteNtB5_5Debug3fmt"
+   ],
+   "start": "0x140019720",
+   "size": 858,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$20::fmt",
+   "aliases": [
+    "_RNvXsi_NtCs8xEFJqa6dYS_4core3fmteNtB5_7Display3fmt"
+   ],
+   "start": "0x140019a80",
+   "size": 17,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$21::fmt",
+   "aliases": [
+    "_RNvXsj_NtCs8xEFJqa6dYS_4core3fmtcNtB5_5Debug3fmt"
+   ],
+   "start": "0x140019aa0",
+   "size": 148,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::impl$22::fmt",
+   "aliases": [
+    "_RNvXsk_NtCs8xEFJqa6dYS_4core3fmtcNtB5_7Display3fmt"
+   ],
+   "start": "0x140019b40",
+   "size": 208,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::num::impl$24::fmt",
+   "aliases": [
+    "_RNvXsm_NtNtCs8xEFJqa6dYS_4core3fmt3numtNtB7_8LowerHex3fmt"
+   ],
+   "start": "0x140019c10",
+   "size": 110,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::cell::impl$29::fmt",
+   "aliases": [
+    "_RNvXsr_NtCs8xEFJqa6dYS_4core4cellNtB5_14BorrowMutErrorNtNtB7_3fmt7Display3fmt"
+   ],
+   "start": "0x140019c80",
+   "size": 21,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::ops::function::FnOnce::call_once<core::io::error::impl$7::DEFAULT::closure_env$1,tuple$<i32> >",
+   "aliases": [],
+   "start": "0x140019ca0",
+   "size": 3,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::fmt::Write::write_fmt<core::fmt::builders::PadAdapter>",
+   "aliases": [],
+   "start": "0x140019cb0",
+   "size": 18,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "pre_c_initialization",
+   "aliases": [],
+   "start": "0x140019cd0",
+   "size": 182,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "post_pgo_initialization",
+   "aliases": [],
+   "start": "0x140019d88",
+   "size": 16,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "pre_cpp_initialization",
+   "aliases": [],
+   "start": "0x140019d98",
+   "size": 25,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_common_main_seh",
+   "aliases": [],
+   "start": "0x140019db4",
+   "size": 380,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "mainCRTStartup",
+   "aliases": [],
+   "start": "0x140019f30",
+   "size": 18,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__chkstk",
+   "aliases": [
+    "_alloca_probe"
+   ],
+   "start": "0x140019f60",
+   "size": 78,
+   "module": "chkstk.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_acquire_startup_lock",
+   "aliases": [],
+   "start": "0x140019fb0",
+   "size": 57,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_crt",
+   "aliases": [],
+   "start": "0x140019fec",
+   "size": 73,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_onexit_tables",
+   "aliases": [],
+   "start": "0x14001a038",
+   "size": 139,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_nonwritable_in_current_image",
+   "aliases": [],
+   "start": "0x14001a0c4",
+   "size": 152,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_release_startup_lock",
+   "aliases": [],
+   "start": "0x14001a15c",
+   "size": 36,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_uninitialize_crt",
+   "aliases": [],
+   "start": "0x14001a180",
+   "size": 41,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_onexit",
+   "aliases": [],
+   "start": "0x14001a1ac",
+   "size": 58,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "atexit",
+   "aliases": [],
+   "start": "0x14001a1e8",
+   "size": 23,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "type_info::`scalar deleting destructor'",
+   "aliases": [
+    "??_Gtype_info@@UEAAPEAXI@Z",
+    "??_Etype_info@@UEAAPEAXI@Z"
+   ],
+   "start": "0x14001a200",
+   "size": 43,
+   "module": "std_type_info_static.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__security_init_cookie",
+   "aliases": [],
+   "start": "0x14001a22c",
+   "size": 172,
+   "module": "gs_support.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_matherr",
+   "aliases": [
+    "_get_startup_commit_mode",
+    "_get_startup_new_mode",
+    "_get_startup_thread_locale_mode",
+    "__scrt_initialize_winrt",
+    "__scrt_stub_for_initialize_mta",
+    "__scrt_exe_initialize_mta"
+   ],
+   "start": "0x14001a2d8",
+   "size": 3,
+   "module": "matherr.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_get_startup_argv_mode",
+   "aliases": [],
+   "start": "0x14001a2dc",
+   "size": 6,
+   "module": "argv_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_get_startup_file_mode",
+   "aliases": [],
+   "start": "0x14001a2e4",
+   "size": 6,
+   "module": "file_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_type_info",
+   "aliases": [
+    "?__scrt_initialize_type_info@@YAXXZ"
+   ],
+   "start": "0x14001a2ec",
+   "size": 14,
+   "module": "tncleanup.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_initialize_invalid_parameter_handler",
+   "aliases": [
+    "_initialize_denormal_control",
+    "_guard_check_icall_nop"
+   ],
+   "start": "0x14001a2fc",
+   "size": 3,
+   "module": "invalid_parameter_handler.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__local_stdio_printf_options",
+   "aliases": [],
+   "start": "0x14001a300",
+   "size": 8,
+   "module": "default_local_stdio_options.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__local_stdio_scanf_options",
+   "aliases": [],
+   "start": "0x14001a308",
+   "size": 8,
+   "module": "default_local_stdio_options.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_default_local_stdio_options",
+   "aliases": [],
+   "start": "0x14001a310",
+   "size": 27,
+   "module": "default_local_stdio_options.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_user_matherr_present",
+   "aliases": [],
+   "start": "0x14001a32c",
+   "size": 12,
+   "module": "matherr_detection.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_get_dyn_tls_init_callback",
+   "aliases": [],
+   "start": "0x14001a338",
+   "size": 8,
+   "module": "dyn_tls_init.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_get_dyn_tls_dtor_callback",
+   "aliases": [],
+   "start": "0x14001a340",
+   "size": 8,
+   "module": "dyn_tls_dtor.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__crt_debugger_hook",
+   "aliases": [],
+   "start": "0x14001a348",
+   "size": 8,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_fastfail",
+   "aliases": [],
+   "start": "0x14001a350",
+   "size": 331,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_mta",
+   "aliases": [],
+   "start": "0x14001a49c",
+   "size": 5,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_managed_app",
+   "aliases": [],
+   "start": "0x14001a4a4",
+   "size": 82,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_set_unhandled_exception_filter",
+   "aliases": [],
+   "start": "0x14001a4f8",
+   "size": 14,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_unhandled_exception_filter",
+   "aliases": [],
+   "start": "0x14001a508",
+   "size": 91,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_RTC_Initialize",
+   "aliases": [],
+   "start": "0x14001a564",
+   "size": 60,
+   "module": "initsect.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_RTC_Terminate",
+   "aliases": [],
+   "start": "0x14001a5a0",
+   "size": 60,
+   "module": "initsect.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__isa_available_init",
+   "aliases": [],
+   "start": "0x14001a5dc",
+   "size": 417,
+   "module": "cpu_disp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_ucrt_dll_in_use",
+   "aliases": [],
+   "start": "0x14001a780",
+   "size": 12,
+   "module": "ucrt_detection.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "operator delete",
+   "aliases": [
+    "??3@YAXPEAX_K@Z"
+   ],
+   "start": "0x14001a78c",
+   "size": 5,
+   "module": "delete_scalar_size.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "operator delete",
+   "aliases": [
+    "??3@YAXPEAX@Z"
+   ],
+   "start": "0x14001a7a0",
+   "size": 5,
+   "module": "delete_scalar.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "memcpy",
+   "aliases": [],
+   "start": "0x14001a7a5",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "memcmp",
+   "aliases": [],
+   "start": "0x14001a7ab",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "memmove",
+   "aliases": [],
+   "start": "0x14001a7b1",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__CxxFrameHandler3",
+   "aliases": [],
+   "start": "0x14001a7b7",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "memset",
+   "aliases": [],
+   "start": "0x14001a7bd",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_CxxThrowException",
+   "aliases": [],
+   "start": "0x14001a7c3",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__C_specific_handler",
+   "aliases": [],
+   "start": "0x14001a7c9",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__current_exception",
+   "aliases": [],
+   "start": "0x14001a7cf",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__current_exception_context",
+   "aliases": [],
+   "start": "0x14001a7d5",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_seh_filter_exe",
+   "aliases": [],
+   "start": "0x14001a7db",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_set_app_type",
+   "aliases": [],
+   "start": "0x14001a7e1",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__setusermatherr",
+   "aliases": [],
+   "start": "0x14001a7e7",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_configure_narrow_argv",
+   "aliases": [],
+   "start": "0x14001a7ed",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initialize_narrow_environment",
+   "aliases": [],
+   "start": "0x14001a7f3",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_get_initial_narrow_environment",
+   "aliases": [],
+   "start": "0x14001a7f9",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initterm",
+   "aliases": [],
+   "start": "0x14001a7ff",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initterm_e",
+   "aliases": [],
+   "start": "0x14001a805",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "exit",
+   "aliases": [],
+   "start": "0x14001a80b",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_exit",
+   "aliases": [],
+   "start": "0x14001a811",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_set_fmode",
+   "aliases": [],
+   "start": "0x14001a817",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__p___argc",
+   "aliases": [],
+   "start": "0x14001a81d",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__p___argv",
+   "aliases": [],
+   "start": "0x14001a823",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_cexit",
+   "aliases": [],
+   "start": "0x14001a829",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_c_exit",
+   "aliases": [],
+   "start": "0x14001a82f",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_register_thread_local_exe_atexit_callback",
+   "aliases": [],
+   "start": "0x14001a835",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_configthreadlocale",
+   "aliases": [],
+   "start": "0x14001a83b",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_set_new_mode",
+   "aliases": [],
+   "start": "0x14001a841",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__p__commode",
+   "aliases": [],
+   "start": "0x14001a847",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_initialize_onexit_table",
+   "aliases": [],
+   "start": "0x14001a84d",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_register_onexit_function",
+   "aliases": [],
+   "start": "0x14001a853",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_crt_atexit",
+   "aliases": [],
+   "start": "0x14001a859",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "terminate",
+   "aliases": [],
+   "start": "0x14001a85f",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "free",
+   "aliases": [],
+   "start": "0x14001a865",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_guard_dispatch_icall_nop",
+   "aliases": [],
+   "start": "0x14001a880",
+   "size": 2,
+   "module": "guard_dispatch.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_guard_xfg_dispatch_icall_nop",
+   "aliases": [],
+   "start": "0x14001a8a0",
+   "size": 6,
+   "module": "guard_xfg_dispatch.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::impl$4::reserve::do_reserve_and_handle<alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14001a8b0",
+   "size": 142,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::RawVec<usize,alloc::alloc::Global>::grow_one<usize,alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14001a940",
+   "size": 107,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::RawVecInner<alloc::alloc::Global>::finish_grow<alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14001a9b0",
+   "size": 177,
+   "module": "benchrs.benchrs.d9136bef189f70b6-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sync::once_lock::OnceLock::initialize<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::sync::once_lock::impl$0::get_or_init::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::io::stdio::stdout::closure_env$0>,never$>",
+   "aliases": [],
+   "start": "0x14001aa61",
+   "size": 90,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sync::once_lock::OnceLock::initialize<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::sync::once_lock::impl$0::get_or_init::closure_env$0<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw> > >,std::io::stdio::cleanup::closure_env$0>,never$>",
+   "aliases": [],
+   "start": "0x14001aabb",
+   "size": 94,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::impl$4::reserve::do_reserve_and_handle<alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14001ab20",
+   "size": 140,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::str::pattern::simd_contains::closure$2",
+   "aliases": [],
+   "start": "0x14001abb0",
+   "size": 259,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::thread_local::native::eager::Storage::get_or_init_slow<core::cell::Cell<enum2$<core::option::Option<alloc::sync::Arc<std::sync::poison::mutex::Mutex<alloc::vec::Vec<u8,alloc::alloc::Global> >,alloc::alloc::Global> > > > >",
+   "aliases": [],
+   "start": "0x14001acc0",
+   "size": 271,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::sync::mutex::futex::Mutex::lock_contended",
+   "aliases": [
+    "_RNvMNtNtNtNtCse0R8cuyqEa_3std3sys4sync5mutex5futexNtB2_5Mutex14lock_contended"
+   ],
+   "start": "0x14001add0",
+   "size": 180,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::sync::rwlock::futex::RwLock::read_contended",
+   "aliases": [
+    "_RNvMNtNtNtNtCse0R8cuyqEa_3std3sys4sync6rwlock5futexNtB2_6RwLock14read_contended"
+   ],
+   "start": "0x14001ae90",
+   "size": 436,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::sync::rwlock::futex::RwLock::wake_writer_or_readers",
+   "aliases": [
+    "_RNvMNtNtNtNtCse0R8cuyqEa_3std3sys4sync6rwlock5futexNtB2_6RwLock22wake_writer_or_readers"
+   ],
+   "start": "0x14001b050",
+   "size": 179,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::sys::sync::once::futex::Once::call",
+   "aliases": [
+    "_RNvMs0_NtNtNtNtCse0R8cuyqEa_3std3sys4sync4once5futexNtB5_4Once4call"
+   ],
+   "start": "0x14001b110",
+   "size": 496,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::RawVec::grow_one<std::ffi::os_str::OsString,alloc::alloc::Global>",
+   "aliases": [
+    "_RNvMs4_NtCsfQUUnEvlYZE_5alloc7raw_vecINtB5_6RawVecNtNtNtCse0R8cuyqEa_3std3ffi6os_str8OsStringE8grow_oneBS_"
+   ],
+   "start": "0x14001b300",
+   "size": 109,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::RawVec::grow_one<tuple$<ptr_mut$<u8>,void (*)(ptr_mut$<u8>)>,std::alloc::System>",
+   "aliases": [
+    "_RNvMs4_NtCsfQUUnEvlYZE_5alloc7raw_vecINtB5_6RawVecTOhFUKCBN_EuENtNtCse0R8cuyqEa_3std5alloc6SystemE8grow_oneB13_"
+   ],
+   "start": "0x14001b370",
+   "size": 40,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::RawVec::grow_one<u16,alloc::alloc::Global>",
+   "aliases": [
+    "_RNvMs4_NtCsfQUUnEvlYZE_5alloc7raw_vecINtB5_6RawVectE8grow_oneCse0R8cuyqEa_3std"
+   ],
+   "start": "0x14001b3a0",
+   "size": 109,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::RawVecInner::finish_grow<std::alloc::System>",
+   "aliases": [],
+   "start": "0x14001b410",
+   "size": 175,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::RawVecInner::grow_amortized<std::alloc::System>",
+   "aliases": [],
+   "start": "0x14001b4c0",
+   "size": 106,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::RawVecInner::finish_grow<alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14001b530",
+   "size": 182,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::io::buffered::bufwriter::BufWriter::write_all_cold<std::io::stdio::StdoutRaw>",
+   "aliases": [
+    "_RNvMs_NtNtNtCse0R8cuyqEa_3std2io8buffered9bufwriterINtB4_9BufWriterNtNtB8_5stdio9StdoutRawE14write_all_coldBa_"
+   ],
+   "start": "0x14001b5f0",
+   "size": 161,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::panic_count::is_zero_slow_path",
+   "aliases": [
+    "_RNvNtNtCse0R8cuyqEa_3std9panicking11panic_count17is_zero_slow_path"
+   ],
+   "start": "0x14001b6a0",
+   "size": 31,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::thread::id::impl$0::new::exhausted",
+   "aliases": [],
+   "start": "0x14001b6c0",
+   "size": 36,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "std::panicking::catch_unwind::cleanup",
+   "aliases": [
+    "_RNvNvNtCse0R8cuyqEa_3std9panicking12catch_unwind7cleanup"
+   ],
+   "start": "0x14001b6e4",
+   "size": 81,
+   "module": "std-44a584f44bc3dd65.std.2a1f8e54e2930f4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::impl$4::reserve::do_reserve_and_handle<alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14001b740",
+   "size": 115,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::RawVecInner::finish_grow<alloc::alloc::Global>",
+   "aliases": [],
+   "start": "0x14001b7c0",
+   "size": 145,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::alloc::handle_alloc_error",
+   "aliases": [
+    "_RNvNtCsfQUUnEvlYZE_5alloc5alloc18handle_alloc_error"
+   ],
+   "start": "0x14001b851",
+   "size": 26,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::handle_error",
+   "aliases": [
+    "_RNvNtCsfQUUnEvlYZE_5alloc7raw_vec12handle_error"
+   ],
+   "start": "0x14001b86b",
+   "size": 29,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "alloc::raw_vec::capacity_overflow",
+   "aliases": [
+    "_RNvNtCsfQUUnEvlYZE_5alloc7raw_vec17capacity_overflow"
+   ],
+   "start": "0x14001b890",
+   "size": 36,
+   "module": "alloc-e70c1e2d2d692bb9.alloc.b8a7db27d8b7bce8-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::panicking::assert_failed<usize,usize>",
+   "aliases": [
+    "_RINvNtCs8xEFJqa6dYS_4core9panicking13assert_failedjjEB4_"
+   ],
+   "start": "0x14001b8b4",
+   "size": 63,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::str::slice_error_fail",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core3str16slice_error_fail"
+   ],
+   "start": "0x14001b900",
+   "size": 26,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::cell::panic_already_borrowed",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core4cell22panic_already_borrowed"
+   ],
+   "start": "0x14001b920",
+   "size": 50,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::option::expect_failed",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core6option13expect_failed"
+   ],
+   "start": "0x14001b960",
+   "size": 55,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::option::unwrap_failed",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core6option13unwrap_failed"
+   ],
+   "start": "0x14001b9a0",
+   "size": 32,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::result::unwrap_failed",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core6result13unwrap_failed"
+   ],
+   "start": "0x14001b9c0",
+   "size": 89,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::panicking::panic_nounwind",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core9panicking14panic_nounwind"
+   ],
+   "start": "0x14001ba20",
+   "size": 35,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::panicking::panic_bounds_check",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core9panicking18panic_bounds_check"
+   ],
+   "start": "0x14001ba43",
+   "size": 64,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::panicking::panic_nounwind_fmt",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core9panicking18panic_nounwind_fmt"
+   ],
+   "start": "0x14001ba90",
+   "size": 85,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::panicking::assert_failed_inner",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core9panicking19assert_failed_inner"
+   ],
+   "start": "0x14001bae5",
+   "size": 250,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::panicking::panic_cannot_unwind",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core9panicking19panic_cannot_unwind"
+   ],
+   "start": "0x14001bbdf",
+   "size": 29,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::panicking::panic",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core9panicking5panic"
+   ],
+   "start": "0x14001bc00",
+   "size": 25,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::panicking::panic_fmt",
+   "aliases": [
+    "_RNvNtCs8xEFJqa6dYS_4core9panicking9panic_fmt"
+   ],
+   "start": "0x14001bc20",
+   "size": 47,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::slice::index::slice_index_fail",
+   "aliases": [
+    "_RNvNtNtCs8xEFJqa6dYS_4core5slice5index16slice_index_fail"
+   ],
+   "start": "0x14001bc50",
+   "size": 205,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "core::io::error::os_functions::set_functions::set_functions_inner",
+   "aliases": [
+    "_RNvNvNtNtNtCs8xEFJqa6dYS_4core2io5error12os_functions13set_functions19set_functions_inner"
+   ],
+   "start": "0x14001bd20",
+   "size": 8,
+   "module": "core-5b8de9dae852fb90.core.6380f46c71b215e4-cgu.0.rcgu.o",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "`__scrt_common_main_seh'::`1'::filt$0",
+   "aliases": [],
+   "start": "0x14001bd28",
+   "size": 30,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_nonwritable_in_current_image$filt$0",
+   "aliases": [],
+   "start": "0x14001bd46",
+   "size": 24,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  }
+ ],
+ "counts": {
+  "functions": 386,
+  "own_functions": 9,
+  "imports": 87
+ }
+}

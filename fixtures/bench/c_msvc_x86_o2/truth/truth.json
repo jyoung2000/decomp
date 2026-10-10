@@ -1,0 +1,1233 @@
+{
+ "schema": "rebuild-studio.bench-truth/1",
+ "row": "c_msvc_x86_o2",
+ "kind": "native_pe_x86",
+ "language": "C",
+ "what": "same C source, MSVC /O2, 32-bit PE (x86), PDB not shipped",
+ "binary": {
+  "path": "bin/benchc32.exe",
+  "sha256": "05f9dccd75e219c4223411b1f0edfc691f123d5694ad0705136c0f29560465be",
+  "size": 12800
+ },
+ "truth_source": "benchc32.pdb (MSF 7.00, read by tools/pdb_truth.py)",
+ "packed": false,
+ "packer": null,
+ "strings": [
+  "benchc 1.0 - Rebuild Studio benchmark fixture",
+  "usage: benchc <wc|crc|rle|b64|hist|sort|rev> <file>",
+  "benchc: cannot open '%s'",
+  "benchc: input larger than %u bytes",
+  "lines=%lu words=%lu bytes=%lu longest=%lu",
+  "crc32=%08lx size=%lu",
+  "rle: %lu -> %lu bytes, ratio %.3f",
+  "benchc: not a number: '%s'",
+  "count=%d min=%ld max=%ld sum=%ld mean=%.2f",
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+ ],
+ "image_base": "0x400000",
+ "machine": "0x14c",
+ "code_ranges": [
+  [
+   "0x401000",
+   "0x402a00"
+  ]
+ ],
+ "imports": [
+  {
+   "lib": "kernel32.dll",
+   "name": "UnhandledExceptionFilter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "SetUnhandledExceptionFilter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentProcess"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "TerminateProcess"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "IsProcessorFeaturePresent"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "QueryPerformanceCounter"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentProcessId"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetCurrentThreadId"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetSystemTimeAsFileTime"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "InitializeSListHead"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "IsDebuggerPresent"
+  },
+  {
+   "lib": "kernel32.dll",
+   "name": "GetModuleHandleW"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "strchr"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "memset"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__current_exception"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "__current_exception_context"
+  },
+  {
+   "lib": "vcruntime140.dll",
+   "name": "_except_handler4_common"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fputc"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "_set_fmode"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fputs"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "puts"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fopen"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__p__commode"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fread"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__stdio_common_vfprintf"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "__acrt_iob_func"
+  },
+  {
+   "lib": "api-ms-win-crt-stdio-l1-1-0.dll",
+   "name": "fclose"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "free"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "_set_new_mode"
+  },
+  {
+   "lib": "api-ms-win-crt-heap-l1-1-0.dll",
+   "name": "malloc"
+  },
+  {
+   "lib": "api-ms-win-crt-utility-l1-1-0.dll",
+   "name": "qsort"
+  },
+  {
+   "lib": "api-ms-win-crt-convert-l1-1-0.dll",
+   "name": "strtol"
+  },
+  {
+   "lib": "api-ms-win-crt-string-l1-1-0.dll",
+   "name": "isspace"
+  },
+  {
+   "lib": "api-ms-win-crt-string-l1-1-0.dll",
+   "name": "tolower"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "terminate"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_controlfp_s"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_crt_atexit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_set_app_type"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_c_exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_configure_narrow_argv"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initialize_narrow_environment"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_get_initial_narrow_environment"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initterm"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initterm_e"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_exit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_register_onexit_function"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "__p___argc"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "__p___argv"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_cexit"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_seh_filter_exe"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_register_thread_local_exe_atexit_callback"
+  },
+  {
+   "lib": "api-ms-win-crt-runtime-l1-1-0.dll",
+   "name": "_initialize_onexit_table"
+  },
+  {
+   "lib": "api-ms-win-crt-math-l1-1-0.dll",
+   "name": "__setusermatherr"
+  },
+  {
+   "lib": "api-ms-win-crt-locale-l1-1-0.dll",
+   "name": "_configthreadlocale"
+  }
+ ],
+ "functions": [
+  {
+   "name": "__local_stdio_printf_options",
+   "aliases": [
+    "___local_stdio_printf_options"
+   ],
+   "start": "0x401000",
+   "size": 6,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench_base64",
+   "aliases": [
+    "_bench_base64"
+   ],
+   "start": "0x401010",
+   "size": 268,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench_count",
+   "aliases": [
+    "_bench_count"
+   ],
+   "start": "0x401120",
+   "size": 135,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench_crc32",
+   "aliases": [
+    "_bench_crc32"
+   ],
+   "start": "0x4011b0",
+   "size": 64,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "bench_rle_encode",
+   "aliases": [
+    "_bench_rle_encode"
+   ],
+   "start": "0x4011f0",
+   "size": 84,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_b64",
+   "aliases": [],
+   "start": "0x401250",
+   "size": 70,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_crc",
+   "aliases": [],
+   "start": "0x4012a0",
+   "size": 34,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_hist",
+   "aliases": [],
+   "start": "0x4012d0",
+   "size": 219,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_rev",
+   "aliases": [],
+   "start": "0x4013b0",
+   "size": 92,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_rle",
+   "aliases": [],
+   "start": "0x401410",
+   "size": 143,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_sort",
+   "aliases": [],
+   "start": "0x4014a0",
+   "size": 99,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_stats",
+   "aliases": [],
+   "start": "0x401510",
+   "size": 226,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "cmd_wc",
+   "aliases": [],
+   "start": "0x401600",
+   "size": 77,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "compare_lines",
+   "aliases": [],
+   "start": "0x401650",
+   "size": 53,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "crc_init",
+   "aliases": [],
+   "start": "0x401690",
+   "size": 179,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "fprintf",
+   "aliases": [
+    "_fprintf"
+   ],
+   "start": "0x401750",
+   "size": 35,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "main",
+   "aliases": [
+    "_main"
+   ],
+   "start": "0x401780",
+   "size": 674,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "printf",
+   "aliases": [
+    "_printf"
+   ],
+   "start": "0x401a30",
+   "size": 46,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "read_file",
+   "aliases": [],
+   "start": "0x401a60",
+   "size": 196,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "reverse_in_place",
+   "aliases": [],
+   "start": "0x401b30",
+   "size": 71,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "split_lines",
+   "aliases": [],
+   "start": "0x401b80",
+   "size": 94,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "usage",
+   "aliases": [],
+   "start": "0x401be0",
+   "size": 64,
+   "module": "benchc.obj",
+   "source": "pdb.proc",
+   "own": true
+  },
+  {
+   "name": "__security_check_cookie",
+   "aliases": [
+    "@__security_check_cookie@4"
+   ],
+   "start": "0x401c20",
+   "size": 14,
+   "module": "secchk.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "pre_c_initialization",
+   "aliases": [],
+   "start": "0x401c2e",
+   "size": 171,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "post_pgo_initialization",
+   "aliases": [],
+   "start": "0x401cd9",
+   "size": 8,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "pre_cpp_initialization",
+   "aliases": [],
+   "start": "0x401ce1",
+   "size": 18,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_common_main_seh",
+   "aliases": [],
+   "start": "0x401cf3",
+   "size": 386,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "mainCRTStartup",
+   "aliases": [
+    "_mainCRTStartup"
+   ],
+   "start": "0x401e75",
+   "size": 10,
+   "module": "exe_main.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__raise_securityfailure",
+   "aliases": [
+    "___raise_securityfailure"
+   ],
+   "start": "0x401e7f",
+   "size": 40,
+   "module": "gs_report.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__report_gsfailure",
+   "aliases": [
+    "___report_gsfailure"
+   ],
+   "start": "0x401ea7",
+   "size": 250,
+   "module": "gs_report.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "find_pe_section",
+   "aliases": [],
+   "start": "0x401fa1",
+   "size": 68,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_acquire_startup_lock",
+   "aliases": [
+    "___scrt_acquire_startup_lock"
+   ],
+   "start": "0x401fe5",
+   "size": 50,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_crt",
+   "aliases": [
+    "___scrt_initialize_crt"
+   ],
+   "start": "0x402017",
+   "size": 57,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_onexit_tables",
+   "aliases": [
+    "___scrt_initialize_onexit_tables"
+   ],
+   "start": "0x402050",
+   "size": 135,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_nonwritable_in_current_image",
+   "aliases": [
+    "___scrt_is_nonwritable_in_current_image"
+   ],
+   "start": "0x4020d7",
+   "size": 148,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_release_startup_lock",
+   "aliases": [
+    "___scrt_release_startup_lock"
+   ],
+   "start": "0x40216b",
+   "size": 29,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_uninitialize_crt",
+   "aliases": [
+    "___scrt_uninitialize_crt"
+   ],
+   "start": "0x402188",
+   "size": 40,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_onexit",
+   "aliases": [
+    "__onexit"
+   ],
+   "start": "0x4021b0",
+   "size": 45,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "atexit",
+   "aliases": [
+    "_atexit"
+   ],
+   "start": "0x4021dd",
+   "size": 21,
+   "module": "utility.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__get_entropy",
+   "aliases": [],
+   "start": "0x4021f2",
+   "size": 77,
+   "module": "gs_support.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__security_init_cookie",
+   "aliases": [
+    "___security_init_cookie"
+   ],
+   "start": "0x40223f",
+   "size": 75,
+   "module": "gs_support.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_matherr",
+   "aliases": [
+    "_get_startup_commit_mode",
+    "_get_startup_new_mode",
+    "_get_startup_thread_locale_mode",
+    "__scrt_initialize_winrt",
+    "__scrt_stub_for_initialize_mta",
+    "___scrt_exe_initialize_mta",
+    "__get_startup_new_mode",
+    "___scrt_stub_for_initialize_mta",
+    "__get_startup_thread_locale_mode",
+    "__get_startup_commit_mode",
+    "__matherr",
+    "___scrt_initialize_winrt"
+   ],
+   "start": "0x40228a",
+   "size": 3,
+   "module": "matherr.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_get_startup_argv_mode",
+   "aliases": [
+    "__get_startup_argv_mode"
+   ],
+   "start": "0x40228d",
+   "size": 4,
+   "module": "argv_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_get_startup_file_mode",
+   "aliases": [
+    "__get_startup_file_mode"
+   ],
+   "start": "0x402291",
+   "size": 6,
+   "module": "file_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_type_info",
+   "aliases": [
+    "?__scrt_initialize_type_info@@YAXXZ"
+   ],
+   "start": "0x402297",
+   "size": 12,
+   "module": "tncleanup.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_should_initialize_environment",
+   "aliases": [
+    "__scrt_stub_for_acrt_initialize",
+    "__scrt_stub_for_acrt_uninitialize",
+    "___vcrt_uninitialize",
+    "__should_initialize_environment",
+    "___acrt_uninitialize",
+    "___acrt_initialize",
+    "___scrt_stub_for_acrt_initialize",
+    "___vcrt_initialize",
+    "___scrt_stub_for_acrt_uninitialize"
+   ],
+   "start": "0x4022a3",
+   "size": 3,
+   "module": "env_mode.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_initialize_default_precision",
+   "aliases": [
+    "__initialize_default_precision"
+   ],
+   "start": "0x4022a6",
+   "size": 33,
+   "module": "default_precision.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_initialize_invalid_parameter_handler",
+   "aliases": [
+    "_initialize_denormal_control",
+    "_guard_check_icall_nop",
+    "__initialize_invalid_parameter_handler",
+    "__initialize_denormal_control",
+    "@_guard_check_icall_nop@4"
+   ],
+   "start": "0x4022c7",
+   "size": 3,
+   "module": "invalid_parameter_handler.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__local_stdio_scanf_options",
+   "aliases": [
+    "___local_stdio_scanf_options"
+   ],
+   "start": "0x4022ca",
+   "size": 6,
+   "module": "default_local_stdio_options.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_default_local_stdio_options",
+   "aliases": [
+    "___scrt_initialize_default_local_stdio_options"
+   ],
+   "start": "0x4022d0",
+   "size": 29,
+   "module": "default_local_stdio_options.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_user_matherr_present",
+   "aliases": [
+    "___scrt_is_user_matherr_present"
+   ],
+   "start": "0x4022ed",
+   "size": 12,
+   "module": "matherr_detection.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_get_dyn_tls_init_callback",
+   "aliases": [
+    "___scrt_get_dyn_tls_init_callback"
+   ],
+   "start": "0x4022f9",
+   "size": 6,
+   "module": "dyn_tls_init.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_get_dyn_tls_dtor_callback",
+   "aliases": [
+    "___scrt_get_dyn_tls_dtor_callback"
+   ],
+   "start": "0x4022ff",
+   "size": 6,
+   "module": "dyn_tls_dtor.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_fastfail",
+   "aliases": [
+    "___scrt_fastfail"
+   ],
+   "start": "0x402305",
+   "size": 283,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_initialize_mta",
+   "aliases": [
+    "___scrt_initialize_mta"
+   ],
+   "start": "0x402420",
+   "size": 5,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_managed_app",
+   "aliases": [
+    "___scrt_is_managed_app"
+   ],
+   "start": "0x402425",
+   "size": 67,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_set_unhandled_exception_filter",
+   "aliases": [
+    "___scrt_set_unhandled_exception_filter"
+   ],
+   "start": "0x402468",
+   "size": 12,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_unhandled_exception_filter",
+   "aliases": [
+    "___scrt_unhandled_exception_filter@4"
+   ],
+   "start": "0x402474",
+   "size": 86,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_crt_debugger_hook",
+   "aliases": [
+    "__crt_debugger_hook"
+   ],
+   "start": "0x4024ca",
+   "size": 8,
+   "module": "utility_desktop.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_RTC_Initialize",
+   "aliases": [
+    "__RTC_Initialize"
+   ],
+   "start": "0x4024d2",
+   "size": 44,
+   "module": "initsect.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_RTC_Terminate",
+   "aliases": [
+    "__RTC_Terminate"
+   ],
+   "start": "0x4024fe",
+   "size": 44,
+   "module": "initsect.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__SEH_prolog4",
+   "aliases": [],
+   "start": "0x402530",
+   "size": 69,
+   "module": "sehprolg4.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_except_handler4",
+   "aliases": [
+    "__except_handler4"
+   ],
+   "start": "0x402575",
+   "size": 47,
+   "module": "chandler4gs.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__isa_available_init",
+   "aliases": [
+    "___isa_available_init"
+   ],
+   "start": "0x4025a4",
+   "size": 465,
+   "module": "cpu_disp.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "__scrt_is_ucrt_dll_in_use",
+   "aliases": [
+    "___scrt_is_ucrt_dll_in_use"
+   ],
+   "start": "0x402775",
+   "size": 12,
+   "module": "ucrt_detection.obj",
+   "source": "pdb.proc",
+   "own": false
+  },
+  {
+   "name": "_strchr",
+   "aliases": [],
+   "start": "0x402781",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_memset",
+   "aliases": [],
+   "start": "0x402787",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "___current_exception",
+   "aliases": [],
+   "start": "0x40278d",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "___current_exception_context",
+   "aliases": [],
+   "start": "0x402793",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__except_handler4_common",
+   "aliases": [],
+   "start": "0x402799",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__seh_filter_exe",
+   "aliases": [],
+   "start": "0x40279f",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__set_app_type",
+   "aliases": [],
+   "start": "0x4027a5",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "___setusermatherr",
+   "aliases": [],
+   "start": "0x4027ab",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__configure_narrow_argv",
+   "aliases": [],
+   "start": "0x4027b1",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__initialize_narrow_environment",
+   "aliases": [],
+   "start": "0x4027b7",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__get_initial_narrow_environment",
+   "aliases": [],
+   "start": "0x4027bd",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__initterm",
+   "aliases": [],
+   "start": "0x4027c3",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__initterm_e",
+   "aliases": [],
+   "start": "0x4027c9",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_exit",
+   "aliases": [],
+   "start": "0x4027cf",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__exit",
+   "aliases": [],
+   "start": "0x4027d5",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__set_fmode",
+   "aliases": [],
+   "start": "0x4027db",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "___p___argc",
+   "aliases": [],
+   "start": "0x4027e1",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "___p___argv",
+   "aliases": [],
+   "start": "0x4027e7",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__cexit",
+   "aliases": [],
+   "start": "0x4027ed",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__c_exit",
+   "aliases": [],
+   "start": "0x4027f3",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__register_thread_local_exe_atexit_callback",
+   "aliases": [],
+   "start": "0x4027f9",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__configthreadlocale",
+   "aliases": [],
+   "start": "0x4027ff",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__set_new_mode",
+   "aliases": [],
+   "start": "0x402805",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "___p__commode",
+   "aliases": [],
+   "start": "0x40280b",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__initialize_onexit_table",
+   "aliases": [],
+   "start": "0x402811",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__register_onexit_function",
+   "aliases": [],
+   "start": "0x402817",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__crt_atexit",
+   "aliases": [],
+   "start": "0x40281d",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "__controlfp_s",
+   "aliases": [],
+   "start": "0x402823",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_terminate",
+   "aliases": [],
+   "start": "0x402829",
+   "size": null,
+   "module": null,
+   "source": "pdb.public",
+   "own": false
+  },
+  {
+   "name": "_filter_x86_sse2_floating_point_exception_default",
+   "aliases": [
+    "__filter_x86_sse2_floating_point_exception",
+    "__filter_x86_sse2_floating_point_exception_default"
+   ],
+   "start": "0x40282f",
+   "size": 120,
+   "module": "x86_exception_filter.obj",
+   "source": "pdb.proc",
+   "own": false
+  }
+ ],
+ "counts": {
+  "functions": 95,
+  "own_functions": 22,
+  "imports": 55
+ }
+}

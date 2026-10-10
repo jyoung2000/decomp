@@ -1,0 +1,13 @@
+{
+ "row": "dotnet_plain",
+ "what": ".NET 8 console (Release, Deterministic), names intact",
+ "toolchain": "dotnet SDK 8.0.424",
+ "commands": [
+  "dotnet build benchnet.csproj -c Release (Deterministic, Optimize, DebugType=none)"
+ ],
+ "stripped_how": "no PDB (DebugType=none)",
+ "binary_sha256": "93cb94b80069b8ef8893241c862c73b6f3f8b43e5d49ea8b88fa1e177681a9f4",
+ "binary_size": 11264,
+ "source": "dotnet_plain/src",
+ "reproduce": "python fixtures/bench/build_bench.py --rows dotnet_plain"
+}

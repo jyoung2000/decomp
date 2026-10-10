@@ -1,0 +1,86 @@
+{
+ "schema": "rebuild-studio.bench-manifest/1",
+ "rows": {
+  "c_msvc_x64_o2": {
+   "kind": "native_pe_x64",
+   "binary": "c_msvc_x64_o2/bin/benchc.exe",
+   "sha256": "06dd1b329db40f0c1bbb48e1c3bd3e5614cb339a62cb65b236a3a84af701cfa1",
+   "size": 15872,
+   "truth": "c_msvc_x64_o2/truth/truth.json",
+   "toolchain": "MSVC cl 19.29.30159 (x64), VC tools 14.29.30133, Windows SDK 10.0.19041.0"
+  },
+  "c_msvc_x86_o2": {
+   "kind": "native_pe_x86",
+   "binary": "c_msvc_x86_o2/bin/benchc32.exe",
+   "sha256": "05f9dccd75e219c4223411b1f0edfc691f123d5694ad0705136c0f29560465be",
+   "size": 12800,
+   "truth": "c_msvc_x86_o2/truth/truth.json",
+   "toolchain": "MSVC cl 19.29.30159 (x86), VC tools 14.29.30133, Windows SDK 10.0.19041.0"
+  },
+  "cpp_msvc_x64_o2": {
+   "kind": "native_pe_x64",
+   "binary": "cpp_msvc_x64_o2/bin/benchcpp.exe",
+   "sha256": "7141fcfdfdb7a7c989792cdb1e8f5b991c0b42d22d6f3346d4a50e9fa5cb4c95",
+   "size": 29696,
+   "truth": "cpp_msvc_x64_o2/truth/truth.json",
+   "toolchain": "MSVC cl 19.29.30159 (x64), VC tools 14.29.30133, Windows SDK 10.0.19041.0"
+  },
+  "dotnet_plain": {
+   "kind": "dotnet",
+   "binary": "dotnet_plain/bin/benchnet.dll",
+   "sha256": "93cb94b80069b8ef8893241c862c73b6f3f8b43e5d49ea8b88fa1e177681a9f4",
+   "size": 11264,
+   "truth": "dotnet_plain/truth/truth.json",
+   "toolchain": "dotnet SDK 8.0.424"
+  },
+  "dotnet_renamed": {
+   "kind": "dotnet",
+   "binary": "dotnet_renamed/bin/benchnet.dll",
+   "sha256": "748477c87f1cba369179a9a3322289646fead16f3dc2eea67b799074aea17b0e",
+   "size": 11264,
+   "truth": "dotnet_renamed/truth/truth.json",
+   "toolchain": "dotnet SDK 8.0.424"
+  },
+  "go_elf_x64": {
+   "kind": "native_elf_x64",
+   "binary": "go_elf_x64/bin/benchgo",
+   "sha256": "eb6d3c611e39a8531108ecdc3907461d394a16e84ee367e3e392907e2c16a5af",
+   "size": 2596988,
+   "truth": "go_elf_x64/truth/truth.json",
+   "toolchain": "go version go1.27.0 windows/amd64"
+  },
+  "go_pe_x64": {
+   "kind": "native_pe_x64",
+   "binary": "go_pe_x64/bin/benchgo.exe",
+   "sha256": "21f80550484b981ce47a64c751a57842938318a501bd72d8e48f0147a330dae2",
+   "size": 2760192,
+   "truth": "go_pe_x64/truth/truth.json",
+   "toolchain": "go version go1.27.0 windows/amd64"
+  },
+  "rust_msvc_x64": {
+   "kind": "native_pe_x64",
+   "binary": "rust_msvc_x64/bin/benchrs.exe",
+   "sha256": "79ade84727af733b9f92a969e9a37c9aea5c01c94bb1eac645d53f12c3ec525d",
+   "size": 159744,
+   "truth": "rust_msvc_x64/truth/truth.json",
+   "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01); cargo 1.98.1 (797e8a9bc 2026-08-05)"
+  },
+  "upx_c_msvc_x64": {
+   "kind": "native_pe_x64",
+   "binary": "upx_c_msvc_x64/bin/benchc_upx.exe",
+   "sha256": "ce95f751f9e3c96e2bd9a7ce70e340b888a975b432e5716e8e4af6653ec41af0",
+   "size": 10240,
+   "truth": "upx_c_msvc_x64/truth/truth.json",
+   "toolchain": "MSVC cl 19.29.30159 (x64), VC tools 14.29.30133, Windows SDK 10.0.19041.0; upx 5.2.1 (sha256 d20ebe0b7b22b6be...)"
+  }
+ },
+ "total_binary_bytes": 5608060,
+ "not_built": {
+  "c_mingw_x64_o2s": "not run: mingw-w64 (x86_64-w64-mingw32-gcc) is not installed on this host",
+  "c_mingw_x86_o2s": "not run: mingw-w64 (i686-w64-mingw32-gcc) is not installed on this host",
+  "c_gcc_elf_stripped": "not run: no gcc/clang/zig for an ELF C build on this host (the stripped-ELF row is go_elf_x64)",
+  "unity_il2cpp": "not run: needs the Unity editor with the IL2CPP module to build a project we own; not installed",
+  "gamemaker": "not run: no free GameMaker runner/CLI build is available on this host",
+  "dotnet_confuserex": "not run as ConfuserEx itself (.NET Framework GUI/CLI, unmaintained); renaming is reproduced by dotnet_rename.py (row dotnet_renamed)"
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "row": "rust_msvc_x64",
+ "what": "Rust release (opt-level 3), x86_64-pc-windows-msvc, PDB not shipped",
+ "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01); cargo 1.98.1 (797e8a9bc 2026-08-05)",
+ "commands": [
+  "RUSTFLAGS='--remap-path-prefix=<src>=benchrs -C link-arg=/Brepro -C link-arg=/PDBALTPATH:benchrs.pdb' cargo build --release --target x86_64-pc-windows-msvc",
+  "Cargo.toml [profile.release]: opt-level=3 debug=2 strip=none codegen-units=1 lto=false panic=unwind"
+ ],
+ "stripped_how": "the PDB is not shipped; MSVC-target executables carry no symbol table",
+ "binary_sha256": "79ade84727af733b9f92a969e9a37c9aea5c01c94bb1eac645d53f12c3ec525d",
+ "binary_size": 159744,
+ "source": "rust_msvc_x64/src",
+ "reproduce": "python fixtures/bench/build_bench.py --rows rust_msvc_x64"
+}
