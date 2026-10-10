@@ -16,6 +16,7 @@ Design notes
 from __future__ import annotations
 
 import collections
+import hashlib
 import json
 import os
 import queue
@@ -39,6 +40,7 @@ from ..ids import sha256_file
 from ..jobs.runner import kill_tree
 from ..paths import resolve_final
 from . import native
+from . import re_annotations as annotations
 
 RIZIN_PINNED = "v0.9.1"
 RIZIN_STATIC_SHA256 = "9102249a9f0b6319c5334a2e5cf8d9cc3f2035e1d3def027c41f6a90f647e8cf"
@@ -451,6 +453,10 @@ class RizinSession:
         self._ranges: list[tuple[int, int, str]] | None = None
         self._functions: list[dict[str, Any]] | None = None
         self._closed = False
+        # Re-applies persisted user/model annotations (renames, types, structs) after every (re-)analysis, so a
+        # re-created rizin process never serves un-annotated output. Set by RizinBackend for case-scoped sessions.
+        self.annotator: Callable[["RizinSession", Callable[[], None] | None], Any] | None = None
+        self.annotation_report: dict[str, Any] | None = None
 
     # -- ownership ------------------------------------------------------
     @contextmanager
@@ -580,6 +586,9 @@ class RizinSession:
         self._functions = None
         self._analysis_report = {"settings": dict(s), "elapsed_seconds": round(elapsed, 3),
                                  "possibly_partial": bool(atimeout and elapsed >= atimeout), "generation": self.generation}
+        if self.annotator is not None:
+            self.annotation_report = self.annotator(self, poll)
+            self._functions = None
         return self._analysis_report
 
     def analyze(self, poll: Callable[[], None] | None = None) -> dict[str, Any]:
@@ -650,6 +659,60 @@ class RizinSession:
 
     def callgraph(self, addr: int, poll=None) -> tuple[Any, bool]:
         return self._run(f"agc json @ {_addr(addr)}", poll=poll, needs_analysis=True)
+
+    def variables(self, addr: int, poll=None) -> tuple[Any, bool]:
+        return self._run(f"afvlj @ {_addr(addr)}", poll=poll, needs_analysis=True)
+
+    def blocks(self, addr: int, poll=None) -> tuple[Any, bool]:
+        return self._run(f"afbj @ {_addr(addr)}", poll=poll, needs_analysis=True)
+
+    def flag_at(self, addr: int, poll=None) -> dict[str, Any] | None:
+        data, _ = self._run(f"fdj @ {_addr(addr)}", poll=poll)
+        return data if isinstance(data, dict) and data.get("offset") == addr else None
+
+    def disasm_linear(self, addr: int, *, count: int | None = None, length: int | None = None, poll=None) -> tuple[Any, bool]:
+        """Linear disassembly from ``addr``: ``count`` instructions (pdj) or ``length`` bytes (pDj). Integers only."""
+        if (count is None) == (length is None):
+            raise ValueError("give exactly one of count or length")
+        n = int(count if count is not None else length)  # type: ignore[arg-type]
+        if n <= 0 or n > 65536:
+            raise ValueError("count/length out of range")
+        with self.owned():
+            self._run("e asm.pseudo=false", json_out=False, poll=poll)
+            return self._run(f"{'pdj' if count is not None else 'pDj'} {n:d} @ {_addr(addr)}", poll=poll, needs_analysis=True)
+
+    def types(self, kind: str, poll=None) -> tuple[Any, bool]:
+        cmd = {"struct": "tsj", "union": "tuj", "enum": "tej", "typedef": "ttj"}[kind]
+        return self._run(cmd, poll=poll)
+
+    # -- annotation commands. Every argument is re-validated here against a strict charset (defence in depth: the
+    #    callers validate first) so no caller text can ever add a command separator, pipe, temporary seek or quote.
+    def rename_function(self, addr: int, name: str, poll=None) -> None:
+        self._run(f"afn {_ident(name)} @ {_addr(addr)}", json_out=False, poll=poll)
+        self._functions = None
+
+    def set_prototype(self, addr: int, prototype: str, poll=None) -> None:
+        self._run(f"afs {_proto(prototype)} @ {_addr(addr)}", json_out=False, poll=poll)
+        self._functions = None
+
+    def rename_variable(self, fn_addr: int, old: str, new: str, poll=None) -> None:
+        self._run(f"afvn {_ident(new)} {_ident(old)} @ {_addr(fn_addr)}", json_out=False, poll=poll)
+
+    def retype_variable(self, fn_addr: int, name: str, ctype: str, poll=None) -> None:
+        self._run(f"afvt {_ident(name)} {_ctype(ctype)} @ {_addr(fn_addr)}", json_out=False, poll=poll)
+
+    def set_flag(self, addr: int, name: str, poll=None) -> None:
+        self._run(f"f {_ident(name)} 1 @ {_addr(addr)}", json_out=False, poll=poll)
+
+    def remove_flag(self, name: str, poll=None) -> None:
+        self._run(f"f- {_ident(name)}", json_out=False, poll=poll)
+
+    def load_types_file(self, path: Path, poll=None) -> None:
+        """Load C type declarations from a file the controller wrote (never a caller-chosen path)."""
+        p = str(Path(path).resolve()).replace("\\", "/")
+        if '"' in p or any(ord(c) < 32 for c in p):
+            raise InvalidTarget("type file path contains characters rizin cannot quote")
+        self._run(f'to "{p}"', json_out=False, poll=poll)
 
     def disasm(self, addr: int, poll=None) -> tuple[Any, bool]:
         with self.owned():
@@ -755,6 +818,30 @@ def _addr(addr: int) -> str:
     return f"0x{addr:x}"
 
 
+_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+_CTYPE_RE = re.compile(r"^(?:(?:struct|union|enum|unsigned|signed|const|long|short|volatile)\s+){0,4}[A-Za-z_][A-Za-z0-9_]{0,63}"
+                       r"(?:\s*\*{1,3})?$")
+_PROTO_RE = re.compile(r"^[A-Za-z0-9_ *,()\[\].]{3,512}$")
+
+
+def _ident(name: str) -> str:
+    if not isinstance(name, str) or not _IDENT_RE.fullmatch(name):
+        raise InvalidTarget(f"invalid identifier {str(name)[:80]!r}: letters, digits and _ only, not starting with a digit")
+    return name
+
+
+def _ctype(t: str) -> str:
+    if not isinstance(t, str) or not _CTYPE_RE.fullmatch(t.strip()):
+        raise InvalidTarget(f"invalid C type {str(t)[:80]!r}")
+    return " ".join(t.split())
+
+
+def _proto(p: str) -> str:
+    if not isinstance(p, str) or not _PROTO_RE.fullmatch(p.strip()) or p.count("(") != 1 or p.count(")") != 1:
+        raise InvalidTarget(f"invalid prototype {str(p)[:80]!r}: expected e.g. 'int parse(char *s, int n)'")
+    return " ".join(p.split())
+
+
 def parse_address(target: Any) -> int | None:
     if isinstance(target, bool):
         raise InvalidTarget("boolean is not an address")
@@ -789,13 +876,15 @@ class SessionPool:
     def __init__(self, limits: Limits, *, idle_timeout: float = DEFAULT_IDLE_TIMEOUT):
         self.limits = limits
         self.idle_timeout = idle_timeout
-        self._sessions: dict[tuple[str, str | None], RizinSession] = {}
+        self._sessions: dict[tuple[str, str | None, str | None], RizinSession] = {}
         self._lock = threading.Lock()
         self._reaper: threading.Thread | None = None
         self._stop = threading.Event()
 
-    def get(self, tool: RizinTool, path: Path, sha256: str | None, analysis: dict[str, Any] | None = None) -> RizinSession:
-        key = (str(path), sha256)
+    def get(self, tool: RizinTool, path: Path, sha256: str | None, analysis: dict[str, Any] | None = None,
+            scope: str | None = None) -> RizinSession:
+        """``scope`` separates sessions on the same file that carry different annotations (one per case module)."""
+        key = (str(path), sha256, scope)
         with self._lock:
             s = self._sessions.get(key)
             if s is None or s._closed or s.tool.exe != tool.exe:
@@ -895,6 +984,17 @@ OPERATIONS = [
     Operation("disasm", "Function disassembly (pdfj); untrusted", {"case_id": "str", "module_id": "str", "function": "str"}, {"disasm": "object"}),
     Operation("decompile", "Decompile a function: rz-ghidra pdgj if loaded, else labelled pseudo output; untrusted", {"case_id": "str", "module_id": "str", "function": "str"}, {"decompiled": "object"}),
     Operation("function_briefing", "Bounded packet: signature, size, callers/callees, strings/imports/constants, decompiled text", {"case_id": "str", "module_id": "str", "function": "str"}, {"briefing": "object"}),
+    Operation("symbols", "Symbol table (isj); untrusted", {"case_id": "str", "module_id": "str"}, {"symbols": "list"}),
+    Operation("function", "One function: signature, cc, blocks (afbj), variables (afvlj), annotations", {"case_id": "str", "module_id": "str", "function": "str"}, {"function": "object"}),
+    Operation("disassemble", "Linear disassembly: count instructions or length bytes at an address", {"case_id": "str", "module_id": "str", "addr": "str", "count": "int", "length": "int"}, {"ops": "list"}),
+    Operation("call_graph", "Bounded BFS call graph (callees/callers/both, depth 1..5)", {"case_id": "str", "module_id": "str", "function": "str", "depth": "int", "direction": "str"}, {"nodes": "list", "edges": "list"}),
+    Operation("search_bytes", "Hex byte pattern search with ?? wildcards over the module file", {"case_id": "str", "module_id": "str", "pattern": "str"}, {"matches": "list"}),
+    Operation("annotations", "Current persisted annotations (+ history)", {"case_id": "str", "module_id": "str"}, {"annotations": "object"}),
+    Operation("rename", "Rename function/global/local; persisted annotation", {"case_id": "str", "module_id": "str", "kind": "str", "target": "str", "new_name": "str"}, {"change": "object"}),
+    Operation("set_type", "Function prototype or local variable type; persisted annotation", {"case_id": "str", "module_id": "str", "kind": "str", "target": "str"}, {"change": "object"}),
+    Operation("add_comment", "Comment at an address; persisted annotation", {"case_id": "str", "module_id": "str", "addr": "str", "text": "str"}, {"change": "object"}),
+    Operation("apply_struct", "Declare C struct/union/enum/typedef; persisted annotation", {"case_id": "str", "module_id": "str", "declaration": "str"}, {"change": "object"}),
+    Operation("patch_bytes", "Patch bytes in a COPY inside the work folder (never the original); needs confirm", {"case_id": "str", "module_id": "str", "addr": "str", "data_hex": "str", "confirm": "bool"}, {"copy_path": "str"}),
     Operation("admin_raw", "Run a raw rizin command (admin/debug only)", {"case_id": "str", "module_id": "str", "cmd": "str"}, {"text": "str"}, dangerous=True),
 ]
 
@@ -1017,13 +1117,21 @@ class RizinBackend(BackendAdapter):
         if tool is None or not tool.version:
             raise RizinError("rizin is not available on this host (see doctor)")
         module, path = self.module_path(cases, case_id, module_id)
-        sess = self.pool.get(tool, path, module["sha256"], self.analysis)
+        sess = self.pool.get(tool, path, module["sha256"], self.analysis, scope=f"{case_id}:{module_id}")
+        if sess.annotator is None:
+            work = self.work_dir(cases, case_id, module_id)
+            sess.annotator = lambda s, poll: annotations.apply_all(s, annotations.load(cases, case_id, module_id)[1], work, poll)
         if not getattr(sess, "_sha_checked", False):
             actual = sha256_file(path)
             if actual != module["sha256"]:
                 raise RizinError(f"module {module['rel_path']} changed on disk since inventory (sha256 {actual[:12]} != {module['sha256'][:12]})")
             sess._sha_checked = True  # type: ignore[attr-defined]
         return module, sess
+
+    def work_dir(self, cases: Any, case_id: str, module_id: str) -> Path:
+        """The session's private work folder (patched copies, generated type headers). Never the user's files."""
+        root = cases.case_root(case_id) if hasattr(cases, "case_root") else Path(self.settings.data_dir) / "cases" / case_id
+        return Path(root) / "re" / module_id
 
     def session_for_path(self, path: Path | str, sha256: str | None = None) -> RizinSession:
         """Direct session on a file (CLI/Cutter/tests). Same pooling and locking as case modules."""
@@ -1063,8 +1171,10 @@ class RizinBackend(BackendAdapter):
             cases = native.cases_of(ctx)
             poll = native.poll_of(ctx)
             module, sess = self.session_for(cases, case_id, module_id)
-            extra = extra_inputs(sess) if extra_inputs else None
-            inputs = self._inputs(sess.tool, module, op, args, analysis=analysis, extra=extra)
+            extra = dict(extra_inputs(sess)) if extra_inputs else {}
+            if analysis:  # analysis-derived output changes when annotations change: they are part of the cache key
+                extra["annotations_rev"] = annotations.load(cases, case_id, module_id)[0]
+            inputs = self._inputs(sess.tool, module, op, args, analysis=analysis, extra=extra or None)
             if use_cache:
                 hit = native.cached_evidence(cases, case_id, module_id, kind, inputs)
                 if hit is not None and hit.get("blob_sha"):
@@ -1215,6 +1325,7 @@ class RizinBackend(BackendAdapter):
             a, fn = s.resolve(function, need_function=True, poll=poll)
             data, t = s.disasm(fn["offset"], poll)
             slim = native.slim_disasm(data)
+            annotations.overlay_disasm(slim["ops"], annotations.load(native.cases_of(ctx), case_id, module_id)[1])
             return ({"untrusted": True, "note": native.UNTRUSTED_NOTE, "function": fn.get("name"),
                      "addr": native.hexaddr(fn["offset"]), "disasm": slim}, t, {"address": native.hexaddr(fn["offset"])})
         return self._op(ctx, case_id, module_id, op="disasm", args={"target": target}, analysis=True, untrusted=True,
@@ -1237,7 +1348,10 @@ class RizinBackend(BackendAdapter):
         def body(s, poll):
             a, fn = s.resolve(function, need_function=True, poll=poll)
             dec = s.decompile(fn["offset"], poll)
-            env = native.untrusted_text(dec["text"], self.settings.limits.max_subprocess_output_bytes)
+            state = annotations.load(native.cases_of(ctx), case_id, module_id)[1]
+            lo, hi = fn.get("minbound", fn["offset"]), fn.get("maxbound", fn["offset"] + (fn.get("size") or 0))
+            text = annotations.overlay_decompiled(dec["text"], annotations.comments_in(state, lo, hi))
+            env = native.untrusted_text(text, self.settings.limits.max_subprocess_output_bytes)
             return ({"function": fn.get("name"), "addr": native.hexaddr(fn["offset"]), "decompiler": dec["decompiler"],
                      "is_real_decompiler": dec["is_real_decompiler"], "decompiled": env},
                     bool(dec.get("truncated")),
@@ -1260,7 +1374,8 @@ class RizinBackend(BackendAdapter):
         try:
             module, sess = self.session_for(cases, case_id, module_id)
             inputs = self._inputs(sess.tool, module, "function_briefing", brief_args, analysis=True,
-                                  extra=self._expected_decompiler(sess))
+                                  extra={**self._expected_decompiler(sess),
+                                         "annotations_rev": annotations.load(cases, case_id, module_id)[0]})
             hit = native.cached_evidence(cases, case_id, module_id, "native.briefing", inputs)
             if hit is not None and hit.get("blob_sha"):
                 packet = cases.blobs.get_json(hit["blob_sha"])
@@ -1306,6 +1421,390 @@ class RizinBackend(BackendAdapter):
         packet["evidence_ids"] = [ev["evidence_id"]] + packet["evidence_ids"]
         return OperationResult(ok=True, data=packet, evidence_ids=packet["evidence_ids"], truncated=packet["any_truncated"])
 
+    # -- reverse-engineering workbench operations (MCP `re` toolset; the R6 app workbench reuses these) ---------------
+    def op_symbols(self, ctx: Any, *, case_id: str, module_id: str) -> OperationResult:
+        def body(s, poll):
+            data, t = s.symbols(poll)
+            items = [{k: x.get(k) for k in ("name", "flagname", "realname", "type", "bind", "vaddr", "paddr", "size", "is_imported")
+                      if k in x} for x in data or [] if isinstance(x, dict)]
+            for x in items:
+                x["addr"] = native.hexaddr(x.get("vaddr")) if isinstance(x.get("vaddr"), int) else None
+            return {"symbols": items, "count": len(items)}, t, {}
+        return self._op(ctx, case_id, module_id, op="symbols", args={}, analysis=False, untrusted=True, title="Symbols", body_fn=body)
+
+    def op_function(self, ctx: Any, *, case_id: str, module_id: str, function: str | int) -> OperationResult:
+        """One function: signature, calling convention, size, basic blocks, variables and its annotations."""
+        try:
+            target = normalize_target(function)
+        except InvalidTarget as e:
+            return OperationResult(ok=False, error=f"invalid target: {e}")
+
+        def body(s, poll):
+            _, fn = s.resolve(function, need_function=True, poll=poll)
+            a = fn["offset"]
+            blocks, t1 = s.blocks(a, poll)
+            vars_, t2 = s.variables(a, poll)
+            variables = []
+            if isinstance(vars_, dict):
+                for group, rows in vars_.items():
+                    for v in rows if isinstance(rows, list) else []:
+                        if isinstance(v, dict):
+                            variables.append({"name": v.get("name"), "type": v.get("type"), "is_arg": bool(v.get("arg")),
+                                              "storage": group, "location": v.get("storage")})
+            state = annotations.load(native.cases_of(ctx), case_id, module_id)[1]
+            key = native.hexaddr(a)
+            lo, hi = fn.get("minbound", a), fn.get("maxbound", a + (fn.get("size") or 0))
+            ann = {"function": state["functions"].get(key), "locals": state["locals"].get(key) or {},
+                   "comments": [{"addr": native.hexaddr(x), "text": tx} for x, tx in annotations.comments_in(state, lo, hi)]}
+            info = native.summarize_function(fn)
+            info["callees"] = len({r.get("to") for r in fn.get("callrefs") or [] if r.get("type") == "CALL"})
+            blk = [{"addr": native.hexaddr(b.get("addr")), "size": b.get("size"), "ninstr": b.get("ninstr"),
+                    "jump": native.hexaddr(b.get("jump")) if b.get("jump") else None,
+                    "fail": native.hexaddr(b.get("fail")) if b.get("fail") else None}
+                   for b in blocks or [] if isinstance(b, dict)]
+            return ({"function": info, "addr": key, "blocks": blk, "variables": variables, "annotations": ann},
+                    t1 or t2, {"address": key})
+        return self._op(ctx, case_id, module_id, op="function", args={"target": target}, analysis=True, untrusted=True,
+                        title=f"Function {target}", body_fn=body)
+
+    def op_disassemble(self, ctx: Any, *, case_id: str, module_id: str, addr: str | int, count: int | None = None,
+                       length: int | None = None) -> OperationResult:
+        """Linear disassembly of ``count`` instructions (<= 2000) or ``length`` bytes (<= 64 KiB) at a mapped address."""
+        try:
+            target = normalize_target(addr)
+            if (count is None) == (length is None):
+                raise InvalidTarget("give exactly one of count or length")
+            if count is not None and not 1 <= int(count) <= 2000:
+                raise InvalidTarget("count must be 1..2000")
+            if length is not None and not 1 <= int(length) <= 65536:
+                raise InvalidTarget("length must be 1..65536")
+        except InvalidTarget as e:
+            return OperationResult(ok=False, error=f"invalid target: {e}")
+
+        def body(s, poll):
+            a, _ = s.resolve(addr, need_function=False, poll=poll)
+            data, t = s.disasm_linear(a, count=count, length=length, poll=poll)
+            ops = [{k: op[k] for k in native.DISASM_OP_FIELDS if k in op} for op in data or [] if isinstance(op, dict)]
+            for op in ops:
+                op["addr"] = native.hexaddr(op.get("offset"))
+            annotations.overlay_disasm(ops, annotations.load(native.cases_of(ctx), case_id, module_id)[1])
+            return ({"untrusted": True, "note": native.UNTRUSTED_NOTE, "addr": native.hexaddr(a), "ops": ops}, t,
+                    {"address": native.hexaddr(a)})
+        return self._op(ctx, case_id, module_id, op="disassemble", args={"target": target, "count": count, "length": length},
+                        analysis=True, untrusted=True, title=f"Disassembly {target}", body_fn=body)
+
+    def op_call_graph(self, ctx: Any, *, case_id: str, module_id: str, function: str | int, depth: int = 2,
+                      direction: str = "callees", max_nodes: int = 200) -> OperationResult:
+        """Bounded call graph (breadth-first) from one function: callees, callers or both, ``depth`` 1..5, <= 500 nodes."""
+        try:
+            target = normalize_target(function)
+            if direction not in ("callees", "callers", "both"):
+                raise InvalidTarget("direction must be callees, callers or both")
+            depth = int(depth)
+            max_nodes = int(max_nodes)
+            if not 1 <= depth <= 5 or not 1 <= max_nodes <= 500:
+                raise InvalidTarget("depth must be 1..5 and max_nodes 1..500")
+        except (InvalidTarget, TypeError, ValueError) as e:
+            return OperationResult(ok=False, error=f"invalid target: {e}")
+
+        def body(s, poll):
+            _, fn = s.resolve(function, need_function=True, poll=poll)
+            funcs = s.cached_functions(poll)
+            by_off = {f["offset"]: f for f in funcs if isinstance(f.get("offset"), int)}
+            ranges = sorted((f.get("minbound", f["offset"]), f.get("maxbound", f["offset"] + (f.get("size") or 0)), f["offset"])
+                            for f in by_off.values())
+
+            def owner(x: int) -> int | None:
+                for lo, hi, off in ranges:
+                    if lo <= x < hi:
+                        return off
+                return None
+            root = fn["offset"]
+            nodes: dict[int, dict[str, Any]] = {root: {"addr": native.hexaddr(root), "name": fn.get("name"), "depth": 0}}
+            edges: set[tuple[int, int]] = set()
+            frontier, truncated = [root], False
+            for d in range(1, depth + 1):
+                nxt: list[int] = []
+                for cur in frontier:
+                    links: list[tuple[int, int]] = []
+                    if direction in ("callees", "both"):
+                        f = by_off.get(cur) or {}
+                        links += [(cur, r["to"]) for r in f.get("callrefs") or []
+                                  if r.get("type") == "CALL" and isinstance(r.get("to"), int)]
+                    if direction in ("callers", "both"):
+                        xto, _ = s.xrefs_to(cur, poll)
+                        for x in xto or []:
+                            if x.get("type") == "CALL" and isinstance(x.get("from"), int):
+                                o = owner(x["from"])
+                                links.append((o if o is not None else x["from"], cur))
+                    for a, b in links:
+                        other = b if a == cur else a
+                        if other not in nodes:
+                            if len(nodes) >= max_nodes:
+                                truncated = True
+                                continue
+                            f = by_off.get(other)
+                            nodes[other] = {"addr": native.hexaddr(other), "name": f.get("name") if f else None, "depth": d}
+                            nxt.append(other)
+                        edges.add((a, b))
+                frontier = nxt
+            edge_list = [{"from": native.hexaddr(a), "to": native.hexaddr(b)} for a, b in sorted(edges) if a in nodes and b in nodes]
+            return ({"root": native.hexaddr(root), "direction": direction, "depth": depth, "nodes": list(nodes.values()),
+                     "edges": edge_list, "node_limit_hit": truncated}, truncated, {"address": native.hexaddr(root)})
+        return self._op(ctx, case_id, module_id, op="call_graph",
+                        args={"target": target, "depth": depth, "direction": direction, "max_nodes": max_nodes},
+                        analysis=True, untrusted=True, title=f"Call graph {target} ({direction}, depth {depth})", body_fn=body)
+
+    def op_search_bytes(self, ctx: Any, *, case_id: str, module_id: str, pattern: str, limit: int = 100) -> OperationResult:
+        """Search the module file for a hex byte pattern ('48 8b ?? 24', '??' = any byte). Python-side, no rizin command."""
+        try:
+            needle = parse_byte_pattern(pattern)
+            limit = max(1, min(int(limit), 1000))
+        except (InvalidTarget, TypeError, ValueError) as e:
+            return OperationResult(ok=False, error=f"invalid target: {e}")
+        canon = " ".join("??" if b is None else f"{b:02x}" for b in needle)
+
+        def body(s, poll):
+            secs, _ = s.sections(poll)
+            regex = re.compile(b"".join(b"." if b is None else re.escape(bytes([b])) for b in needle), re.DOTALL)
+            data = s.path.read_bytes()
+            hits, more = [], False
+            for m in regex.finditer(data):
+                if len(hits) >= limit:
+                    more = True
+                    break
+                off = m.start()
+                sec = next((x for x in secs or [] if isinstance(x.get("paddr"), int) and x.get("size")
+                            and x["paddr"] <= off < x["paddr"] + x["size"]), None)
+                va = sec["vaddr"] + (off - sec["paddr"]) if sec and isinstance(sec.get("vaddr"), int) else None
+                hits.append({"paddr": native.hexaddr(off), "addr": native.hexaddr(va), "section": sec.get("name") if sec else None})
+            return {"pattern": canon, "matches": hits, "returned": len(hits), "limit": limit, "more": more}, more, {}
+        return self._op(ctx, case_id, module_id, op="search_bytes", args={"pattern": canon, "limit": limit}, analysis=False,
+                        untrusted=False, title=f"Byte search {canon[:60]}", body_fn=body)
+
+    # ---- annotations (persisted as evidence revisions, re-applied after every re-analysis) -------------------------
+    def op_annotations(self, ctx: Any, *, case_id: str, module_id: str, history: int = 0) -> OperationResult:
+        try:
+            cases = native.cases_of(ctx)
+            rev, state, ev = annotations.load(cases, case_id, module_id)
+            data: dict[str, Any] = {"revision": rev, "annotations": state,
+                                    "label": "annotations are user/model proposals, not analysis facts"}
+            if history:
+                data["history"] = annotations.history(cases, case_id, module_id, limit=max(1, min(int(history), 200)))
+            return OperationResult(ok=True, data=data, evidence_ids=[ev] if ev else [])
+        except (KeyError, ValueError) as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
+
+    def _mutate(self, ctx: Any, case_id: str, module_id: str, author: str,
+                fn: Callable[..., tuple[dict[str, Any], dict[str, Any]]]) -> OperationResult:
+        try:
+            cases = native.cases_of(ctx)
+            poll = native.poll_of(ctx)
+            _, sess = self.session_for(cases, case_id, module_id)
+            with sess.owned():
+                sess.analyze(poll)   # also replays existing annotations onto a fresh process
+                _, state, parent = annotations.load(cases, case_id, module_id)
+                new_state, change = fn(sess, annotations.mutated(state), poll, self.work_dir(cases, case_id, module_id))
+                ev = annotations.save(cases, case_id, module_id, new_state, change, parent=parent, author=author)
+            return OperationResult(ok=True, data={"change": change, "revision": ev["revision"], "applied_to_analysis": True,
+                                                  "note": "Persisted; re-applied automatically after re-analysis and on re-decompile."},
+                                   evidence_ids=[ev["evidence_id"]])
+        except (InvalidTarget, annotations.AnnotationError) as e:
+            return OperationResult(ok=False, error=f"invalid target: {e}")
+        except RizinTimeout as e:
+            return OperationResult(ok=False, error=f"timeout: {e}")
+        except (RizinError, KeyError, ValueError, OSError) as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
+
+    def op_rename(self, ctx: Any, *, case_id: str, module_id: str, kind: str, target: str | int, new_name: str,
+                  function: str | int | None = None, author: str = "user") -> OperationResult:
+        """Rename a function (target = its address/name), a global (target = address; sets a flag) or a local variable
+        (function = its function, target = the variable's current name)."""
+        if kind not in ("function", "global", "local"):
+            return OperationResult(ok=False, error="invalid target: kind must be function, global or local")
+
+        def apply(s: RizinSession, state, poll, work):
+            name = annotations.check_ident(new_name)
+            if kind == "function":
+                _, fn = s.resolve(target, need_function=True, poll=poll)
+                a = fn["offset"]
+                old = fn.get("name")
+                s.rename_function(a, name, poll)
+                got = (s.function_info(a, poll) or {}).get("name")
+                if got != name:
+                    raise InvalidTarget(f"rizin did not accept the name (function is still {got!r})")
+                state["functions"].setdefault(native.hexaddr(a), {})["name"] = name
+                return state, {"action": "rename", "kind": kind, "addr": native.hexaddr(a), "old": old, "new": name}
+            if kind == "global":
+                a = parse_address(target)
+                if a is None:
+                    raise InvalidTarget("global renames take an address (0x...)")
+                s.validate_address(a, poll)
+                key = native.hexaddr(a)
+                prev = (state["globals"].get(key) or {}).get("name")
+                if prev and prev != name:
+                    s.remove_flag(prev, poll)
+                s.set_flag(a, name, poll)
+                got = s.flag_at(a, poll)
+                if not got or got.get("name") != name:
+                    raise InvalidTarget("rizin did not accept the global name")
+                state["globals"][key] = {"name": name}
+                return state, {"action": "rename", "kind": kind, "addr": key, "old": prev, "new": name}
+            if function is None:
+                raise InvalidTarget("local renames need the function (address or name) that owns the variable")
+            cur = annotations.check_ident(str(target))
+            _, fn = s.resolve(function, need_function=True, poll=poll)
+            fa = fn["offset"]
+            if cur not in _var_names(s, fa, poll):
+                raise InvalidTarget(f"no variable {cur!r} in {fn.get('name')} "
+                                    f"(variables: {', '.join(sorted(n for n in _var_names(s, fa, poll) if n))[:300]})")
+            s.rename_variable(fa, cur, name, poll)
+            if name not in _var_names(s, fa, poll):
+                raise InvalidTarget(f"rizin did not accept the new name for {cur!r}")
+            fkey = native.hexaddr(fa)
+            orig = annotations.local_key(state, fkey, cur)
+            state["locals"].setdefault(fkey, {}).setdefault(orig, {})["name"] = name
+            return state, {"action": "rename", "kind": kind, "function": fkey, "old": cur, "new": name, "original": orig}
+        return self._mutate(ctx, case_id, module_id, author, apply)
+
+    def op_set_type(self, ctx: Any, *, case_id: str, module_id: str, kind: str, target: str | int,
+                    prototype: str | None = None, variable: str | None = None, ctype: str | None = None,
+                    author: str = "user") -> OperationResult:
+        """kind=function: apply a C prototype (its name becomes the function's name). kind=local: set a variable's type."""
+        if kind not in ("function", "local"):
+            return OperationResult(ok=False, error="invalid target: kind must be function or local")
+
+        def apply(s: RizinSession, state, poll, work):
+            _, fn = s.resolve(target, need_function=True, poll=poll)
+            fa = fn["offset"]
+            fkey = native.hexaddr(fa)
+            if kind == "function":
+                if prototype is None:
+                    raise InvalidTarget("prototype is required for kind=function")
+                proto, pname = annotations.check_prototype(prototype)
+                s.set_prototype(fa, proto, poll)
+                info = s.function_info(fa, poll) or {}
+                if f"{pname}(" not in (info.get("signature") or "").replace(" (", "("):
+                    raise InvalidTarget(f"rizin did not accept the prototype (signature is {info.get('signature')!r})")
+                ent = state["functions"].setdefault(fkey, {})
+                ent.update({"prototype": proto, "name": pname})
+                return state, {"action": "set_type", "kind": kind, "addr": fkey, "prototype": proto,
+                               "signature": info.get("signature")}
+            if variable is None or ctype is None:
+                raise InvalidTarget("variable and type are required for kind=local")
+            var = annotations.check_ident(variable)
+            t = annotations.check_ctype(ctype)
+            if var not in _var_names(s, fa, poll):
+                raise InvalidTarget(f"no variable {var!r} in {fn.get('name')}")
+            s.retype_variable(fa, var, t, poll)
+            got = _var_types(s, fa, poll).get(var)
+            if got is None or " ".join(got.split()) != t:
+                raise InvalidTarget(f"rizin did not accept type {t!r} for {var!r} (now {got!r}); "
+                                    "declare structs first with apply_struct")
+            orig = annotations.local_key(state, fkey, var)
+            ent = state["locals"].setdefault(fkey, {}).setdefault(orig, {})
+            ent["type"] = t
+            if orig != var:
+                ent.setdefault("name", var)
+            return state, {"action": "set_type", "kind": kind, "function": fkey, "variable": var, "type": t}
+        return self._mutate(ctx, case_id, module_id, author, apply)
+
+    def op_add_comment(self, ctx: Any, *, case_id: str, module_id: str, addr: str | int, text: str,
+                       author: str = "user") -> OperationResult:
+        """Attach a comment to an address (empty text removes it). Shown in disassembly and decompiler output."""
+        def apply(s: RizinSession, state, poll, work):
+            a = parse_address(addr)
+            if a is None:
+                raise InvalidTarget("comments take an address (0x...)")
+            s.validate_address(a, poll)
+            body = annotations.check_comment(text)
+            key = native.hexaddr(a)
+            if body:
+                state["comments"][key] = {"text": body}
+            else:
+                state["comments"].pop(key, None)
+            return state, {"action": "comment", "addr": key, "text": body}
+        return self._mutate(ctx, case_id, module_id, author, apply)
+
+    def op_apply_struct(self, ctx: Any, *, case_id: str, module_id: str, declaration: str, author: str = "user") -> OperationResult:
+        """Declare C types (struct/union/enum/typedef) for this module; usable afterwards in set_type."""
+        def apply(s: RizinSession, state, poll, work):
+            decl, names = annotations.check_declaration(declaration)
+            s.load_types_file(annotations.type_file(work, decl), poll)
+            for n in names:
+                if n["kind"] == "typedef":
+                    continue
+                listing, _ = s.types(n["kind"], poll)
+                if not any(isinstance(x, dict) and x.get("name") == n["name"] for x in listing or []):
+                    raise InvalidTarget(f"rizin did not accept the declaration ({n['kind']} {n['name']} not defined afterwards)")
+            sha = hashlib.sha256(decl.encode("utf-8")).hexdigest()
+            state["types"] = [t for t in state["types"] if t.get("sha256") != sha]
+            if len(state["types"]) >= annotations.MAX_TYPES:
+                raise InvalidTarget(f"at most {annotations.MAX_TYPES} declarations per module")
+            state["types"].append({"decl": decl, "names": names, "sha256": sha})
+            return state, {"action": "apply_struct", "names": names, "sha256": sha}
+        return self._mutate(ctx, case_id, module_id, author, apply)
+
+    def op_patch_bytes(self, ctx: Any, *, case_id: str, module_id: str, addr: str | int, data_hex: str, confirm: bool = False,
+                       author: str = "user") -> OperationResult:
+        """Write bytes into a COPY of the module inside the session work folder. The user's original file is never opened
+        for writing. ``confirm`` must be True. Analysis keeps using the original; open the copy to analyse the patch."""
+        if confirm is not True:
+            return OperationResult(ok=False, error="refused: patch_bytes writes a patched copy; pass confirm=true to proceed")
+        try:
+            new = bytes.fromhex(re.sub(r"\s+", "", data_hex or ""))
+        except ValueError:
+            return OperationResult(ok=False, error="invalid target: data must be hex bytes, e.g. '90 90'")
+        if not 1 <= len(new) <= 4096:
+            return OperationResult(ok=False, error="invalid target: 1..4096 bytes per patch")
+        try:
+            from ..paths import is_within
+            cases = native.cases_of(ctx)
+            poll = native.poll_of(ctx)
+            module, sess = self.session_for(cases, case_id, module_id)
+            a = parse_address(addr)
+            if a is None:
+                raise InvalidTarget("patches take an address (0x...)")
+            secs, _ = sess.sections(poll)
+            sec = next((x for x in secs or [] if isinstance(x.get("vaddr"), int) and isinstance(x.get("paddr"), int) and x.get("size")
+                        and x["vaddr"] <= a and a + len(new) <= x["vaddr"] + x["size"]), None)
+            if sec is None:
+                raise InvalidTarget(f"0x{a:x}..+{len(new)} is not inside the file-backed bytes of one section")
+            paddr = sec["paddr"] + (a - sec["vaddr"])
+            work = self.work_dir(cases, case_id, module_id)
+            copy_dir = work / "patched"
+            copy_dir.mkdir(parents=True, exist_ok=True)
+            original = resolve_final(sess.path)
+            dest = copy_dir / Path(module["rel_path"]).name
+            work_r = resolve_final(work)
+            if resolve_final(dest) == original or not is_within(resolve_final(dest), work_r) or is_within(original, work_r):
+                raise InvalidTarget("refusing: the patch destination would not be a separate copy inside the work folder")
+            if not dest.is_file():
+                shutil.copyfile(original, dest)
+            with open(original, "rb") as f:
+                f.seek(paddr)
+                orig_bytes = f.read(len(new))
+            with open(dest, "r+b") as f:
+                f.seek(paddr)
+                before = f.read(len(new))
+                f.seek(paddr)
+                f.write(new)
+            if sha256_file(original) != module["sha256"]:   # belt and braces: the original must be untouched
+                raise RizinError("original module changed on disk during patching; only the copy was written")
+            body = {"addr": native.hexaddr(a), "paddr": native.hexaddr(paddr), "section": sec.get("name"), "length": len(new),
+                    "original_bytes": orig_bytes.hex(), "previous_bytes": before.hex(), "new_bytes": new.hex(),
+                    "copy_path": str(dest), "copy_sha256": sha256_file(dest), "original_sha256": module["sha256"],
+                    "original_untouched": True, "author": author}
+            ev = native.store_evidence(cases, case_id, module_id, "re.patch", f"Patch {len(new)} bytes at 0x{a:x} (copy)", body,
+                                       {"op": "patch_bytes", "addr": body["addr"], "new": body["new_bytes"],
+                                        "previous": body["previous_bytes"], "copy_sha256": body["copy_sha256"]},
+                                       untrusted=False, producer=f"patch:{author}")
+            return OperationResult(ok=True, data=body, evidence_ids=[ev["evidence_id"]])
+        except InvalidTarget as e:
+            return OperationResult(ok=False, error=f"invalid target: {e}")
+        except (RizinError, KeyError, ValueError, OSError) as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
+
     # -- dangerous ----------------------------------------------------------------
     def admin_raw(self, ctx: Any, *, case_id: str, module_id: str, cmd: str, dangerous_ok: bool = False) -> OperationResult:
         """DANGEROUS raw command for human admins. Not an ``op_*`` method, so ``call()``/MCP/model routes cannot reach it."""
@@ -1320,3 +1819,31 @@ class RizinBackend(BackendAdapter):
                                                   "stderr_tail": pipe.stderr_tail(1000) if pipe else ""}, truncated=trunc)
         except (RizinError, InvalidTarget, KeyError, ValueError, OSError) as e:
             return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
+
+
+def _var_rows(s: RizinSession, fa: int, poll) -> list[dict[str, Any]]:
+    data, _ = s.variables(fa, poll)
+    if not isinstance(data, dict):
+        return []
+    return [v for g in data.values() if isinstance(g, list) for v in g if isinstance(v, dict)]
+
+
+def _var_names(s: RizinSession, fa: int, poll) -> set[str]:
+    return {v.get("name") for v in _var_rows(s, fa, poll)}
+
+
+def _var_types(s: RizinSession, fa: int, poll) -> dict[str, str]:
+    return {v.get("name"): v.get("type") or "" for v in _var_rows(s, fa, poll)}
+
+
+def parse_byte_pattern(pattern: str) -> list[int | None]:
+    """'48 8b ?? 24' / '488b??24' -> [0x48, 0x8b, None, 0x24]. 1..256 bytes, at least one fixed byte."""
+    if not isinstance(pattern, str):
+        raise InvalidTarget("pattern must be a string")
+    p = re.sub(r"\s+", "", pattern)
+    if not p or len(p) % 2 or not re.fullmatch(r"(?:[0-9a-fA-F]{2}|\?\?)+", p):
+        raise InvalidTarget("pattern must be hex byte pairs with optional '??' wildcards, e.g. '48 8b ?? 24'")
+    out = [None if p[i:i + 2] == "??" else int(p[i:i + 2], 16) for i in range(0, len(p), 2)]
+    if len(out) > 256 or all(b is None for b in out):
+        raise InvalidTarget("pattern must be 1..256 bytes with at least one fixed byte")
+    return out

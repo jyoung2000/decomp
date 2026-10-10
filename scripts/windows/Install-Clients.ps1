@@ -10,7 +10,7 @@
 .PARAMETER RuntimeDir  Bundled runtime folder (contains python.exe and Scripts\rebuild-mcp.exe). Auto-detected next to the install root.
 .PARAMETER McpCommand  Explicit path to rebuild-mcp.exe (overrides detection).
 .PARAMETER DataDir     Data directory to pass to the MCP server (always written for Hermes).
-.PARAMETER Toolset     minimal | analysis | rebuild | all (default all)
+.PARAMETER Toolset     minimal | analysis | rebuild | re | all (default all)
 .PARAMETER Rules       Also add the short rules block to the global AGENTS.md / GEMINI.md (Codex, Gemini).
 #>
 [CmdletBinding()]
@@ -20,7 +20,7 @@ param(
   [string]$RuntimeDir,
   [string]$McpCommand,
   [string]$DataDir,
-  [ValidateSet('minimal','analysis','rebuild','all')][string]$Toolset = 'all',
+  [ValidateSet('minimal','analysis','rebuild','re','all')][string]$Toolset = 'all',
   [switch]$Rules,
   [switch]$Remove
 )

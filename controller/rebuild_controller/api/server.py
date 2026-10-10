@@ -222,9 +222,48 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
             code = 400
         return JSONResponse({"error": {"code": name, "message": str(exc)[:2000], "next_action": next_action}}, status_code=code)
 
+    # ---------------------------------------------------------------- MCP over streamable HTTP (same tools as rebuild-mcp)
+    # Loopback only (serve() binds 127.0.0.1), guarded by the auth middleware above (bearer token + Origin allow-list) and the
+    # SDK's Host-header check. Stateless JSON responses: analysis sessions live in the controller, not in the HTTP session.
+    mcp_http = _mount_mcp(app, studio)
+
     @app.on_event("startup")
     async def _startup():
         loop_holder["loop"] = asyncio.get_running_loop()
+        if mcp_http is not None:
+            stop = loop_holder["mcp_stop"] = asyncio.Event()
+
+            async def _run_mcp():
+                async with mcp_http.session_manager.run():
+                    await stop.wait()
+            loop_holder["mcp_task"] = asyncio.create_task(_run_mcp())
+
+    @app.on_event("shutdown")
+    async def _shutdown():
+        if "mcp_stop" in loop_holder:
+            loop_holder["mcp_stop"].set()
+            try:
+                await asyncio.wait_for(loop_holder["mcp_task"], timeout=5)
+            except Exception:
+                pass
+
+    @app.get("/mcp/config")
+    def mcp_config(request: Request, client: str = "claude-code", transport: str = "stdio", toolset: str = "all"):
+        """Config snippet for an MCP client (UI: Settings -> Copy MCP config). stdio is stable; http uses this controller."""
+        from ..mcp.client_config import render
+        from ..mcp.server import TOOLSETS
+        if toolset not in TOOLSETS:
+            raise _err("validation", f"toolset must be one of {', '.join(sorted(TOOLSETS))}", 400)
+        if transport == "http" and mcp_http is None:
+            raise _err("unavailable", "the MCP HTTP transport is not available in this controller", 503)
+        base = f"http://127.0.0.1:{request.url.port}" if request.url.port else str(request.base_url).rstrip("/")
+        try:
+            out = render(client, transport, toolset=toolset, data_dir=str(studio.settings.data_dir),
+                         url=base + "/mcp", token=token)
+        except ValueError as e:
+            raise _err("validation", str(e), 400, next_action="choose client claude-code|codex|gemini|hermes|generic, transport stdio|http")
+        out["http_available"] = mcp_http is not None
+        return out
 
     # ---------------------------------------------------------------- health / events
     @app.get("/health")
@@ -289,8 +328,9 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
                         launch_profile=body.launch_profile, profile=body.profile)
 
     @app.get("/cases")
-    def cases():
-        rows = studio.cases.list_cases()
+    def cases(include_re: int = 0):
+        from ..re_workbench import is_re_case
+        rows = [c for c in studio.cases.list_cases() if include_re or not is_re_case(c)]  # hidden analysis-session cases
         for c in rows:
             c["outcome"] = _outcome(studio, c["case_id"])
         return rows
@@ -667,6 +707,27 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     from .scenario_routes import mount_scenario_routes; mount_scenario_routes(app, studio)  # user-declared scenarios
     from .local_ai_routes import mount_local_ai_routes; mount_local_ai_routes(app, studio)  # local AI detection + model downloads
     return app
+
+
+def _mount_mcp(app: FastAPI, studio: StudioServices):
+    """Add POST/GET/DELETE /mcp (MCP streamable HTTP). Returns the MCP server, or None when the SDK is unavailable."""
+    try:
+        from mcp.server.streamable_http_manager import StreamableHTTPASGIApp
+        from mcp.server.transport_security import TransportSecuritySettings
+        from starlette.routing import Route
+        from ..mcp.server import ServerConfig, build_server
+    except Exception as e:  # pragma: no cover - optional dependency missing in a partial install
+        getattr(studio, "optional_errors", {})["mcp_http"] = f"{type(e).__name__}: {e}"
+        return None
+    server = build_server(studio, ServerConfig(toolset="all", max_context_bytes=studio.settings.limits.max_context_bytes,
+                                               runner="never"))
+    local = ["127.0.0.1:*", "localhost:*", "[::1]:*"]
+    server.streamable_http_app(streamable_http_path="/mcp", stateless_http=True, json_response=True,
+                               transport_security=TransportSecuritySettings(
+                                   enable_dns_rebinding_protection=True, allowed_hosts=local,
+                                   allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"]))
+    app.router.routes.append(Route("/mcp", endpoint=StreamableHTTPASGIApp(server.session_manager), methods=["GET", "POST", "DELETE"]))
+    return server
 
 
 def write_controller_info(data_dir: Path, port: int, token: str) -> Path:

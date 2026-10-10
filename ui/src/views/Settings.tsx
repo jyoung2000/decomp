@@ -5,7 +5,7 @@ import { StatusChip } from '../components/StatusChip';
 import { useToast } from '../components/Toasts';
 import { bytes, humanize } from '../lib/format';
 import { useApi, useResource } from '../lib/store';
-import type { Availability, BackendEntry, ToolProbe } from '../lib/types';
+import type { Availability, BackendEntry, McpClient, ToolProbe } from '../lib/types';
 
 const AVAIL: Availability[] = ['missing', 'detected', 'installed', 'usable', 'verified'];
 const AVAIL_HELP: Record<Availability, string> = {
@@ -26,6 +26,7 @@ export function SettingsView() {
         </div>
       </div>
       <Doctor />
+      <McpConfigCard />
       <SettingsEditor />
     </div>
   );
@@ -83,6 +84,90 @@ function Doctor() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const MCP_CLIENTS: { id: McpClient; label: string }[] = [
+  { id: 'claude-code', label: 'Claude Code' },
+  { id: 'codex', label: 'Codex' },
+  { id: 'gemini', label: 'Gemini CLI' },
+  { id: 'hermes', label: 'Hermes' },
+  { id: 'generic', label: 'Other MCP client (generic)' },
+];
+
+/** "Copy MCP config": lets an AI client use the same analysis tools (stdio: permanent; http: this running app only). */
+function McpConfigCard() {
+  const api = useApi();
+  const toast = useToast();
+  const [client, setClient] = useState<McpClient>('claude-code');
+  const [transport, setTransport] = useState<'stdio' | 'http'>('stdio');
+  const res = useResource(() => api.mcpConfig(client, transport), [api, client, transport]);
+  const copy = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${what} copied`, 'Paste it into the client’s MCP settings.');
+    } catch (e) {
+      toast.error(`Could not copy the ${what.toLowerCase()}`, e);
+    }
+  };
+  return (
+    <section className="card" aria-labelledby="mcp-h" data-testid="mcp-config">
+      <div className="card-head">
+        <h3 id="mcp-h">Use Rebuild Studio from an AI client (MCP)</h3>
+      </div>
+      <p className="small muted" style={{ marginBottom: 12 }}>
+        Claude Code, Codex, Gemini CLI, Hermes or any MCP client can open binaries, decompile, rename and retype through the same
+        tools this app uses. Nothing is changed in the client until you paste the configuration.
+      </p>
+      <div className="row" style={{ marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+        <label className="stack" htmlFor="mcp-client">
+          <span className="small">Client</span>
+          <select id="mcp-client" value={client} onChange={(e) => setClient(e.target.value as McpClient)}>
+            {MCP_CLIENTS.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="stack" htmlFor="mcp-transport">
+          <span className="small">Connection</span>
+          <select id="mcp-transport" value={transport} onChange={(e) => setTransport(e.target.value as 'stdio' | 'http')}>
+            <option value="stdio">Start its own server (stdio, permanent)</option>
+            <option value="http">Connect to this running app (HTTP, until restart)</option>
+          </select>
+        </label>
+      </div>
+      {res.error ? (
+        <ErrorCallout error={res.error} title="MCP configuration unavailable" onRetry={res.reload} />
+      ) : !res.data ? (
+        <Loading what="MCP configuration" />
+      ) : (
+        <div className="stack">
+          <div className="small">
+            Paste into <span className="mono">{res.data.where}</span> ({res.data.format.toUpperCase()}).
+          </div>
+          <pre className="mono small wrap-any" data-testid="mcp-config-text" style={{ maxHeight: 220, overflow: 'auto' }}>
+            {res.data.text}
+          </pre>
+          {res.data.notes.map((n) => (
+            <p key={n} className="xs muted">
+              {n}
+            </p>
+          ))}
+          <div className="btn-group">
+            <button type="button" className="btn primary" data-testid="mcp-copy" onClick={() => copy(res.data!.text, 'MCP config')}>
+              Copy MCP config
+            </button>
+            {res.data.command && (
+              <button type="button" className="btn" data-testid="mcp-copy-command" onClick={() => copy(res.data!.command!, 'Command')}>
+                Copy <span className="mono">claude mcp add</span> command
+              </button>
+            )}
+          </div>
         </div>
       )}
     </section>

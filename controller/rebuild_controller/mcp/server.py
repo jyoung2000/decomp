@@ -60,8 +60,12 @@ _MINIMAL = ("doctor", "list_cases", "create_case", "start_rebuild", "job_status"
 _ANALYSIS = _MINIMAL + ("inventory", "list_modules", "analyze_module", "list_features", "get_function_briefing",
                         "search_evidence", "get_evidence", "capture_original")
 _REBUILD = _ANALYSIS + ("propose_candidate", "build_candidate", "compare_candidate")
-_ALL = _REBUILD + ("propose_knowledge", "validate_knowledge")
-TOOLSETS.update({"minimal": _MINIMAL, "analysis": _ANALYSIS, "rebuild": _REBUILD, "all": _ALL})
+# Reverse-engineering primitives over an analysis session (Ghidra/Cutter-class; docs/API.md "MCP tool reference").
+_RE = ("doctor", "open_binary", "list_sessions", "close_session", "list_functions", "get_function", "decompile", "disassemble",
+       "xrefs_to", "xrefs_from", "call_graph", "strings", "imports", "exports", "symbols", "sections", "entry_points",
+       "search_bytes", "get_annotations", "rename", "set_type", "add_comment", "apply_struct", "patch_bytes")
+_ALL = tuple(dict.fromkeys(_REBUILD + ("propose_knowledge", "validate_knowledge") + _RE))
+TOOLSETS.update({"minimal": _MINIMAL, "analysis": _ANALYSIS, "rebuild": _REBUILD, "re": _RE, "all": _ALL})
 DIAGNOSTIC_TOOL = "admin_diagnostics"   # only registered with --diagnostic; in no toolset
 
 
@@ -235,6 +239,7 @@ _TRUSTED_KEYS = frozenset({
     "kind", "state", "status", "stage", "ai_mode", "tools", "server_version", "mcp_sdk", "python", "format", "profile", "arch", "producer", "verdict", "availability", "target_language",
     "output_type", "mode", "impl_status", "verify_status", "user_review", "origin", "toolset", "tool", "code", "backend_id",
     "integration", "version", "app_version", "revision", "sha256", "build_hash", "tree_sha", "input_hash", "blob_sha",
+    "addr", "address", "paddr", "root", "from", "to", "call_site", "decompiler", "direction", "pattern", "action",
 })
 _TRUSTED_SUFFIXES = ("_id", "_ids", "_at", "_sha", "_sha256", "_hash")
 
@@ -509,7 +514,7 @@ class Runtime:
 
     def t_list_cases(self, limit: int) -> Callable[[StudioLike], Outcome]:
         def body(s: StudioLike) -> Outcome:
-            rows = s.cases.list_cases()
+            rows = [c for c in s.cases.list_cases() if (c.get("settings") or {}).get("kind") != "re_session"]  # RE sessions: list_sessions
             return Outcome({"cases": [self._case_summary(c) for c in rows[:limit]], "total": len(rows)}, truncated=len(rows) > limit)
         return body
 
@@ -730,6 +735,99 @@ class Runtime:
             return Outcome(info)
         return body
 
+    # -- reverse-engineering session tools (toolset `re`) ------------------------------------------------
+    def workbench(self, s: StudioLike) -> Any:
+        wb = getattr(s, "re", None)
+        if wb is None:
+            with self._lock:
+                wb = getattr(self, "_wb", None)
+                if wb is None:
+                    from ..re_workbench import ReWorkbench
+                    wb = self._wb = ReWorkbench(s)
+        return wb
+
+    @staticmethod
+    def _wb_guard(fn: Callable[[], Any]) -> Any:
+        from ..re_workbench import WorkbenchError
+        try:
+            return fn()
+        except WorkbenchError as e:
+            raise ToolFailure(e.code, e.message, e.next_action) from None
+
+    @staticmethod
+    def op_data(res: Any) -> dict[str, Any]:
+        """Map a backend OperationResult to tool data, or raise a ToolFailure with a stable code."""
+        if not res.ok:
+            err = str(res.error or "")
+            low = err.lower()
+            if low.startswith("invalid target"):
+                raise ToolFailure("invalid_target", "The backend rejected the target or value.",
+                                  "Check the address/name (list_functions, sections) and the value format.", detail=err)
+            if low.startswith("refused"):
+                raise ToolFailure("refused", "The request was refused.", "Read the detail; do not retry unchanged.", detail=err)
+            if low.startswith("timeout"):
+                raise ToolFailure("timeout", "The analysis backend timed out.", "Retry with a narrower request.", detail=err)
+            if "not available" in low:
+                raise ToolFailure("unavailable", "The analysis backend is not available.", "Run doctor; install rizin in Tools.",
+                                  detail=err)
+            raise ToolFailure("backend_error", "The analysis backend reported an error.", "See detail.", detail=err)
+        data = dict(res.data or {})
+        data["evidence_ids"] = list(res.evidence_ids or [])
+        return data
+
+    def t_re(self, session_id: str, op: str, shape: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None,
+             **kwargs: Any) -> Callable[[StudioLike], Outcome]:
+        def body(s: StudioLike) -> Outcome:
+            wb = self.workbench(s)
+            res, sess = self._wb_guard(lambda: wb.call(session_id, op, **kwargs))
+            data = self.op_data(res)
+            trunc = bool(res.truncated)
+            if shape is not None:
+                data = shape(data)
+                trunc = trunc or bool(data.pop("_truncated", False))
+            data["session_id"] = session_id
+            return Outcome(data, case_id=sess["case_id"], truncated=trunc)
+        return body
+
+    def t_re_custom(self, fn: Callable[[Any, StudioLike], tuple[Any, Optional[str], bool]]) -> Callable[[StudioLike], Outcome]:
+        def body(s: StudioLike) -> Outcome:
+            data, case_id, trunc = self._wb_guard(lambda: fn(self.workbench(s), s))
+            return Outcome(data, case_id=case_id, truncated=trunc)
+        return body
+
+
+def _target(address: Optional[str], name: Optional[str]) -> str:
+    if bool(address) == bool(name):
+        raise ToolFailure("rejected", "Provide exactly one of address or name.", "Retry with one of them.")
+    return normalize_address(address) if address else str(name)
+
+
+def _paged(data: dict[str, Any], key: str, offset: int, limit: int, rows: Optional[list[Any]] = None) -> dict[str, Any]:
+    items = rows if rows is not None else list(data.get(key) or [])
+    page = items[offset:offset + limit]
+    return {key: page, "total": len(items), "offset": offset, "returned": len(page), "evidence_ids": data.get("evidence_ids", []),
+            "_truncated": offset + limit < len(items)}
+
+
+def _filter(rows: list[Any], contains: Optional[str], keys: tuple[str, ...]) -> list[Any]:
+    if not contains:
+        return rows
+    n = contains.lower()
+    return [r for r in rows if isinstance(r, dict) and any(n in str(r.get(k) or "").lower() for k in keys)]
+
+
+def _hexify_refs(rows: list[Any]) -> list[dict[str, Any]]:
+    out = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        x = {k: v for k, v in r.items() if k in ("from", "to", "addr", "type", "perm", "opcode", "fcn_addr", "fcn_name", "refname", "name")}
+        for k in ("from", "to", "addr", "fcn_addr"):
+            if isinstance(x.get(k), int):
+                x[k] = "0x%x" % x[k]
+        out.append(x)
+    return out
+
 
 def _sdk_version() -> str:
     try:
@@ -898,6 +996,280 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
     async def validate_knowledge(knowledge_id: KnowledgeId) -> CallToolResult:
         return await run("validate_knowledge", rt.t_validate_knowledge(knowledge_id))
 
+    # ---- reverse engineering (toolset `re`) -----------------------------------------------------
+    SID = Annotated[str, Field(pattern=r"^res_[0-9a-f]{22}$", description="Analysis session id from open_binary")]
+    Addr = Optional[HexAddress]
+    Name = Optional[SymbolName]
+    Offset = Annotated[int, Field(ge=0, le=10_000_000)]
+    Contains = Optional[Annotated[str, Field(min_length=1, max_length=120), AfterValidator(_check_no_controls)]]
+    Ident = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$", description="C identifier")]
+    BinaryPath = Annotated[str, AfterValidator(_check_abs_root), Field(description="Absolute path of a binary file the user named")]
+
+    @spec("open_binary", "Open an analysis session on a binary: either an absolute file path (ad-hoc; no case needed, evidence "
+                         "and annotations are still stored and persist when the same file is opened again) or an existing "
+                         "case module (case_id + module_id). Returns session_id for every other re tool. Analysis (aaa) runs "
+                         "lazily on the first tool that needs it.", read_only=False, idempotent=True)
+    async def open_binary(path: Optional[BinaryPath] = None, case_id: Optional[CaseId] = None,
+                          module_id: Optional[ModuleId] = None) -> CallToolResult:
+        def fn(wb: Any, s: StudioLike):
+            sess = wb.open(path=path, case_id=case_id, module_id=module_id)
+            return {"session": sess, "next": "list_functions / strings / imports, then decompile or get_function."}, sess["case_id"], False
+        return await run("open_binary", rt.t_re_custom(fn))
+
+    @spec("list_sessions", "List open analysis sessions (session_id, case/module, file name, sha256).", read_only=True)
+    async def list_sessions(include_closed: bool = False) -> CallToolResult:
+        return await run("list_sessions", rt.t_re_custom(lambda wb, s: ({"sessions": wb.list(include_closed)}, None, False)))
+
+    @spec("close_session", "Close an analysis session and stop its rizin process. Evidence and annotations are kept.",
+          read_only=False, idempotent=True)
+    async def close_session(session_id: SID) -> CallToolResult:
+        def fn(wb: Any, s: StudioLike):
+            sess = wb.get(session_id)
+            return wb.close(session_id), sess["case_id"], False
+        return await run("close_session", rt.t_re_custom(fn))
+
+    @spec("list_functions", "Analysed functions (address, name, size, blocks, cc, signature). Filter by name substring; sort by "
+                            "addr|size|name; paged.", read_only=True)
+    async def list_functions(session_id: SID, contains: Contains = None,
+                             sort: Literal["addr", "size", "name"] = "addr", offset: Offset = 0,
+                             limit: Annotated[int, Field(ge=1, le=500)] = 100) -> CallToolResult:
+        def shape(d: dict[str, Any]) -> dict[str, Any]:
+            rows = _filter(list(d.get("functions") or []), contains, ("name",))
+            key = {"addr": lambda f: f.get("offset") or 0, "size": lambda f: -(f.get("size") or 0), "name": lambda f: str(f.get("name"))}[sort]
+            rows.sort(key=key)
+            slim = [{k: f.get(k) for k in ("addr", "name", "size", "nbbs", "cc", "calltype", "signature", "noreturn") if k in f} for f in rows]
+            return _paged(d, "functions", offset, limit, slim)
+        return await run("list_functions", rt.t_re(session_id, "functions", shape))
+
+    @spec("get_function", "One function: signature, calling convention, size, basic blocks, variables (args/locals with types) "
+                          "and its annotations. Give exactly one of address (any address inside it) or name.", read_only=True)
+    async def get_function(session_id: SID, address: Addr = None, name: Name = None) -> CallToolResult:
+        def body(s: StudioLike) -> Outcome:
+            return rt.t_re(session_id, "function", function=_target(address, name))(s)
+        return await run("get_function", body)
+
+    @spec("decompile", "Decompile one function. decompiler=rizin uses rz-ghidra (pdg) when loaded, otherwise rizin pseudo-code "
+                       "(labelled is_real_decompiler=false); decompiler=ghidra uses Ghidra headless when installed. Annotations "
+                       "(renames, types, structs, comments) are applied to rizin output.", read_only=True)
+    async def decompile(session_id: SID, address: Addr = None, name: Name = None,
+                        decompiler: Literal["rizin", "ghidra"] = "rizin") -> CallToolResult:
+        def body(s: StudioLike) -> Outcome:
+            target = _target(address, name)
+            wb = rt.workbench(s)
+            res, sess = rt._wb_guard(lambda: wb.decompile(session_id, target, decompiler))
+            data = rt.op_data(res)
+            data["session_id"] = session_id
+            return Outcome(data, case_id=sess["case_id"], truncated=bool(res.truncated))
+        return await run("decompile", body)
+
+    @spec("disassemble", "Disassemble a whole function (address or name, no count/length), or linearly from an address: count "
+                         "instructions (<= 2000) or length bytes (<= 65536). User comments appear as user_comment.", read_only=True)
+    async def disassemble(session_id: SID, address: Addr = None, name: Name = None,
+                          count: Optional[Annotated[int, Field(ge=1, le=2000)]] = None,
+                          length: Optional[Annotated[int, Field(ge=1, le=65536)]] = None) -> CallToolResult:
+        def body(s: StudioLike) -> Outcome:
+            target = _target(address, name)
+            if count is not None and length is not None:
+                raise ToolFailure("rejected", "Give at most one of count or length.", "Retry with one of them.")
+            if count is None and length is None:
+                return rt.t_re(session_id, "disasm", function=target)(s)
+            if not address:
+                raise ToolFailure("rejected", "Linear disassembly (count/length) needs an address.", "Pass address.")
+            return rt.t_re(session_id, "disassemble", addr=target, count=count, length=length)(s)
+        return await run("disassemble", body)
+
+    def _xrefs(direction: str, session_id: str, address: Optional[str], name: Optional[str], limit: int):
+        def body(s: StudioLike) -> Outcome:
+            target = _target(address, name)
+
+            def shape(d: dict[str, Any]) -> dict[str, Any]:
+                rows = _hexify_refs(d.get(direction) or [])
+                return {"addr": d.get("addr"), "direction": direction, "refs": rows[:limit], "total": len(rows),
+                        "evidence_ids": d.get("evidence_ids", []), "_truncated": len(rows) > limit}
+            return rt.t_re(session_id, "xrefs", shape, addr=target)(s)
+        return body
+
+    @spec("xrefs_to", "References TO an address or symbol (who calls/reads/writes it): from, type (CALL/CODE/DATA/STRING), "
+                      "containing function.", read_only=True)
+    async def xrefs_to(session_id: SID, address: Addr = None, name: Name = None,
+                       limit: Annotated[int, Field(ge=1, le=1000)] = 200) -> CallToolResult:
+        return await run("xrefs_to", _xrefs("to", session_id, address, name, limit))
+
+    @spec("xrefs_from", "References FROM an address (the instruction or data at it) to other addresses.", read_only=True)
+    async def xrefs_from(session_id: SID, address: Addr = None, name: Name = None,
+                         limit: Annotated[int, Field(ge=1, le=1000)] = 200) -> CallToolResult:
+        return await run("xrefs_from", _xrefs("from", session_id, address, name, limit))
+
+    @spec("call_graph", "Bounded call graph from one function (breadth-first): callees, callers or both; depth 1..5; at most "
+                        "max_nodes nodes (node_limit_hit=true when cut).", read_only=True)
+    async def call_graph(session_id: SID, address: Addr = None, name: Name = None,
+                         direction: Literal["callees", "callers", "both"] = "callees",
+                         depth: Annotated[int, Field(ge=1, le=5)] = 2,
+                         max_nodes: Annotated[int, Field(ge=1, le=500)] = 200) -> CallToolResult:
+        def body(s: StudioLike) -> Outcome:
+            return rt.t_re(session_id, "call_graph", function=_target(address, name), depth=depth, direction=direction,
+                           max_nodes=max_nodes)(s)
+        return await run("call_graph", body)
+
+    @spec("strings", "Strings in the binary (izz), filtered by substring (contains) or bounded regex (no nested quantifiers or "
+                     "backreferences), minimum length and section; paged.", read_only=True)
+    async def strings(session_id: SID, contains: Contains = None,
+                      regex: Optional[Annotated[str, Field(min_length=1, max_length=200), AfterValidator(_check_no_controls)]] = None,
+                      min_length: Annotated[int, Field(ge=1, le=1000)] = 4,
+                      section: Optional[Annotated[str, Field(pattern=r"^[A-Za-z0-9_.$\-]{1,64}$")]] = None,
+                      offset: Offset = 0, limit: Annotated[int, Field(ge=1, le=500)] = 100) -> CallToolResult:
+        def body(s: StudioLike) -> Outcome:
+            from ..backends.rizin_worker import MAX_STRINGS
+            rx = rt._wb_guard(lambda: rt.workbench(s).compile_regex(regex)) if regex else None
+
+            def shape(d: dict[str, Any]) -> dict[str, Any]:
+                rows = [x for x in d.get("strings") or [] if isinstance(x, dict) and (x.get("length") or 0) >= min_length]
+                if section:
+                    rows = [x for x in rows if str(x.get("section") or "") == section]
+                rows = _filter(rows, contains, ("string",))
+                if rx is not None:
+                    rows = [x for x in rows if rx.search(str(x.get("string") or ""))]
+                for x in rows:
+                    if isinstance(x.get("vaddr"), int):
+                        x["addr"] = "0x%x" % x["vaddr"]
+                out = _paged(d, "strings", offset, limit, rows)
+                out["scanned"] = d.get("seen")
+                out["_truncated"] = out["_truncated"] or bool(d.get("count_truncated"))
+                return out
+            return rt.t_re(session_id, "strings", shape, limit=MAX_STRINGS)(s)
+        return await run("strings", body)
+
+    def _table(op: str, key: str, session_id: str, contains: Optional[str], offset: int, limit: int):
+        def shape(d: dict[str, Any]) -> dict[str, Any]:
+            rows = _filter(list(d.get(key) or []), contains, ("name", "realname", "flagname", "libname"))
+            for x in rows:
+                if isinstance(x, dict):
+                    for k in ("vaddr", "plt"):
+                        if isinstance(x.get(k), int) and x[k]:
+                            x.setdefault("addr", "0x%x" % x[k])
+            return _paged(d, key, offset, limit, rows)
+        return rt.t_re(session_id, op, shape)
+
+    @spec("imports", "Imported functions/symbols (library, name, PLT/IAT address); name filter; paged.", read_only=True)
+    async def imports(session_id: SID, contains: Contains = None, offset: Offset = 0,
+                      limit: Annotated[int, Field(ge=1, le=1000)] = 200) -> CallToolResult:
+        return await run("imports", _table("imports", "imports", session_id, contains, offset, limit))
+
+    @spec("exports", "Exported symbols; name filter; paged.", read_only=True)
+    async def exports(session_id: SID, contains: Contains = None, offset: Offset = 0,
+                      limit: Annotated[int, Field(ge=1, le=1000)] = 200) -> CallToolResult:
+        return await run("exports", _table("exports", "exports", session_id, contains, offset, limit))
+
+    @spec("symbols", "Symbol table (functions, objects, imports); name filter; paged.", read_only=True)
+    async def symbols(session_id: SID, contains: Contains = None, offset: Offset = 0,
+                      limit: Annotated[int, Field(ge=1, le=1000)] = 200) -> CallToolResult:
+        return await run("symbols", _table("symbols", "symbols", session_id, contains, offset, limit))
+
+    @spec("sections", "Sections and segments (name, virtual/physical address and size, permissions).", read_only=True)
+    async def sections(session_id: SID) -> CallToolResult:
+        def shape(d: dict[str, Any]) -> dict[str, Any]:
+            for grp in ("sections", "segments"):
+                for x in d.get(grp) or []:
+                    if isinstance(x, dict):
+                        for k in ("vaddr", "paddr"):
+                            if isinstance(x.get(k), int):
+                                x[k] = "0x%x" % x[k]
+            return d
+        return await run("sections", rt.t_re(session_id, "sections", shape))
+
+    @spec("entry_points", "Program entry points (address, type).", read_only=True)
+    async def entry_points(session_id: SID) -> CallToolResult:
+        return await run("entry_points", rt.t_re(session_id, "entrypoints"))
+
+    @spec("search_bytes", "Search the binary: hex = byte pattern with ?? wildcards (e.g. '48 8b ?? 24'), or string_regex = "
+                          "bounded regex over extracted strings. Give exactly one.", read_only=True)
+    async def search_bytes(session_id: SID,
+                           hex: Optional[Annotated[str, Field(pattern=r"^[0-9a-fA-F?\s]{2,800}$")]] = None,
+                           string_regex: Optional[Annotated[str, Field(min_length=1, max_length=200), AfterValidator(_check_no_controls)]] = None,
+                           limit: Annotated[int, Field(ge=1, le=1000)] = 100) -> CallToolResult:
+        def body(s: StudioLike) -> Outcome:
+            if bool(hex) == bool(string_regex):
+                raise ToolFailure("rejected", "Provide exactly one of hex or string_regex.", "Retry with one of them.")
+            if hex:
+                return rt.t_re(session_id, "search_bytes", pattern=hex, limit=limit)(s)
+            from ..backends.rizin_worker import MAX_STRINGS
+            rx = rt._wb_guard(lambda: rt.workbench(s).compile_regex(string_regex))
+
+            def shape(d: dict[str, Any]) -> dict[str, Any]:
+                hits = [{"addr": "0x%x" % x["vaddr"] if isinstance(x.get("vaddr"), int) else None, "string": x.get("string"),
+                         "section": x.get("section")} for x in d.get("strings") or [] if isinstance(x, dict) and rx.search(str(x.get("string") or ""))]
+                return {"matches": hits[:limit], "total": len(hits), "evidence_ids": d.get("evidence_ids", []), "_truncated": len(hits) > limit}
+            return rt.t_re(session_id, "strings", shape, limit=MAX_STRINGS)(s)
+        return await run("search_bytes", body)
+
+    @spec("get_annotations", "Current annotations of the session's module (renames, prototypes, local types, comments, declared "
+                             "types) and optionally the last N changes. Annotations are proposals, not analysis facts.", read_only=True)
+    async def get_annotations(session_id: SID, history: Annotated[int, Field(ge=0, le=200)] = 0) -> CallToolResult:
+        return await run("get_annotations", rt.t_re(session_id, "annotations", history=history))
+
+    @spec("rename", "Rename a function (address or name), a global (address; creates/renames a flag) or a local variable "
+                    "(function address/name + variable = its current name). Persisted as an evidence revision and re-applied "
+                    "after re-analysis; visible in decompile output.", read_only=False, idempotent=True)
+    async def rename(session_id: SID, kind: Literal["function", "global", "local"], new_name: Ident,
+                     address: Addr = None, name: Name = None, variable: Optional[Ident] = None) -> CallToolResult:
+        def body(s: StudioLike) -> Outcome:
+            target = _target(address, name)
+            if kind == "local":
+                if not variable:
+                    raise ToolFailure("rejected", "kind=local needs variable (the current variable name).", "Read get_function.variables.")
+                return rt.t_re(session_id, "rename", kind=kind, target=variable, new_name=new_name, function=target, author="model")(s)
+            if variable:
+                raise ToolFailure("rejected", "variable is only valid with kind=local.", "Remove variable.")
+            return rt.t_re(session_id, "rename", kind=kind, target=target, new_name=new_name, author="model")(s)
+        return await run("rename", body)
+
+    @spec("set_type", "kind=function: apply a C prototype to the function at address/name (the name in the prototype becomes "
+                      "the function's name), e.g. 'int parse_args(int argc, char **argv)'. kind=local: set a variable's C type "
+                      "('uint32_t', 'char *', 'struct point *'; declare structs first with apply_struct). Persisted; re-applied "
+                      "on re-analysis.", read_only=False, idempotent=True)
+    async def set_type(session_id: SID, kind: Literal["function", "local"], address: Addr = None, name: Name = None,
+                       prototype: Optional[Annotated[str, Field(pattern=r"^[A-Za-z0-9_ *,()\[\].]{3,512}$")]] = None,
+                       variable: Optional[Ident] = None,
+                       type: Optional[Annotated[str, Field(pattern=r"^[A-Za-z0-9_ *]{1,128}$")]] = None) -> CallToolResult:
+        def body(s: StudioLike) -> Outcome:
+            target = _target(address, name)
+            if kind == "function" and (not prototype or variable or type):
+                raise ToolFailure("rejected", "kind=function takes prototype only.", "Pass prototype.")
+            if kind == "local" and (prototype or not variable or not type):
+                raise ToolFailure("rejected", "kind=local takes variable and type.", "Pass variable and type.")
+            return rt.t_re(session_id, "set_type", kind=kind, target=target, prototype=prototype, variable=variable,
+                           ctype=type, author="model")(s)
+        return await run("set_type", body)
+
+    @spec("add_comment", "Attach a one-line comment (<= 1000 chars) to an address; empty text removes it. Shown in disassemble "
+                         "(user_comment) and at the top of decompile output. Persisted.", read_only=False, idempotent=True)
+    async def add_comment(session_id: SID, address: HexAddress,
+                          text: Annotated[str, Field(max_length=1000), AfterValidator(_check_no_controls)]) -> CallToolResult:
+        if "\n" in text:
+            return rt._error(new_id("op"), "add_comment", time.monotonic(),
+                             ToolFailure("rejected", "Comments are single-line.", "Remove newlines."))
+        return await run("add_comment", rt.t_re(session_id, "add_comment", addr=normalize_address(address), text=text, author="model"))
+
+    @spec("apply_struct", "Declare C types for the module from declaration text: struct/union/enum/typedef only, no '#' "
+                          "preprocessor lines, comments or quotes, <= 16 KiB. Afterwards usable in set_type. Persisted.",
+          read_only=False, idempotent=True)
+    async def apply_struct(session_id: SID, declaration: Annotated[str, Field(min_length=1, max_length=16384)]) -> CallToolResult:
+        return await run("apply_struct", rt.t_re(session_id, "apply_struct", declaration=declaration, author="model"))
+
+    @spec("patch_bytes", "Write bytes at an address into a COPY of the binary inside the session's work folder (the user's "
+                         "original file is never written). confirm must be true. Returns the copy's path and sha256 and the "
+                         "original/previous bytes; analysis keeps using the original (open the copy with open_binary to "
+                         "analyse it). At most 4096 bytes per call.", read_only=False)
+    async def patch_bytes(session_id: SID, address: HexAddress,
+                          data: Annotated[str, Field(pattern=r"^[0-9a-fA-F\s]{2,9000}$", description="Hex bytes, e.g. '90 90'")],
+                          confirm: bool = False) -> CallToolResult:
+        if confirm is not True:
+            return rt._error(new_id("op"), "patch_bytes", time.monotonic(),
+                             ToolFailure("refused", "patch_bytes needs confirm=true (it writes a patched copy, never the original).",
+                                         "Ask the user, then retry with confirm=true."))
+        return await run("patch_bytes", rt.t_re(session_id, "patch_bytes", addr=normalize_address(address), data_hex=data,
+                                                confirm=True, author="model"))
+
     # ---- diagnostics (never part of a toolset) ---------------------------------------------------
     @spec(DIAGNOSTIC_TOOL, "Server/controller diagnostics for troubleshooting the integration (versions, loaded tools, limits, data "
                            "directory, controller status). Enabled only with --diagnostic. Reveals no secrets.", read_only=True)
@@ -936,9 +1308,50 @@ def _forbid_extra_arguments(server: MCPServer, names: list[str]) -> None:
         tool.parameters["additionalProperties"] = False
 
 
+# --------------------------------------------------------------------------------------------------- docs
+DOC_BEGIN = "<!-- BEGIN generated: rebuild-mcp --list-tools --markdown -->"
+DOC_END = "<!-- END generated: rebuild-mcp --list-tools --markdown -->"
+
+
+def _param_doc(name: str, schema: dict[str, Any], required: bool) -> str:
+    alts = schema.get("anyOf") or [schema]
+    s = next((a for a in alts if a.get("type") != "null"), alts[0])
+    t = s.get("type", "object")
+    if "enum" in s:
+        t = "|".join(str(x) for x in s["enum"])
+    elif t == "array":
+        t = "list"
+    bits = [t]
+    for k, label in (("minimum", ">="), ("maximum", "<="), ("minLength", "len>="), ("maxLength", "len<=")):
+        if k in s:
+            bits.append(f"{label}{s[k]}")
+    if "default" in schema and schema["default"] is not None:
+        bits.append(f"default {json.dumps(schema['default'])}")
+    return f"`{name}`{'' if required else '?'} ({', '.join(bits)})"
+
+
+def tool_reference_markdown() -> str:
+    """Markdown tool reference generated from the live tool definitions (docs/API.md embeds it; a test checks drift)."""
+    server = build_server(object(), ServerConfig(toolset="all", diagnostic=True))
+    member = {name: [ts for ts in ("minimal", "analysis", "rebuild", "re", "all") if name in TOOLSETS[ts]] for name in TOOLSETS["all"]}
+    lines = [DOC_BEGIN, "", "| Tool | Toolsets | Kind | Parameters (`?` = optional) | What it does |", "|---|---|---|---|---|"]
+    for tool in server._tool_manager.list_tools():
+        params = tool.parameters.get("properties") or {}
+        req = set(tool.parameters.get("required") or [])
+        pdoc = "<br>".join(_param_doc(n, p, n in req) for n, p in params.items()) or "-"
+        desc = tool.description.replace(" " + UNTRUSTED_NOTICE, "").replace("|", "\\|").strip()
+        ro = tool.annotations.read_only_hint if tool.annotations else None
+        kind = "read" if ro else "write"
+        sets = ", ".join(member.get(tool.name) or ["--diagnostic only"])
+        lines.append(f"| `{tool.name}` | {sets} | {kind} | {pdoc.replace('|', chr(92) + '|')} | {desc} |")
+    lines += ["", "Every result is an envelope `{operation_id, tool, ok, evidence_revision, truncated, data | error}`; program-derived "
+              "strings are wrapped as `{\"untrusted\": true, \"text\": ...}`; unknown arguments are rejected.", "", DOC_END]
+    return "\n".join(lines) + "\n"
+
+
 # --------------------------------------------------------------------------------------------------- entry point
 def _parse_args(argv: Optional[list[str]]) -> argparse.Namespace:
-    p = argparse.ArgumentParser(prog="rebuild-mcp", description="Rebuild Studio MCP server (stdio).")
+    p = argparse.ArgumentParser(prog="rebuild-mcp", description="Rebuild Studio MCP server (stdio; the desktop app also serves it over loopback HTTP at /mcp).")
     p.add_argument("--toolset", choices=sorted(TOOLSETS), default="all",
                    help="tools to load: minimal (run+monitor), analysis (+read evidence), rebuild (+candidates), all (+knowledge)")
     p.add_argument("--diagnostic", action="store_true", help="also expose the admin_diagnostics tool (never in a toolset)")
@@ -950,6 +1363,7 @@ def _parse_args(argv: Optional[list[str]]) -> argparse.Namespace:
     p.add_argument("--data-dir", default=None, help="override the data directory (REBUILD_STUDIO_DATA)")
     p.add_argument("--named-pipe", action="store_true", help="Windows named pipe transport (not available; stdio only)")
     p.add_argument("--list-tools", action="store_true", help="print the tools this configuration would load and exit")
+    p.add_argument("--markdown", action="store_true", help="with --list-tools: print the full tool reference as Markdown (docs/API.md)")
     p.add_argument("--version", action="version", version=f"rebuild-mcp {__version__}")
     return p.parse_args(argv)
 
@@ -963,6 +1377,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"rebuild-mcp: --named-pipe is not available: {why}. Use stdio (the default).", file=sys.stderr)
         return 2
     wanted = list(TOOLSETS[args.toolset]) + ([DIAGNOSTIC_TOOL] if args.diagnostic else [])
+    if args.list_tools and args.markdown:
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            pass
+        print(tool_reference_markdown(), end="")
+        return 0
     if args.list_tools:
         print(json.dumps({"toolset": args.toolset, "tools": wanted}))
         return 0

@@ -75,3 +75,104 @@ ends); warnings and errors have their own 5/s budget so problems are never starv
 | GET | `/cases/{id}/log?since=&limit=&level=&stage=` | `{entries:[{seq, at, kind:"log"\|"job"\|"ai", level, text, detail, job_id, stage, milestone, plan_item_id, (provider, model, outcome)}], latest_seq, limit}` oldest first. `since=0` returns the newest `limit` (default 300, max 2000); `since>0` returns entries after that seq. `level=warn` keeps warnings and errors, `level=error` errors only. Merges `job.log`, `ai.activity` and job state changes (`job.started/completed/failed/blocked/cancelled/retry`) rendered as text. |
 
 The UI's Live log tab loads this once, then appends live events and dedupes by `seq`.
+
+## MCP model interface (`rebuild-mcp`, and `/mcp` on the running controller)
+
+Two transports serve the same tools (`controller/rebuild_controller/mcp/server.py`):
+
+| Transport | How | Auth | When |
+|---|---|---|---|
+| stdio | the client starts `rebuild-mcp --toolset <set>` (installed at `<install>\runtime\Scripts\rebuild-mcp.exe`) | local process | permanent client setup; works without the app running |
+| streamable HTTP | `POST/GET/DELETE http://127.0.0.1:<port>/mcp` on the running controller (stateless, JSON responses) | the controller's per-launch bearer token (`Authorization: Bearer <token>`), Origin allow-list, Host header must be `127.0.0.1`/`localhost`/`[::1]` | an agent should see the same analysis sessions as the open app; token and port change on every launch |
+
+`GET /mcp/config?client=claude-code|codex|gemini|hermes|generic&transport=stdio|http&toolset=all|re|...` returns
+`{client, transport, format: json|toml|yaml, where, text, notes[], command?, http_available}`: a ready-to-paste config
+snippet (Claude Code also gets a `claude mcp add ...` command). The app's Settings page shows it with a **Copy MCP config** button.
+Nothing is written to the client's files (use `scripts/install-clients.py` for that).
+
+Toolsets: `minimal` ⊂ `analysis` ⊂ `rebuild` ⊂ `all`; `re` (reverse engineering, below) is its own set and is also part of `all`.
+Rules kept for every tool: typed arguments only (no raw rizin/shell command anywhere), unknown arguments rejected, results bounded
+by `max_context_bytes`, program-derived text wrapped as untrusted.
+
+### Reverse-engineering sessions (`re` toolset)
+
+- `open_binary` takes an absolute file path (ad hoc; a hidden case with `settings.kind = "re_session"` is created per file path so
+  evidence is still stored; hidden from `GET /cases` unless `?include_re=1` and from `list_cases`) or an existing `case_id` +
+  `module_id`. It returns `session_id`; reopening the same file or module returns the same session while it is open.
+  Sessions are listed in `<data_dir>/re_sessions.json`; `close_session` stops the rizin process and keeps everything else.
+- Every read tool is a typed backend operation (`RizinBackend.op_*`: functions, function, decompile, disasm, disassemble, xrefs,
+  call_graph, strings, imports, exports, symbols, sections, entrypoints, search_bytes) and stores evidence (`native.*`) keyed by
+  module sha256 + rizin version + analysis settings + annotation revision. The R6 app workbench uses the same operations
+  (`StudioServices.re`, `rebuild_controller/re_workbench.py`).
+- Annotations (`rename` function/global/local, `set_type` prototype/local, `add_comment`, `apply_struct`) are validated against
+  strict grammars (identifiers, C types, prototypes, declarations without `#`, comments or quotes), applied to the live rizin
+  session and verified by reading the result back, then stored as a new `re.annotations` evidence revision holding the full state
+  (the newest revision is current; older ones are history, `get_annotations(history=N)`). They are replayed after every
+  (re-)analysis, so a crashed or idle-reaped rizin process, a closed session and a controller restart all keep them; cached
+  analysis evidence is invalidated by the annotation revision. Comments are never sent to rizin: they are overlaid onto
+  disassembly (`user_comment`) and the top of decompiler output. Model-made annotations are labelled `model-proposed`.
+- `patch_bytes(confirm=true)` copies the module to `<data_dir>/cases/<case>/re/<module>/patched/<name>` on first use and writes
+  only that copy (the original's sha256 is re-checked after every patch); it returns the copy path/sha256 and the original and
+  previous bytes and records `re.patch` evidence. Analysis keeps using the original; `open_binary(path=<copy>)` analyses the patch.
+- `decompile(decompiler="ghidra")` uses Ghidra headless when `GHIDRA_INSTALL_DIR` points at an installation (annotations are not
+  applied there); otherwise it fails with `unavailable`.
+
+Error codes in `error.code`: `rejected` (bad input), `not_found`, `closed` (session closed), `invalid_target` (address/name/value
+refused by the backend), `refused`, `timeout`, `unavailable`, `backend_error`, `controller_unavailable`, `internal_error`.
+
+### MCP tool reference
+
+Regenerate with `rebuild-mcp --list-tools --markdown` (a test fails when this block drifts from the code).
+
+<!-- BEGIN generated: rebuild-mcp --list-tools --markdown -->
+
+| Tool | Toolsets | Kind | Parameters (`?` = optional) | What it does |
+|---|---|---|---|---|
+| `doctor` | minimal, analysis, rebuild, re, all | read | `smoke`? (boolean, default false) | Report which backend tools (rizin, ilspy, gdre, node, ...) are missing/detected/installed/usable/verified. smoke=true runs a tiny real operation per tool (slower). |
+| `list_cases` | minimal, analysis, rebuild, all | read | `limit`? (integer, >=1, <=100, default 25) | List existing cases (id, name, status, target, roots). |
+| `create_case` | minimal, analysis, rebuild, all | write | `name` (string, len>=1, len<=120)<br>`source_root` (string)<br>`output_root` (string)<br>`target_language`? (rust\|rust_bevy\|web\|auto, default "auto")<br>`output_type`? (exe\|installer\|portable\|web\|pwa, default "exe")<br>`ai_policy`? (object)<br>`launch_profile`? (object) | Create a rebuild case for a program folder. Does not start work; call start_rebuild next. Only folders the user named may be used. launch_profile.execute_original allows running the original program and is refused unless the server was started with --allow-execute-original. |
+| `start_rebuild` | minimal, analysis, rebuild, all | write | `case_id` (string) | Schedule the full analysis -> rebuild pipeline for a case. Returns job ids; poll with job_status. |
+| `job_status` | minimal, analysis, rebuild, all | read | `job_id`? (string)<br>`case_id`? (string)<br>`limit`? (integer, >=1, <=200, default 50) | Status of one job (job_id) or a summary of all jobs of a case (case_id). Progress is raw counts, never a synthesized percentage. Give exactly one of job_id/case_id. |
+| `cancel` | minimal, analysis, rebuild, all | write | `job_id`? (string)<br>`case_id`? (string) | Request cancellation of a job or of every job of a case (exactly one of job_id/case_id). |
+| `resume` | minimal, analysis, rebuild, all | write | `job_id`? (string)<br>`case_id`? (string) | Resume failed/cancelled jobs of a case, or one job (exactly one of job_id/case_id). Work resumes from durable state. |
+| `inventory` | analysis, rebuild, all | read | `case_id` (string)<br>`module_limit`? (integer, >=0, <=200, default 50) | Overview of a case: modules by format, evidence counts by kind (stale counted separately), first modules. |
+| `list_modules` | analysis, rebuild, all | read | `case_id` (string)<br>`limit`? (integer, >=1, <=200, default 50)<br>`offset`? (integer, >=0, <=1000000, default 0)<br>`format`? (string) | List the modules (executables, assemblies, packs, bundles) of a case, optionally filtered by format. |
+| `analyze_module` | analysis, rebuild, all | read | `case_id` (string)<br>`module_id` (string)<br>`limit`? (integer, >=1, <=500, default 100) | What is known about one module: metadata plus an index of its evidence (ids, kinds, titles). Read-only; use get_evidence for bodies. |
+| `list_features` | analysis, rebuild, all | read | `case_id` (string)<br>`limit`? (integer, >=1, <=500, default 100)<br>`offset`? (integer, >=0, <=1000000, default 0)<br>`verify_status`? (untested\|verified\|partial\|failed\|stale) | Feature ledger of a case (impl_status, verify_status, review). Verification status is written by the verifier only; you cannot change it. |
+| `get_function_briefing` | analysis, rebuild, all | read | `case_id` (string)<br>`module_id` (string)<br>`address`? (string)<br>`name`? (string) | Bounded briefing for one function (disassembly/decompilation summary, xrefs, strings, callers). Give exactly one of address (hex) or name. |
+| `search_evidence` | analysis, rebuild, all | read | `case_id` (string)<br>`query` (string, len>=1, len<=200)<br>`kinds`? (list)<br>`limit`? (integer, >=1, <=100, default 25) | Lexical search over a case's evidence titles/metadata/small bodies. Returns ids, never full bodies. |
+| `get_evidence` | analysis, rebuild, all | read | `evidence_id` (string)<br>`case_id`? (string)<br>`max_bytes`? (integer, >=1024, <=1048576) | Read one evidence item by id (bounded; truncated=true when cut). Pass case_id to make sure the evidence belongs to the case you are working on. Cite evidence ids in anything you propose. |
+| `capture_original` | analysis, rebuild, all | write | `case_id` (string)<br>`scenario_id`? (string) | Schedule a capture of the original program's behaviour (a job). Refused unless the case allows running the original. |
+| `propose_candidate` | rebuild, all | write | `case_id` (string)<br>`files` (object)<br>`note`? (string, len<=2000, default "")<br>`evidence_ids`? (list)<br>`base_candidate`? (string) | Propose source files as a NEW staged candidate (never touches the original or the trusted baseline). Destinations are relative text-file paths. List the evidence ids your proposal is based on. |
+| `build_candidate` | rebuild, all | write | `case_id` (string)<br>`candidate_id` (string) | Schedule a build of a candidate (a job). Poll with job_status. |
+| `compare_candidate` | rebuild, all | write | `case_id` (string)<br>`candidate_id` (string)<br>`feature_ids`? (list) | Schedule the verifier's comparison of a built candidate against the original (a job). You cannot set verdicts; the verifier records them. |
+| `propose_knowledge` | all | write | `kind` (signature\|type_lib\|parser\|recipe\|rewrite\|template\|replay\|fixture)<br>`name` (string)<br>`body` (object)<br>`acceptance`? (object)<br>`constraints`? (object)<br>`evidence_ids`? (list)<br>`confidence`? (number, >=0, <=1, default 0.5) | Propose a reusable knowledge item. body/acceptance are JSON objects whose shape depends on kind (signature: {pattern, symbol, arch} + acceptance {positives, negatives}; rewrite: {match, replace}; parser: {struct, magic}; recipe/replay: {actions}; see the reference). Inert until the controller validates it in isolation and promotes it. |
+| `validate_knowledge` | all | write | `knowledge_id` (string) | Run the controller's isolated validation for a proposed knowledge item. Promotion is not available to models. |
+| `open_binary` | re, all | write | `path`? (string)<br>`case_id`? (string)<br>`module_id`? (string) | Open an analysis session on a binary: either an absolute file path (ad-hoc; no case needed, evidence and annotations are still stored and persist when the same file is opened again) or an existing case module (case_id + module_id). Returns session_id for every other re tool. Analysis (aaa) runs lazily on the first tool that needs it. |
+| `list_sessions` | re, all | read | `include_closed`? (boolean, default false) | List open analysis sessions (session_id, case/module, file name, sha256). |
+| `close_session` | re, all | write | `session_id` (string) | Close an analysis session and stop its rizin process. Evidence and annotations are kept. |
+| `list_functions` | re, all | read | `session_id` (string)<br>`contains`? (string, len>=1, len<=120)<br>`sort`? (addr\|size\|name, default "addr")<br>`offset`? (integer, >=0, <=10000000, default 0)<br>`limit`? (integer, >=1, <=500, default 100) | Analysed functions (address, name, size, blocks, cc, signature). Filter by name substring; sort by addr\|size\|name; paged. |
+| `get_function` | re, all | read | `session_id` (string)<br>`address`? (string)<br>`name`? (string) | One function: signature, calling convention, size, basic blocks, variables (args/locals with types) and its annotations. Give exactly one of address (any address inside it) or name. |
+| `decompile` | re, all | read | `session_id` (string)<br>`address`? (string)<br>`name`? (string)<br>`decompiler`? (rizin\|ghidra, default "rizin") | Decompile one function. decompiler=rizin uses rz-ghidra (pdg) when loaded, otherwise rizin pseudo-code (labelled is_real_decompiler=false); decompiler=ghidra uses Ghidra headless when installed. Annotations (renames, types, structs, comments) are applied to rizin output. |
+| `disassemble` | re, all | read | `session_id` (string)<br>`address`? (string)<br>`name`? (string)<br>`count`? (integer, >=1, <=2000)<br>`length`? (integer, >=1, <=65536) | Disassemble a whole function (address or name, no count/length), or linearly from an address: count instructions (<= 2000) or length bytes (<= 65536). User comments appear as user_comment. |
+| `xrefs_to` | re, all | read | `session_id` (string)<br>`address`? (string)<br>`name`? (string)<br>`limit`? (integer, >=1, <=1000, default 200) | References TO an address or symbol (who calls/reads/writes it): from, type (CALL/CODE/DATA/STRING), containing function. |
+| `xrefs_from` | re, all | read | `session_id` (string)<br>`address`? (string)<br>`name`? (string)<br>`limit`? (integer, >=1, <=1000, default 200) | References FROM an address (the instruction or data at it) to other addresses. |
+| `call_graph` | re, all | read | `session_id` (string)<br>`address`? (string)<br>`name`? (string)<br>`direction`? (callees\|callers\|both, default "callees")<br>`depth`? (integer, >=1, <=5, default 2)<br>`max_nodes`? (integer, >=1, <=500, default 200) | Bounded call graph from one function (breadth-first): callees, callers or both; depth 1..5; at most max_nodes nodes (node_limit_hit=true when cut). |
+| `strings` | re, all | read | `session_id` (string)<br>`contains`? (string, len>=1, len<=120)<br>`regex`? (string, len>=1, len<=200)<br>`min_length`? (integer, >=1, <=1000, default 4)<br>`section`? (string)<br>`offset`? (integer, >=0, <=10000000, default 0)<br>`limit`? (integer, >=1, <=500, default 100) | Strings in the binary (izz), filtered by substring (contains) or bounded regex (no nested quantifiers or backreferences), minimum length and section; paged. |
+| `imports` | re, all | read | `session_id` (string)<br>`contains`? (string, len>=1, len<=120)<br>`offset`? (integer, >=0, <=10000000, default 0)<br>`limit`? (integer, >=1, <=1000, default 200) | Imported functions/symbols (library, name, PLT/IAT address); name filter; paged. |
+| `exports` | re, all | read | `session_id` (string)<br>`contains`? (string, len>=1, len<=120)<br>`offset`? (integer, >=0, <=10000000, default 0)<br>`limit`? (integer, >=1, <=1000, default 200) | Exported symbols; name filter; paged. |
+| `symbols` | re, all | read | `session_id` (string)<br>`contains`? (string, len>=1, len<=120)<br>`offset`? (integer, >=0, <=10000000, default 0)<br>`limit`? (integer, >=1, <=1000, default 200) | Symbol table (functions, objects, imports); name filter; paged. |
+| `sections` | re, all | read | `session_id` (string) | Sections and segments (name, virtual/physical address and size, permissions). |
+| `entry_points` | re, all | read | `session_id` (string) | Program entry points (address, type). |
+| `search_bytes` | re, all | read | `session_id` (string)<br>`hex`? (string)<br>`string_regex`? (string, len>=1, len<=200)<br>`limit`? (integer, >=1, <=1000, default 100) | Search the binary: hex = byte pattern with ?? wildcards (e.g. '48 8b ?? 24'), or string_regex = bounded regex over extracted strings. Give exactly one. |
+| `get_annotations` | re, all | read | `session_id` (string)<br>`history`? (integer, >=0, <=200, default 0) | Current annotations of the session's module (renames, prototypes, local types, comments, declared types) and optionally the last N changes. Annotations are proposals, not analysis facts. |
+| `rename` | re, all | write | `session_id` (string)<br>`kind` (function\|global\|local)<br>`new_name` (string)<br>`address`? (string)<br>`name`? (string)<br>`variable`? (string) | Rename a function (address or name), a global (address; creates/renames a flag) or a local variable (function address/name + variable = its current name). Persisted as an evidence revision and re-applied after re-analysis; visible in decompile output. |
+| `set_type` | re, all | write | `session_id` (string)<br>`kind` (function\|local)<br>`address`? (string)<br>`name`? (string)<br>`prototype`? (string)<br>`variable`? (string)<br>`type`? (string) | kind=function: apply a C prototype to the function at address/name (the name in the prototype becomes the function's name), e.g. 'int parse_args(int argc, char **argv)'. kind=local: set a variable's C type ('uint32_t', 'char *', 'struct point *'; declare structs first with apply_struct). Persisted; re-applied on re-analysis. |
+| `add_comment` | re, all | write | `session_id` (string)<br>`address` (string)<br>`text` (string, len<=1000) | Attach a one-line comment (<= 1000 chars) to an address; empty text removes it. Shown in disassemble (user_comment) and at the top of decompile output. Persisted. |
+| `apply_struct` | re, all | write | `session_id` (string)<br>`declaration` (string, len>=1, len<=16384) | Declare C types for the module from declaration text: struct/union/enum/typedef only, no '#' preprocessor lines, comments or quotes, <= 16 KiB. Afterwards usable in set_type. Persisted. |
+| `patch_bytes` | re, all | write | `session_id` (string)<br>`address` (string)<br>`data` (string)<br>`confirm`? (boolean, default false) | Write bytes at an address into a COPY of the binary inside the session's work folder (the user's original file is never written). confirm must be true. Returns the copy's path and sha256 and the original/previous bytes; analysis keeps using the original (open the copy with open_binary to analyse it). At most 4096 bytes per call. |
+| `admin_diagnostics` | --diagnostic only | read | - | Server/controller diagnostics for troubleshooting the integration (versions, loaded tools, limits, data directory, controller status). Enabled only with --diagnostic. Reveals no secrets. |
+
+Every result is an envelope `{operation_id, tool, ok, evidence_revision, truncated, data | error}`; program-derived strings are wrapped as `{"untrusted": true, "text": ...}`; unknown arguments are rejected.
+
+<!-- END generated: rebuild-mcp --list-tools --markdown -->

@@ -85,6 +85,15 @@ class StudioServices:
         except Exception as e:  # pragma: no cover
             self.optional_errors["ai"] = f"{type(e).__name__}: {e}"
 
+    @property
+    def re(self) -> Any:
+        """Reverse-engineering workbench (analysis sessions + annotations); shared by MCP and the app."""
+        wb = self.__dict__.get("_re")
+        if wb is None:
+            from .re_workbench import ReWorkbench
+            wb = self.__dict__["_re"] = ReWorkbench(self)
+        return wb
+
     # ------------------------------------------------------------------ lifecycle
     def start(self) -> None:
         self.runner.start()

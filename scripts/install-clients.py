@@ -680,7 +680,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--remove", action="store_true", help="remove what this installer added")
     p.add_argument("--mcp-command", default=None, help="path to rebuild-mcp (default: PATH lookup, else python -m ...)")
     p.add_argument("--data-dir", default=None, help="REBUILD_STUDIO_DATA to pass to the server (always set for Hermes)")
-    p.add_argument("--toolset", choices=("minimal", "analysis", "rebuild", "all"), default="all")
+    p.add_argument("--toolset", choices=("minimal", "analysis", "rebuild", "re", "all"), default="all")
     p.add_argument("--rules", action="store_true", help="also add the short rules block to the global AGENTS.md / GEMINI.md (Codex, Gemini)")
     p.add_argument("--home", default=None, help="treat this directory as the user's home (testing; ignores *_HOME env overrides)")
     p.add_argument("--clients-dir", default=None, help="directory holding the client packages (default: <repo>/clients)")

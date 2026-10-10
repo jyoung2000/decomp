@@ -927,3 +927,16 @@ export interface DownloadedModel {
   exists?: boolean;
   install_pages?: Record<string, string>;
 }
+
+/** MCP client config snippet (GET /mcp/config); shown by Settings -> Copy MCP config. */
+export type McpClient = 'claude-code' | 'codex' | 'gemini' | 'hermes' | 'generic';
+export interface McpConfig {
+  client: McpClient;
+  transport: 'stdio' | 'http';
+  format: 'json' | 'toml' | 'yaml';
+  where: string;
+  text: string;
+  notes: string[];
+  command?: string;
+  http_available?: boolean;
+}

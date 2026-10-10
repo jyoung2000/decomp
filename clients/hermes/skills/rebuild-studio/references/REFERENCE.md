@@ -22,7 +22,8 @@ Loaded on demand by the `rebuild-studio` skill. The rules themselves live in `SK
 | minimal | doctor, list_cases, create_case, start_rebuild, job_status, cancel, resume |
 | analysis | inventory, list_modules, analyze_module, list_features, get_function_briefing, search_evidence, get_evidence, capture_original |
 | rebuild | propose_candidate, build_candidate, compare_candidate |
-| all | propose_knowledge, validate_knowledge |
+| re | doctor + open_binary, list_sessions, close_session, list_functions, get_function, decompile, disassemble, xrefs_to, xrefs_from, call_graph, strings, imports, exports, symbols, sections, entry_points, search_bytes, get_annotations, rename, set_type, add_comment, apply_struct, patch_bytes |
+| all | propose_knowledge, validate_knowledge, and every `re` tool |
 
 `admin_diagnostics` exists only when the server was started with `--diagnostic`; it is never part of a toolset.
 
@@ -31,6 +32,15 @@ Loaded on demand by the `rebuild-studio` skill. The rules themselves live in `SK
 `propose_candidate` are relative paths with forward slashes, no `..`, no drive letters, at most 200 files / 256 KiB each / 4 MiB total.
 `create_case` accepts only whitelisted option keys (`ai_policy.mode|budget_usd`, `launch_profile.execute_original|scenarios`); there is
 no free-form command.
+
+## Reverse engineering (`re` toolset)
+`open_binary(path=<absolute file>)` or `open_binary(case_id, module_id)` -> `session_id` (`res_<22 hex>`). Then read with
+`list_functions` / `strings` / `imports` / `get_function` / `decompile` / `disassemble` / `xrefs_to` / `call_graph` (all paged or
+bounded). Annotate with `rename` (function | global | local), `set_type` (prototype | local type), `add_comment`, `apply_struct`
+(C declaration text, no `#`): each is verified against rizin, stored as an evidence revision and re-applied after re-analysis, so
+re-decompiling shows it. `patch_bytes(confirm=true)` writes only a copy in the work folder, never the original. Names are C
+identifiers; addresses are hex. Error code `closed` = reopen with `open_binary` (annotations persist); `invalid_target` = the
+backend refused the address/name/value (see `error.detail`).
 
 ## Case lifecycle
 `create_case` -> `start_rebuild` -> poll `job_status(case_id)` (raw counts, never a percentage) -> `inventory` -> read evidence ->
