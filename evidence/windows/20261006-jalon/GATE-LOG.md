@@ -112,3 +112,18 @@ sha256 was checked against the build each time (last: c1bd68f5… = commit 219dc
 
 Verdict, every run: "Scaffold only: not a working remake", Behavior verified 0 of 7 — delivered and labelled honestly; the
 verifier, not the model, decided. Not achieved: a working .NET → Rust remake with the local models on this RTX 4070 12 GB.
+
+## Run 9 — .NET Notes app rebuilt as C# through the genuine install (2026-10-10, R4)
+
+Installed controller sha256 41f29e74… (= commit c3c80ba build); updated in place via the Explorer-launched passive installer.
+Project "Notes app (.NET) as C#": same source and the same 7 user scenarios as runs 1–7, original recorded in isolation with consent,
+target C#, **AI off**. Preflight: ready (machine .NET SDK 8.0.424 counted as external compiler).
+
+- 4 deterministic fixes before the first build (net8.0 moniker; InvariantGlobalization/PredefinedCulturesOnly from runtimeconfig;
+  RefSafetyRules attribute removed; 3 `case null:` labels ILSpy dropped restored from the IL).
+- `dotnet build` passed in 8.1 s; verifier **7 of 7 scenarios match**; outcome **fully_matched** ("Fully matched within declared
+  coverage", can_claim_complete=true); delivered 29 files to `D:\Rebuild Studio Test Output\dotnet notes csharp`. 10 s end to end, $0.
+- Manual cross-check on an input in no scenario (add a note, list, rename user, quit): stdout and state.json byte-identical to the
+  original `dotnetapp.dll`.
+
+Compare runs 1–7: the Rust port with local models (deepseek-coder-v2:16b, qwen2.5:14b, gemma4:12b, qwen2.5-coder:14b) never compiled.
