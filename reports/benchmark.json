@@ -1,11 +1,17 @@
 {
  "schema": "rebuild-studio.benchmark/1",
- "generated_utc": "2026-10-10T15:57:51Z",
+ "generated_utc": "2026-10-10T17:08:41Z",
  "config": {
-  "name": "default",
+  "name": "default + optional Ghidra",
   "analysis": {
    "command": "aaa",
-   "analysis.timeout": 300
+   "analysis.timeout": 300,
+   "passes": [
+    "sigpacks",
+    "pdata",
+    "relocptrs",
+    "thunks"
+   ]
   },
   "decompile": {
    "max_functions": 200
@@ -15,6 +21,19 @@
   "dotnet": {
    "enabled": true,
    "timeout": 600
+  },
+  "packer": {
+   "check": true,
+   "unpack": true
+  },
+  "ghidra": {
+   "enabled": true,
+   "max_functions": 2000,
+   "per_function_timeout": 60,
+   "skip_rows": [
+    "go_pe_x64",
+    "go_elf_x64"
+   ]
   }
  },
  "environment": {
@@ -38,30 +57,38 @@
    "analysis": {
     "settings": {
      "command": "aaa",
-     "analysis.timeout": 300
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
     },
     "possibly_partial": false
    },
    "decompiler": "rz-ghidra(pdg)",
    "rz_ghidra_loaded": true,
-   "functions_found": 78,
+   "functions_found": 87,
    "functions_truncated": false,
    "imports_found": 57,
    "strings_found": 274,
    "functions": {
     "truth_functions": 95,
-    "found_functions": 78,
-    "found_in_code": 78,
-    "matched": 78,
-    "recall": 0.8211,
+    "found_functions": 87,
+    "found_in_code": 87,
+    "matched": 87,
+    "recall": 0.9158,
     "precision": 1.0,
     "own_truth": 22,
     "own_matched": 19,
     "own_recall": 0.8636,
-    "named": 13,
-    "named_recall": 0.1368,
+    "named": 45,
+    "named_recall": 0.4737,
     "own_named_recall": 0.0455,
-    "size_exact": 0.9423
+    "named_precision": 0.9375,
+    "with_name": 48,
+    "size_exact": 0.9016
    },
    "imports": {
     "truth": 57,
@@ -101,19 +128,38 @@
     ],
     "coverage": 0.8636
    },
+   "seconds": {
+    "packer": 0.008,
+    "analysis": 1.27,
+    "functions": 0.003,
+    "imports": 0.0,
+    "strings": 0.002,
+    "decompile": 0.265,
+    "ghidra": 17.612
+   },
+   "ghidra": {
+    "status": "ok",
+    "ghidra_version": "12.1.4",
+    "functions_total": 64,
+    "decompiled": 64,
+    "failed": 0,
+    "list_complete": true,
+    "recall": 0.6737,
+    "precision": 1.0,
+    "own_coverage": 0.9545,
+    "own_real": 21,
+    "own_functions": 22,
+    "seconds": 17.6
+   },
    "packed": {
     "truth": false,
-    "detected": null,
-    "note": "the analysis pipeline has no packer/entropy check yet (R1); a packed row counts as missed"
+    "detected": false,
+    "packer": null,
+    "unpacked": false,
+    "unpack_tool": null,
+    "note": "not packed"
    },
-   "seconds": {
-    "analysis": 2.546,
-    "functions": 0.006,
-    "imports": 0.001,
-    "strings": 0.004,
-    "decompile": 0.452
-   },
-   "wall_seconds": 3.982
+   "wall_seconds": 19.585
   },
   {
    "row": "c_msvc_x86_o2",
@@ -124,30 +170,38 @@
    "analysis": {
     "settings": {
      "command": "aaa",
-     "analysis.timeout": 300
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
     },
     "possibly_partial": false
    },
    "decompiler": "rz-ghidra(pdg)",
    "rz_ghidra_loaded": true,
-   "functions_found": 86,
+   "functions_found": 91,
    "functions_truncated": false,
    "imports_found": 55,
    "strings_found": 250,
    "functions": {
     "truth_functions": 95,
-    "found_functions": 86,
-    "found_in_code": 86,
-    "matched": 86,
-    "recall": 0.9053,
+    "found_functions": 91,
+    "found_in_code": 91,
+    "matched": 91,
+    "recall": 0.9579,
     "precision": 1.0,
     "own_truth": 22,
-    "own_matched": 20,
-    "own_recall": 0.9091,
-    "named": 12,
-    "named_recall": 0.1263,
+    "own_matched": 21,
+    "own_recall": 0.9545,
+    "named": 51,
+    "named_recall": 0.5368,
     "own_named_recall": 0.0455,
-    "size_exact": 0.9649
+    "named_precision": 0.9808,
+    "with_name": 52,
+    "size_exact": 0.9677
    },
    "imports": {
     "truth": 55,
@@ -165,37 +219,52 @@
    },
    "decompile": {
     "own_functions": 22,
-    "attempted": 20,
-    "real": 20,
+    "attempted": 21,
+    "real": 21,
     "pseudo_only": 0,
-    "no_function": 2,
+    "no_function": 1,
     "errors": 0,
     "not_attempted_budget": 0,
     "failures": [
-     {
-      "function": "compare_lines",
-      "reason": "analyzer found no function at this start"
-     },
      {
       "function": "usage",
       "reason": "analyzer found no function at this start"
      }
     ],
-    "coverage": 0.9091
+    "coverage": 0.9545
+   },
+   "seconds": {
+    "packer": 0.005,
+    "analysis": 1.289,
+    "functions": 0.003,
+    "imports": 0.0,
+    "strings": 0.002,
+    "decompile": 0.166,
+    "ghidra": 14.951
+   },
+   "ghidra": {
+    "status": "ok",
+    "ghidra_version": "12.1.4",
+    "functions_total": 60,
+    "decompiled": 60,
+    "failed": 0,
+    "list_complete": true,
+    "recall": 0.6316,
+    "precision": 1.0,
+    "own_coverage": 0.9545,
+    "own_real": 21,
+    "own_functions": 22,
+    "seconds": 14.9
    },
    "packed": {
     "truth": false,
-    "detected": null,
-    "note": "the analysis pipeline has no packer/entropy check yet (R1); a packed row counts as missed"
+    "detected": false,
+    "packer": null,
+    "unpacked": false,
+    "unpack_tool": null,
+    "note": "not packed"
    },
-   "seconds": {
-    "analysis": 2.457,
-    "functions": 0.007,
-    "imports": 0.001,
-    "strings": 0.005,
-    "decompile": 0.276
-   },
-   "wall_seconds": 3.009
+   "wall_seconds": 16.562
   },
   {
    "row": "cpp_msvc_x64_o2",
@@ -206,30 +275,38 @@
    "analysis": {
     "settings": {
      "command": "aaa",
-     "analysis.timeout": 300
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
     },
     "possibly_partial": false
    },
    "decompiler": "rz-ghidra(pdg)",
    "rz_ghidra_loaded": true,
-   "functions_found": 117,
+   "functions_found": 155,
    "functions_truncated": false,
    "imports_found": 65,
    "strings_found": 442,
    "functions": {
     "truth_functions": 184,
-    "found_functions": 117,
-    "found_in_code": 117,
-    "matched": 117,
-    "recall": 0.6359,
+    "found_functions": 155,
+    "found_in_code": 155,
+    "matched": 155,
+    "recall": 0.8424,
     "precision": 1.0,
     "own_truth": 38,
-    "own_matched": 15,
-    "own_recall": 0.3947,
-    "named": 17,
-    "named_recall": 0.0924,
+    "own_matched": 30,
+    "own_recall": 0.7895,
+    "named": 59,
+    "named_recall": 0.3207,
     "own_named_recall": 0.0263,
-    "size_exact": 0.9494
+    "named_precision": 0.7195,
+    "with_name": 82,
+    "size_exact": 0.9316
    },
    "imports": {
     "truth": 65,
@@ -250,75 +327,15 @@
    },
    "decompile": {
     "own_functions": 38,
-    "attempted": 15,
-    "real": 15,
+    "attempted": 30,
+    "real": 30,
     "pseudo_only": 0,
-    "no_function": 23,
+    "no_function": 8,
     "errors": 0,
     "not_attempted_budget": 0,
     "failures": [
      {
-      "function": "bench::ShapeError::ShapeError",
-      "reason": "analyzer found no function at this start"
-     },
-     {
       "function": "bench::ShapeError::~ShapeError",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Circle::`scalar deleting destructor'",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Rect::`scalar deleting destructor'",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::ShapeError::`scalar deleting destructor'",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Triangle::`scalar deleting destructor'",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Circle::area",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Rect::area",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Triangle::area",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Square::describe",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Circle::kind",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Rect::kind",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Square::kind",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Triangle::kind",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Circle::perimeter",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench::Triangle::perimeter",
       "reason": "analyzer found no function at this start"
      },
      {
@@ -336,23 +353,54 @@
      {
       "function": "main$dtor$3",
       "reason": "analyzer found no function at this start"
+     },
+     {
+      "function": "main$dtor$4",
+      "reason": "analyzer found no function at this start"
+     },
+     {
+      "function": "main$dtor$19",
+      "reason": "analyzer found no function at this start"
+     },
+     {
+      "function": "main$catch$30",
+      "reason": "analyzer found no function at this start"
      }
     ],
-    "coverage": 0.3947
+    "coverage": 0.7895
+   },
+   "seconds": {
+    "packer": 0.005,
+    "analysis": 1.369,
+    "functions": 0.01,
+    "imports": 0.0,
+    "strings": 0.004,
+    "decompile": 0.444,
+    "ghidra": 21.83
+   },
+   "ghidra": {
+    "status": "ok",
+    "ghidra_version": "12.1.4",
+    "functions_total": 120,
+    "decompiled": 120,
+    "failed": 0,
+    "list_complete": true,
+    "recall": 0.6522,
+    "precision": 1.0,
+    "own_coverage": 0.8158,
+    "own_real": 31,
+    "own_functions": 38,
+    "seconds": 21.8
    },
    "packed": {
     "truth": false,
-    "detected": null,
-    "note": "the analysis pipeline has no packer/entropy check yet (R1); a packed row counts as missed"
+    "detected": false,
+    "packer": null,
+    "unpacked": false,
+    "unpack_tool": null,
+    "note": "not packed"
    },
-   "seconds": {
-    "analysis": 2.722,
-    "functions": 0.021,
-    "imports": 0.001,
-    "strings": 0.012,
-    "decompile": 1.436
-   },
-   "wall_seconds": 4.487
+   "wall_seconds": 23.804
   },
   {
    "row": "dotnet_plain",
@@ -381,7 +429,7 @@
     "failures": 0
    },
    "seconds": {
-    "decompile": 2.618
+    "decompile": 0.47
    },
    "strings": {
     "truth": 5,
@@ -390,7 +438,7 @@
     "recall": 1.0,
     "missing": []
    },
-   "wall_seconds": 4.758
+   "wall_seconds": 0.787
   },
   {
    "row": "dotnet_renamed",
@@ -437,7 +485,7 @@
     "failures": 0
    },
    "seconds": {
-    "decompile": 2.1
+    "decompile": 0.464
    },
    "strings": {
     "truth": 5,
@@ -446,7 +494,7 @@
     "recall": 1.0,
     "missing": []
    },
-   "wall_seconds": 2.121
+   "wall_seconds": 0.469
   },
   {
    "row": "go_elf_x64",
@@ -457,7 +505,13 @@
    "analysis": {
     "settings": {
      "command": "aaa",
-     "analysis.timeout": 300
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
     },
     "possibly_partial": false
    },
@@ -480,6 +534,8 @@
     "named": 2544,
     "named_recall": 0.937,
     "own_named_recall": 0.8889,
+    "named_precision": 0.9503,
+    "with_name": 2677,
     "size_exact": 0.9514
    },
    "imports": null,
@@ -501,19 +557,23 @@
     "failures": [],
     "coverage": 1.0
    },
+   "seconds": {
+    "packer": 0.138,
+    "analysis": 11.711,
+    "functions": 0.685,
+    "imports": 0.0,
+    "strings": 0.18,
+    "decompile": 0.583
+   },
    "packed": {
     "truth": false,
-    "detected": null,
-    "note": "the analysis pipeline has no packer/entropy check yet (R1); a packed row counts as missed"
+    "detected": false,
+    "packer": null,
+    "unpacked": false,
+    "unpack_tool": null,
+    "note": "not packed"
    },
-   "seconds": {
-    "analysis": 40.394,
-    "functions": 1.585,
-    "imports": 0.0,
-    "strings": 0.425,
-    "decompile": 1.545
-   },
-   "wall_seconds": 44.624
+   "wall_seconds": 16.278
   },
   {
    "row": "go_pe_x64",
@@ -524,22 +584,28 @@
    "analysis": {
     "settings": {
      "command": "aaa",
-     "analysis.timeout": 300
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
     },
     "possibly_partial": false
    },
    "decompiler": "rz-ghidra(pdg)",
    "rz_ghidra_loaded": true,
-   "functions_found": 2815,
+   "functions_found": 2822,
    "functions_truncated": false,
    "imports_found": 47,
    "strings_found": 39279,
    "functions": {
     "truth_functions": 2810,
-    "found_functions": 2815,
-    "found_in_code": 2815,
-    "matched": 2787,
-    "recall": 0.9918,
+    "found_functions": 2822,
+    "found_in_code": 2822,
+    "matched": 2794,
+    "recall": 0.9943,
     "precision": 0.9901,
     "own_truth": 9,
     "own_matched": 9,
@@ -547,6 +613,8 @@
     "named": 2655,
     "named_recall": 0.9448,
     "own_named_recall": 0.8889,
+    "named_precision": 0.9588,
+    "with_name": 2769,
     "size_exact": 0.005
    },
    "imports": {
@@ -574,19 +642,23 @@
     "failures": [],
     "coverage": 1.0
    },
+   "seconds": {
+    "packer": 0.292,
+    "analysis": 15.766,
+    "functions": 0.655,
+    "imports": 0.002,
+    "strings": 0.274,
+    "decompile": 0.428
+   },
    "packed": {
     "truth": false,
-    "detected": null,
-    "note": "the analysis pipeline has no packer/entropy check yet (R1); a packed row counts as missed"
+    "detected": false,
+    "packer": null,
+    "unpacked": false,
+    "unpack_tool": null,
+    "note": "not packed"
    },
-   "seconds": {
-    "analysis": 30.425,
-    "functions": 1.105,
-    "imports": 0.0,
-    "strings": 0.404,
-    "decompile": 0.792
-   },
-   "wall_seconds": 34.844
+   "wall_seconds": 17.906
   },
   {
    "row": "rust_msvc_x64",
@@ -597,30 +669,38 @@
    "analysis": {
     "settings": {
      "command": "aaa",
-     "analysis.timeout": 300
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
     },
     "possibly_partial": false
    },
    "decompiler": "rz-ghidra(pdg)",
    "rz_ghidra_loaded": true,
-   "functions_found": 287,
+   "functions_found": 363,
    "functions_truncated": false,
    "imports_found": 87,
    "strings_found": 1845,
    "functions": {
     "truth_functions": 386,
-    "found_functions": 287,
-    "found_in_code": 287,
-    "matched": 251,
-    "recall": 0.6503,
-    "precision": 0.8746,
+    "found_functions": 363,
+    "found_in_code": 363,
+    "matched": 326,
+    "recall": 0.8446,
+    "precision": 0.8981,
     "own_truth": 9,
-    "own_matched": 7,
-    "own_recall": 0.7778,
-    "named": 12,
-    "named_recall": 0.0311,
+    "own_matched": 9,
+    "own_recall": 1.0,
+    "named": 97,
+    "named_recall": 0.2513,
     "own_named_recall": 0.0,
-    "size_exact": 0.7156
+    "named_precision": 0.5706,
+    "with_name": 170,
+    "size_exact": 0.6986
    },
    "imports": {
     "truth": 87,
@@ -638,37 +718,47 @@
    },
    "decompile": {
     "own_functions": 9,
-    "attempted": 7,
-    "real": 7,
+    "attempted": 9,
+    "real": 9,
     "pseudo_only": 0,
-    "no_function": 2,
+    "no_function": 0,
     "errors": 0,
     "not_attempted_budget": 0,
-    "failures": [
-     {
-      "function": "benchrs::main",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "benchrs::impl$0::fmt",
-      "reason": "analyzer found no function at this start"
-     }
-    ],
-    "coverage": 0.7778
+    "failures": [],
+    "coverage": 1.0
+   },
+   "seconds": {
+    "packer": 0.077,
+    "analysis": 2.144,
+    "functions": 0.032,
+    "imports": 0.0,
+    "strings": 0.011,
+    "decompile": 0.397,
+    "ghidra": 34.398
+   },
+   "ghidra": {
+    "status": "ok",
+    "ghidra_version": "12.1.4",
+    "functions_total": 449,
+    "decompiled": 449,
+    "failed": 0,
+    "list_complete": true,
+    "recall": 0.7694,
+    "precision": 0.6615,
+    "own_coverage": 1.0,
+    "own_real": 9,
+    "own_functions": 9,
+    "seconds": 34.1
    },
    "packed": {
     "truth": false,
-    "detected": null,
-    "note": "the analysis pipeline has no packer/entropy check yet (R1); a packed row counts as missed"
+    "detected": false,
+    "packer": null,
+    "unpacked": false,
+    "unpack_tool": null,
+    "note": "not packed"
    },
-   "seconds": {
-    "analysis": 6.33,
-    "functions": 0.094,
-    "imports": 0.002,
-    "strings": 0.037,
-    "decompile": 1.265
-   },
-   "wall_seconds": 8.256
+   "wall_seconds": 37.256
   },
   {
    "row": "upx_c_msvc_x64",
@@ -679,126 +769,64 @@
    "analysis": {
     "settings": {
      "command": "aaa",
-     "analysis.timeout": 300
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
     },
     "possibly_partial": false
    },
    "decompiler": "rz-ghidra(pdg)",
    "rz_ghidra_loaded": true,
-   "functions_found": 3,
+   "functions_found": 87,
    "functions_truncated": false,
-   "imports_found": 13,
-   "strings_found": 237,
+   "imports_found": 57,
+   "strings_found": 274,
    "functions": {
     "truth_functions": 95,
-    "found_functions": 3,
-    "found_in_code": 0,
-    "matched": 0,
-    "recall": 0.0,
-    "precision": null,
+    "found_functions": 87,
+    "found_in_code": 87,
+    "matched": 87,
+    "recall": 0.9158,
+    "precision": 1.0,
     "own_truth": 22,
-    "own_matched": 0,
-    "own_recall": 0.0,
-    "named": 0,
-    "named_recall": 0.0,
-    "own_named_recall": 0.0,
-    "size_exact": null
+    "own_matched": 19,
+    "own_recall": 0.8636,
+    "named": 45,
+    "named_recall": 0.4737,
+    "own_named_recall": 0.0455,
+    "named_precision": 0.9375,
+    "with_name": 48,
+    "size_exact": 0.9016
    },
    "imports": {
     "truth": 57,
-    "found": 13,
-    "matched": 9,
-    "recall": 0.1579,
-    "missing_sample": [
-     "GetCurrentProcess",
-     "GetCurrentProcessId",
-     "GetCurrentThreadId",
-     "GetModuleHandleW",
-     "GetSystemTimeAsFileTime",
-     "InitializeSListHead",
-     "IsDebuggerPresent",
-     "IsProcessorFeaturePresent",
-     "QueryPerformanceCounter",
-     "RtlCaptureContext"
-    ]
+    "found": 57,
+    "matched": 57,
+    "recall": 1.0,
+    "missing_sample": []
    },
    "strings": {
     "truth": 10,
-    "found": 237,
-    "matched": 0,
-    "recall": 0.0,
-    "missing": [
-     "benchc 1.0 - Rebuild Studio benchmark fixture",
-     "usage: benchc <wc|crc|rle|b64|hist|sort|rev> <file>",
-     "benchc: cannot open '%s'",
-     "benchc: input larger than %u bytes",
-     "lines=%lu words=%lu bytes=%lu longest=%lu",
-     "crc32=%08lx size=%lu",
-     "rle: %lu -> %lu bytes, ratio %.3f",
-     "benchc: not a number: '%s'",
-     "count=%d min=%ld max=%ld sum=%ld mean=%.2f",
-     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    ]
+    "found": 274,
+    "matched": 10,
+    "recall": 1.0,
+    "missing": []
    },
    "decompile": {
     "own_functions": 22,
-    "attempted": 0,
-    "real": 0,
+    "attempted": 19,
+    "real": 19,
     "pseudo_only": 0,
-    "no_function": 22,
+    "no_function": 3,
     "errors": 0,
     "not_attempted_budget": 0,
     "failures": [
      {
-      "function": "__local_stdio_printf_options",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench_base64",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench_count",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench_crc32",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "bench_rle_encode",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "cmd_b64",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "cmd_crc",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "cmd_hist",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "cmd_rev",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "cmd_rle",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "cmd_sort",
-      "reason": "analyzer found no function at this start"
-     },
-     {
       "function": "cmd_stats",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "cmd_wc",
       "reason": "analyzer found no function at this start"
      },
      {
@@ -806,45 +834,44 @@
       "reason": "analyzer found no function at this start"
      },
      {
-      "function": "crc_init",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "fprintf",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "main",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "printf",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "read_file",
-      "reason": "analyzer found no function at this start"
-     },
-     {
-      "function": "reverse_in_place",
+      "function": "usage",
       "reason": "analyzer found no function at this start"
      }
     ],
-    "coverage": 0.0
+    "coverage": 0.8636
+   },
+   "seconds": {
+    "packer": 0.224,
+    "analysis": 1.368,
+    "functions": 0.003,
+    "imports": 0.0,
+    "strings": 0.002,
+    "decompile": 0.274,
+    "ghidra": 18.227
+   },
+   "ghidra": {
+    "status": "ok",
+    "ghidra_version": "12.1.4",
+    "functions_total": 64,
+    "decompiled": 64,
+    "failed": 0,
+    "list_complete": true,
+    "recall": 0.6737,
+    "precision": 1.0,
+    "own_coverage": 0.9545,
+    "own_real": 21,
+    "own_functions": 22,
+    "seconds": 18.2
    },
    "packed": {
     "truth": true,
-    "detected": null,
-    "note": "the analysis pipeline has no packer/entropy check yet (R1); a packed row counts as missed"
+    "detected": true,
+    "packer": "UPX",
+    "unpacked": true,
+    "unpack_tool": "upx 5.2.1",
+    "note": "packed (UPX, confidence 0.95)"
    },
-   "seconds": {
-    "analysis": 4.866,
-    "functions": 0.001,
-    "imports": 0.0,
-    "strings": 0.022,
-    "decompile": 0.0
-   },
-   "wall_seconds": 5.293
+   "wall_seconds": 24.738
   },
   {
    "row": "c_mingw_x64_o2s",
@@ -891,23 +918,30 @@
    "analysis": {
     "settings": {
      "command": "aaa",
-     "analysis.timeout": 300
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
     },
     "possibly_partial": false
    },
    "decompiler": "rz-ghidra(pdg)",
    "rz_ghidra_loaded": true,
-   "functions_found": 107,
+   "functions_found": 133,
    "functions_truncated": false,
    "imports_found": 55,
    "strings_found": 508,
    "seconds": {
-    "analysis": 4.911,
-    "functions": 0.016,
-    "imports": 0.001,
-    "strings": 0.01
+    "packer": 0.013,
+    "analysis": 1.42,
+    "functions": 0.009,
+    "imports": 0.0,
+    "strings": 0.005
    },
-   "wall_seconds": 5.453
+   "wall_seconds": 1.598
   },
   {
    "row": "dotnetapp",
@@ -936,9 +970,9 @@
     "failures": 0
    },
    "seconds": {
-    "decompile": 1.481
+    "decompile": 0.421
    },
-   "wall_seconds": 2.055
+   "wall_seconds": 0.441
   },
   {
    "row": "javacli",

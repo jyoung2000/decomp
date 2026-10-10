@@ -227,6 +227,94 @@
       },
       "install_dir": "jadx"
     },
+    "upx": {
+      "version": "5.2.1",
+      "role": "Optional: unpacks UPX-packed programs before native analysis (`upx -d`, separate process). Runs only with the user's consent, on a copy inside the case work folder (never in place); the original's sha256 is checked before and after. Also packs the upx_c_msvc_x64 benchmark row (fixture_build_tools.upx is the same pin).",
+      "license": "GPL-2.0-or-later with the UPX exception (see COPYING/LICENSE in the archive)",
+      "optional": true,
+      "source": {
+        "repo": "https://github.com/upx/upx",
+        "tag": "v5.2.1"
+      },
+      "artifact": {
+        "name": "upx-5.2.1-win64.zip",
+        "url": "https://github.com/upx/upx/releases/download/v5.2.1/upx-5.2.1-win64.zip",
+        "size_bytes": 680290,
+        "sha256": "eabc6792a347d45e945be7748423e7868fd01b0d2bcaa2f4b1031fd71ff69bda",
+        "verify_required": true,
+        "hash_provenance": "2026-10-10 on Windows 11: downloaded from the official GitHub release (published 2026-08-27); sha256 computed locally equals the GitHub release asset digest (sha256:eabc6792...)."
+      },
+      "layout": {
+        "archive_root": "upx-5.2.1-win64",
+        "entry": "upx.exe",
+        "entry_sha256": "d20ebe0b7b22b6be968c8c34be61f94ddea12cb11462e2cec27f548ef9574df8",
+        "version_args": [
+          "--version"
+        ]
+      },
+      "install_dir": "upx"
+    },
+    "temurin-jdk21": {
+      "version": "21.0.12.1+1",
+      "role": "Optional: Java 21 runtime for the optional Ghidra headless decompiler (Ghidra 12 needs JDK 21+; the Temurin 17 JRE above is too old). Eclipse Temurin 21 JDK, installed side by side under tools\\jdk21; no machine-wide install, no PATH change (Rebuild Studio sets JAVA_HOME only for the Ghidra process).",
+      "license": "GPL-2.0-with-classpath-exception",
+      "optional": true,
+      "source": {
+        "docs": "https://adoptium.net/temurin/releases/?version=21",
+        "repo": "https://github.com/adoptium/temurin21-binaries",
+        "tag": "jdk-21.0.12.1+1",
+        "api": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=windows&vendor=eclipse"
+      },
+      "artifact": {
+        "name": "OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip",
+        "size_bytes": 205073461,
+        "sha256": "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e",
+        "verify_required": true,
+        "hash_provenance": "2026-10-10 on Windows 11 (R1): downloaded from the Adoptium GitHub release; sha256 computed locally equals the 'checksum' field of the Adoptium v3 assets API response for this package.",
+        "sha256_official": "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e"
+      },
+      "layout": {
+        "archive_root": "jdk-21.0.12.1+1",
+        "entry": "bin/java.exe",
+        "entry_sha256": "82051fdab26319d77d20cc0065045d05ec00b3e3d05f44935d7c06b96b621d55",
+        "version_args": [
+          "-version"
+        ]
+      },
+      "install_dir": "jdk21"
+    },
+    "ghidra": {
+      "version": "12.1.4",
+      "role": "Optional: full Ghidra headless (analyzeHeadless) as a second decompiler next to rz-ghidra: per-function and whole-program decompilation in a separate Java process. Needs the Temurin JDK 21 entry (or any JDK 21+).",
+      "license": "Apache-2.0",
+      "optional": true,
+      "source": {
+        "repo": "https://github.com/NationalSecurityAgency/ghidra",
+        "tag": "Ghidra_12.1.4_build"
+      },
+      "artifact": {
+        "name": "ghidra_12.1.4_PUBLIC_20260921.zip",
+        "url": "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip",
+        "size_bytes": 569649598,
+        "sha256": "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db",
+        "verify_required": true,
+        "hash_provenance": "2026-10-10 on Windows 11 (R1): downloaded from the official GitHub release (published 2026-09-21); sha256 computed locally equals both the GitHub release asset digest and the SHA-256 printed in the release notes.",
+        "sha256_official": "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db"
+      },
+      "layout": {
+        "archive_root": "ghidra_12.1.4_PUBLIC",
+        "entry": "support/analyzeHeadless.bat",
+        "entry_sha256": "dd7b9d17d32ed70a71df82a43a21cdaed6c4ce67064e30f8642c149f81c2ae07",
+        "extra_files": {
+          "Ghidra/application.properties": "e84c26b08545eee63d24a1a8a4dd7905e4209538e2e7192093877c435c64eb67"
+        },
+        "requires": [
+          "temurin-jdk21"
+        ]
+      },
+      "install_dir": "ghidra"
+    },
     "rust": {
       "version": "1.97.0",
       "role": "Rust compiler for building rebuilt programs as Windows .exe files (cargo + rustc, stable 1.97.0, host/target x86_64-pc-windows-gnu). Installed privately under tools\\rust by the official rustup-init 1.29.1 (sha256-pinned below) run as a lock-declared post_install step with RUSTUP_HOME/CARGO_HOME inside the tools folder: no administrator rights, no PATH changes, no Visual Studio Build Tools (the GNU toolchain ships its own self-contained mingw linker). Without it the app falls back to a cargo already on PATH. Optional: needed only to build Rust remakes (not for recovery, web ports or comparisons).",
@@ -372,7 +460,7 @@
     }
   },
   "fixture_build_tools": {
-    "$comment": "Tools used only to build test/benchmark fixtures (fixtures/bench/build_bench.py); never installed by Setup-Dependencies or the Tools page. R1 may promote upx to 'tools' for consented 'upx -d'.",
+    "$comment": "Tools used to build test/benchmark fixtures (fixtures/bench/build_bench.py). upx is also in 'tools' (same version and sha256) since R1, where the Tools page installs it for the consented 'upx -d' step.",
     "upx": {
       "version": "5.2.1",
       "role": "Packs the upx_c_msvc_x64 benchmark row (upx --best). Fixture build only.",

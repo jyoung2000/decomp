@@ -1,6 +1,6 @@
-# Benchmark scoreboard (R0)
+# Benchmark scoreboard (R0 corpus)
 
-Generated 2026-10-10T15:57:51Z by `scripts/benchmark.py` with config **default** (analysis `aaa`, timeout 300 s, decompile budget 200 own functions).
+Generated 2026-10-10T17:08:41Z by `scripts/benchmark.py` with config **default + optional Ghidra** (analysis `aaa` + passes `sigpacks,pdata,relocptrs,thunks`, timeout 300 s, decompile budget 200 own functions, packer check on).
 
 Native engine: rizin 0.9.1 (commit c3a90e9226d9), rz-ghidra plugin: loaded. 
 .NET engine: ilspycmd 9.1.0.7988 (C:\Users\jalon\AppData\Local\RebuildStudio\tools\ilspycmd\ilspycmd.dll).
@@ -9,24 +9,36 @@ Ground truth: our own sources built with symbols (PDB / Go symbol table / unobfu
 
 ## Native rows
 
-| Row | Truth fns | Found | Boundary recall | Boundary precision | Own-fn recall | Named recall | Real-decompiler coverage (own) | Decompile failures | Imports recall | Strings recall | Packed detected | Analysis s | Decompile s | Total s |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| c_msvc_x64_o2 | 95 | 78 | 82.1% | 100.0% | 86.4% | 13.7% | 86.4% (19/22) | 3 | 100.0% | 100.0% | - | 2.5 | 0.5 | 4.0 |
-| c_msvc_x86_o2 | 95 | 86 | 90.5% | 100.0% | 90.9% | 12.6% | 90.9% (20/22) | 2 | 100.0% | 100.0% | - | 2.5 | 0.3 | 3.0 |
-| cpp_msvc_x64_o2 | 184 | 117 | 63.6% | 100.0% | 39.5% | 9.2% | 39.5% (15/38) | 23 | 96.9% | 100.0% | - | 2.7 | 1.4 | 4.5 |
-| go_elf_x64 | 2715 | 2719 | 99.2% | 99.1% | 100.0% | 93.7% | 100.0% (9/9) | 0 | n/a | 100.0% | - | 40.4 | 1.5 | 44.6 |
-| go_pe_x64 | 2810 | 2815 | 99.2% | 99.0% | 100.0% | 94.5% | 100.0% (9/9) | 0 | 100.0% | 100.0% | - | 30.4 | 0.8 | 34.8 |
-| rust_msvc_x64 | 386 | 287 | 65.0% | 87.5% | 77.8% | 3.1% | 77.8% (7/9) | 2 | 100.0% | 100.0% | - | 6.3 | 1.3 | 8.3 |
-| upx_c_msvc_x64 | 95 | 3 | 0.0% | n/a | 0.0% | 0.0% | 0.0% (0/22) | 22 | 15.8% | 0.0% | missed (no packer check) | 4.9 | 0.0 | 5.3 |
-| pecli (partial) | n/a | 107 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | 4.9 | - | 5.5 |
+| Row | Truth fns | Found | Boundary recall | Boundary precision | Own-fn recall | Named recall | Name precision | Real-decompiler coverage (own) | Decompile failures | Imports recall | Strings recall | Packed detected | Analysis s | Decompile s | Total s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| c_msvc_x64_o2 | 95 | 87 | 91.6% | 100.0% | 86.4% | 47.4% | 93.8% | 86.4% (19/22) | 3 | 100.0% | 100.0% | - | 1.3 | 0.3 | 19.6 |
+| c_msvc_x86_o2 | 95 | 91 | 95.8% | 100.0% | 95.5% | 53.7% | 98.1% | 95.5% (21/22) | 1 | 100.0% | 100.0% | - | 1.3 | 0.2 | 16.6 |
+| cpp_msvc_x64_o2 | 184 | 155 | 84.2% | 100.0% | 79.0% | 32.1% | 72.0% | 79.0% (30/38) | 8 | 96.9% | 100.0% | - | 1.4 | 0.4 | 23.8 |
+| go_elf_x64 | 2715 | 2719 | 99.2% | 99.1% | 100.0% | 93.7% | 95.0% | 100.0% (9/9) | 0 | n/a | 100.0% | - | 11.7 | 0.6 | 16.3 |
+| go_pe_x64 | 2810 | 2822 | 99.4% | 99.0% | 100.0% | 94.5% | 95.9% | 100.0% (9/9) | 0 | 100.0% | 100.0% | - | 15.8 | 0.4 | 17.9 |
+| rust_msvc_x64 | 386 | 363 | 84.5% | 89.8% | 100.0% | 25.1% | 57.1% | 100.0% (9/9) | 0 | 100.0% | 100.0% | - | 2.1 | 0.4 | 37.3 |
+| upx_c_msvc_x64 | 95 | 87 | 91.6% | 100.0% | 86.4% | 47.4% | 93.8% | 86.4% (19/22) | 3 | 100.0% | 100.0% | yes (UPX), unpacked with upx 5.2.1 | 1.4 | 0.3 | 24.7 |
+| pecli (partial) | n/a | 133 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | 1.4 | - | 1.6 |
+
+## Ghidra headless (optional second decompiler)
+
+Whole-program `analyzeHeadless` run per row (auto-analysis, then every function decompiled, largest first). Boundary recall/precision use Ghidra's own function list.
+
+| Row | Ghidra | Functions | Boundary recall | Boundary precision | Real-decompiler coverage (own) | Decompile failures | Seconds |
+|---|---|---|---|---|---|---|---|
+| c_msvc_x64_o2 | 12.1.4 | 64 | 67.4% | 100.0% | 95.5% (21/22) | 0 | 17.6 |
+| c_msvc_x86_o2 | 12.1.4 | 60 | 63.2% | 100.0% | 95.5% (21/22) | 0 | 14.9 |
+| cpp_msvc_x64_o2 | 12.1.4 | 120 | 65.2% | 100.0% | 81.6% (31/38) | 0 | 21.8 |
+| rust_msvc_x64 | 12.1.4 | 449 | 76.9% | 66.1% | 100.0% (9/9) | 0 | 34.1 |
+| upx_c_msvc_x64 | 12.1.4 | 64 | 67.4% | 100.0% | 95.5% (21/22) | 0 | 18.2 |
 
 ## .NET rows
 
 | Row | Truth types | Type recall | Truth methods | Method recall | Types decompiled | Decompile failures | Strings recall | Decompile s |
 |---|---|---|---|---|---|---|---|---|
-| dotnet_plain | 9 | 100.0% | 10 | 100.0% | 100.0% (8/8) | 0 | 100.0% | 2.6 |
-| dotnet_renamed | 9 | 11.1% | 10 | 20.0% | 100.0% (8/8) | 0 | 100.0% | 2.1 |
-| dotnetapp (partial) | 4 | 100.0% | 7 | 100.0% | 100.0% (4/4) | 0 | n/a | 1.5 |
+| dotnet_plain | 9 | 100.0% | 10 | 100.0% | 100.0% (8/8) | 0 | 100.0% | 0.5 |
+| dotnet_renamed | 9 | 11.1% | 10 | 20.0% | 100.0% (8/8) | 0 | 100.0% | 0.5 |
+| dotnetapp (partial) | 4 | 100.0% | 7 | 100.0% | 100.0% (4/4) | 0 | n/a | 0.4 |
 
 ## Rows not run or not scored
 
@@ -49,7 +61,8 @@ Ground truth: our own sources built with symbols (PDB / Go symbol table / unobfu
 
 ## Notes
 
-* `Packed detected`: the pipeline has no packer/entropy check yet, so a packed row is reported as missed until R1 adds one.
-* Named recall counts a function as named only when rizin's name at the true start equals a truth name (modulo prefixes, case, punctuation); auto names (`fcn.*`, `entry0`) never count.
+* `Packed detected`: the product's packer check (`backends/packer.py`: section names, UPX magic, entropy, W+X/virtual-only code sections, entry-point and import anomalies). A UPX row is then unpacked with the pinned `upx -d` into a temp work folder (consent = benchmark config `packer.unpack`) and the unpacked copy is what gets scored; `false positive` marks an unpacked row reported as packed.
+* Named recall counts a function as named only when rizin's name at the true start equals a truth name (modulo prefixes, case, punctuation); auto names (`fcn.*`, `entry0`) never count. Name precision = right names / matched functions that carry any non-auto name (a wrong name misleads more than `fcn.*`; rizin's RTTI names such as `method.Foo.virtual_0` count as wrong).
+* Analysis passes (R1, `backends/rizin_passes.py`): `sigpacks` = FLIRT packs built from the MSVC 14.29 runtime libraries and the Rust 1.98.1 std rlibs (`scripts/build_sigpacks.py`, pinned in `rebuild_controller/data/sigpacks/manifest.json`; never built from this corpus); `pdata` = x64 exception-directory function starts (chained entries and EH funclets skipped); `relocptrs` = functions at relocated code pointers no analysed function covers; `thunks` = `jmp [IAT]` thunks named after their import.
 * Failures per row are listed in `reports/benchmark.json` (`decompile.failures`, `imports.missing_sample`, `strings.missing`).
 * Reproduce: `python fixtures/bench/build_bench.py --verify` (corpus), then `python scripts/benchmark.py` (needs rizin; REBUILD_STUDIO_TOOLS).

@@ -121,7 +121,7 @@ def test_evidence_inputs_include_rizin_version_and_settings(backend, cases, case
     assert inputs["rizin_version"] == tool.version == "0.9.1"
     assert inputs["rizin_commit"] == tool.commit and len(tool.commit) == 40
     assert inputs["module_sha256"] == sha256_file(SAMPLES["elf"])
-    assert inputs["analysis"] == {"command": "aaa", "analysis.timeout": 300}
+    assert inputs["analysis"] == {"command": "aaa", "analysis.timeout": 300, "passes": ["sigpacks", "pdata", "relocptrs", "thunks"]}
     assert ev["input_hash"] == stable_json_hash(inputs)   # cache key is exactly these inputs
     # second call is served from the evidence cache with the same id
     r2 = backend.op_functions(cases, case_id=case_id, module_id=mods["elf"])
@@ -441,6 +441,7 @@ def test_backend_registers(settings):
 
 def test_ghidra_reports_missing_cleanly(monkeypatch, tmp_path, settings, cases, case):
     monkeypatch.delenv("GHIDRA_INSTALL_DIR", raising=False)
+    monkeypatch.setattr(settings, "tools_dir", tmp_path / "no-tools")   # no <tools>/ghidra either
     g = GhidraBackend(settings)
     p = g.probe()
     assert p.availability == Availability.MISSING and "GHIDRA_INSTALL_DIR" in p.tools[0].detail

@@ -161,35 +161,104 @@ def _result(res, what: str) -> dict[str, Any]:
     return {"data": res.data, "evidence_ids": res.evidence_ids, "truncated": res.truncated}
 
 
-_OP_TEXT = {"info": "file header", "imports": "imports", "exports": "exports", "strings": "strings", "analyze": "code analysis", "functions": "function list"}
+_OP_TEXT = {"info": "file header", "imports": "imports", "exports": "exports", "strings": "strings", "analyze": "code analysis", "functions": "function list",
+            "sections": "sections", "entrypoints": "entry points", "symbols": "symbols", "relocations": "relocations",
+            "xref_index": "cross-index of strings, references and calls"}
+DECOMPILE_SECONDS = 300   # default time budget for decompiling during the pipeline; the rest is decompiled on demand
+
+
+def decompile_order(funcs: list[dict[str, Any]], entry_addrs: set[int]) -> list[dict[str, Any]]:
+    """Entry points first, then the largest functions (most code to read), ties by address."""
+    fs = [f for f in funcs if isinstance(f, dict) and isinstance(f.get("offset"), int)]
+    return sorted(fs, key=lambda f: (f["offset"] not in entry_addrs, -int(f.get("size") or 0), f["offset"]))
+
+
+def _packer_step(ctx: StageContext, b, case: dict[str, Any], mod: dict[str, Any], out: dict[str, Any]) -> None:
+    """Packer/entropy check of the original file; a consented UPX unpack goes to the case work folder (never in place)."""
+    res = b.call("packer_report", ctx, case_id=case["case_id"], module_id=mod["module_id"])
+    if not res.ok:
+        ctx.log(f"{mod['rel_path']}: packer check skipped ({res.error})", "warn")
+        return
+    rep = res.data["report"]
+    out["evidence_ids"] += res.evidence_ids
+    out["packer"] = {k: rep.get(k) for k in ("summary", "packed", "packer", "confidence", "anomalies", "overlay")}
+    if not rep.get("packed"):
+        return
+    if res.data.get("analysis_copy"):
+        ctx.log(f"{mod['rel_path']} is packed ({rep['packer']}); analysing the unpacked copy made earlier")
+        out["unpacked"] = res.data["analysis_copy"]
+        return
+    allow = bool((case.get("settings") or {}).get("unpack_packed"))
+    if rep.get("packer") == "UPX" and allow:
+        u = b.call("unpack", ctx, case_id=case["case_id"], module_id=mod["module_id"], confirm=True)
+        if u.ok:
+            out["unpacked"] = u.data["unpacked"]
+            out["evidence_ids"] += u.evidence_ids
+            ctx.log(f"{mod['rel_path']} was packed with UPX; unpacked a copy ({u.data['unpacked']['tool']}) and analysing that copy")
+        else:
+            ctx.log(f"{mod['rel_path']} is packed with UPX but could not be unpacked: {u.error}", "warn")
+        return
+    how = ("allow unpacking for this project (project setting \"unpack_packed\", or the module's Unpack action), then press Resume"
+           if rep.get("packer") == "UPX" else "no unpacker is available for this packer; results describe the packed file")
+    ctx.log(f"{mod['rel_path']} looks packed ({rep['summary']}): analysis mostly sees the unpacking stub; {how}", "warn",
+            "; ".join(rep.get("reasons") or [])[:500])
 
 
 def stage_analyze_module(ctx: StageContext) -> dict[str, Any]:
     st = studio_of(ctx)
     mod = st.cases.get_module(ctx.job.inputs["module_id"])
     case = st.cases.get_case(ctx.job.case_id)
-    path = Path(case["source_root"]) / mod["rel_path"]
     b = _backend(ctx, "rizin", "Rizin")
     out: dict[str, Any] = {"module_id": mod["module_id"], "evidence_ids": []}
     rz = tool_label(ctx, "rizin", "Rizin")
+    _packer_step(ctx, b, case, mod, out)
     ctx.log(f"Analysing {mod['rel_path']} with {rz}…")
     for op in ("info", "imports", "exports", "strings", "analyze", "functions"):
         res = b.call(op, ctx, case_id=case["case_id"], module_id=mod["module_id"])
         r = _result(res, f"rizin {op}")
         out["evidence_ids"] += r["evidence_ids"]
         out[op] = {k: v for k, v in r["data"].items() if k in ("count", "functions", "decompiler", "rizin_version", "truncated", "arch", "bits")}
+        if op == "analyze":
+            out["analysis_passes"] = (r["data"].get("analysis") or {}).get("passes")
         ctx.progress(module=mod["rel_path"], op=op)
         ctx.log(f"{mod['rel_path']}: {_OP_TEXT[op]} done", key=f"op-{op}")
     funcs = res.data.get("functions") or []
     out["function_count"] = len(funcs) if isinstance(funcs, list) else res.data.get("count")
-    # decompile a bounded set of functions as evidence (all functions are available on demand via briefing)
-    decompiled, errors = 0, 0
-    names = [f.get("name") for f in funcs if isinstance(f, dict) and f.get("name")] if isinstance(funcs, list) else []
-    limit = int(case.get("settings", {}).get("decompile_limit", 200))
-    ctx.log(f"Found {len(names)} functions in {mod['rel_path']}; decompiling up to {min(limit, len(names))} of them")
-    for i, name in enumerate(names[:limit]):
+    # every other whole-module operation, so later steps (and MCP/briefings) read evidence instead of re-running rizin
+    entry_addrs: set[int] = set()
+    for op in ("sections", "entrypoints", "symbols", "relocations", "xref_index"):
+        res2 = b.call(op, ctx, case_id=case["case_id"], module_id=mod["module_id"])
+        if not res2.ok:
+            ctx.log(f"{mod['rel_path']}: {_OP_TEXT[op]} failed: {res2.error}", "warn")
+            continue
+        out["evidence_ids"] += res2.evidence_ids
+        d = res2.data
+        out[op] = {"count": d.get("count", len(d.get(op) or [])) if op != "xref_index" else d.get("counts"), "truncated": res2.truncated}
+        if op == "entrypoints":
+            entry_addrs = {e.get("vaddr") for e in d.get("entrypoints") or [] if isinstance(e.get("vaddr"), int)}
+        ctx.log(f"{mod['rel_path']}: {_OP_TEXT[op]} done", key=f"op-{op}")
+    # decompile entry points first, then the largest functions, under a count and a time budget; the rest is on demand
+    settings = case.get("settings") or {}
+    limit = int(settings.get("decompile_limit", 200))
+    budget_s = float(settings.get("decompile_seconds", DECOMPILE_SECONDS))
+    order = decompile_order(funcs if isinstance(funcs, list) else [], entry_addrs)
+    if (out.get("packer") or {}).get("packed") and not out.get("unpacked"):
+        # still packed: the "largest functions" are the unpacker's decompression loops (minutes each in the decompiler,
+        # nothing to learn); decompile the entry points only
+        limit = min(limit, max(1, len(entry_addrs)))
+        ctx.log(f"{mod['rel_path']} is still packed: decompiling only its entry point", "warn")
+    planned = min(limit, len(order))
+    decompiled, errors, attempted = 0, 0, 0
+    ctx.log(f"Found {len(order)} functions in {mod['rel_path']}; decompiling up to {planned} of them "
+            f"(entry points and largest first, at most {budget_s:.0f} s); the rest are decompiled when opened")
+    import time as _time
+    t0 = _time.monotonic()
+    for i, f in enumerate(order[:limit]):
+        if _time.monotonic() - t0 > budget_s:
+            break
+        attempted += 1
         try:
-            r = b.call("decompile", ctx, case_id=case["case_id"], module_id=mod["module_id"], function=name)
+            r = b.call("decompile", ctx, case_id=case["case_id"], module_id=mod["module_id"], function=f"0x{f['offset']:x}")
             if r.ok:
                 decompiled += 1; out["evidence_ids"] += r.evidence_ids
             else:
@@ -197,13 +266,17 @@ def stage_analyze_module(ctx: StageContext) -> dict[str, Any]:
         except Exception:
             errors += 1
         if i % 10 == 0:
-            ctx.progress(module=mod["rel_path"], functions_decompiled=decompiled, functions_total=len(names), decompile_errors=errors)
-            ctx.log(f"Analysing {mod['rel_path']} with {rz}: {decompiled} of {min(limit, len(names))} functions", key="decomp")
-    ctx.log(f"Analysed {mod['rel_path']}: {decompiled} of {min(limit, len(names))} functions decompiled"
-            + (f", {errors} could not be" if errors else ""), "warn" if errors else "info")
-    out.update({"decompiled": decompiled, "decompile_errors": errors, "decompile_limit": limit, "functions_total": len(names)})
+            ctx.progress(module=mod["rel_path"], functions_decompiled=decompiled, functions_total=len(order), decompile_errors=errors)
+            ctx.log(f"Analysing {mod['rel_path']} with {rz}: {decompiled} of {planned} functions", key="decomp")
+    ctx.log(f"Analysed {mod['rel_path']}: {decompiled} of {planned} functions decompiled"
+            + (f", {errors} could not be" if errors else "")
+            + (f"; stopped at the {budget_s:.0f} s budget" if attempted < planned else ""), "warn" if errors else "info")
+    out.update({"decompiled": decompiled, "decompile_errors": errors, "decompile_limit": limit, "functions_total": len(order),
+                "decompile_order": "entry points, then largest first", "decompile_seconds_budget": budget_s,
+                "decompile_attempted": attempted, "decompile_on_demand": max(0, len(order) - attempted)})
     ev = st.cases.add_evidence(case["case_id"], "module_report", f"Native analysis: {mod['rel_path']}", body=out, module_id=mod["module_id"],
-                               inputs={"module_sha": mod["sha256"], "ops": "info,imports,exports,strings,analyze,functions,decompile", "limit": limit}, producer="rizin")
+                               inputs={"module_sha": mod["sha256"], "ops": "packer,info,imports,exports,strings,analyze,functions,sections,"
+                                       "entrypoints,symbols,relocations,xref_index,decompile", "limit": limit}, producer="rizin")
     st.plan.add_evidence(st.plan.milestone_id(case["case_id"], "M-RECOVERY"), ev["evidence_id"])
     return out
 

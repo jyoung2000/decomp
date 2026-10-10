@@ -1,9 +1,11 @@
-"""Optional full-Ghidra headless backend.
+"""Optional full-Ghidra headless backend (second decompiler next to rz-ghidra).
 
-Probe-only unless ``GHIDRA_INSTALL_DIR`` points at a Ghidra installation. When it does, ``op_decompile`` runs
-``analyzeHeadless`` with a small bundled GhidraScript (Java) that decompiles one function and writes JSON. Output is stored
-as untrusted evidence (producer ``ghidra``). This backend is marked experimental: it has not been exercised on this host
-because Ghidra is not installed here.
+Ghidra is found at ``GHIDRA_INSTALL_DIR`` or at ``<tools>/ghidra`` (the pinned ``ghidra`` entry of docs/dependency-lock.json,
+installed from the Tools page); it needs a JDK 21+, preferably the pinned ``temurin-jdk21`` at ``<tools>/jdk21`` (else
+JAVA_HOME / PATH). ``op_decompile`` runs ``analyzeHeadless`` with a bundled GhidraScript that decompiles one function;
+``op_decompile_all`` decompiles a whole program in one headless run (largest functions first, bounded count and per-function
+timeout). Output is untrusted evidence (producer ``ghidra``). Verified on Windows with Ghidra 12.1.4 + Temurin 21.0.12.1
+(tests/test_ghidra_live.py, opt-in ``-m live``).
 """
 from __future__ import annotations
 
@@ -94,6 +96,69 @@ public class RebuildDecompile extends GhidraScript {
 """
 
 
+DECOMPILE_ALL_SCRIPT = r"""
+// Rebuild Studio: decompile up to N functions (largest first) and write JSON lines. Args: <out.jsonl> <max> <timeoutSeconds>
+//@category RebuildStudio
+import ghidra.app.script.GhidraScript;
+import ghidra.app.decompiler.DecompInterface;
+import ghidra.app.decompiler.DecompileResults;
+import ghidra.program.model.listing.Function;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+public class RebuildDecompileAll extends GhidraScript {
+    private static String q(String s) {
+        if (s == null) return "null";
+        StringBuilder b = new StringBuilder("\"");
+        for (char c : s.toCharArray()) {
+            switch (c) {
+                case '"': b.append("\\\""); break;
+                case '\\': b.append("\\\\"); break;
+                case '\n': b.append("\\n"); break;
+                case '\r': b.append("\\r"); break;
+                case '\t': b.append("\\t"); break;
+                default:
+                    if (c < 0x20) b.append(String.format("\\u%04x", (int) c)); else b.append(c);
+            }
+        }
+        return b.append('"').toString();
+    }
+
+    @Override
+    public void run() throws Exception {
+        String[] a = getScriptArgs();
+        String out = a[0];
+        int max = Integer.parseInt(a[1]);
+        int timeout = Integer.parseInt(a[2]);
+        List<Function> fs = new ArrayList<>();
+        for (Function g : currentProgram.getFunctionManager().getFunctions(true)) {
+            if (!g.isThunk() && !g.isExternal()) fs.add(g);
+        }
+        fs.sort((x, y) -> Long.compare(y.getBody().getNumAddresses(), x.getBody().getNumAddresses()));
+        DecompInterface di = new DecompInterface();
+        di.openProgram(currentProgram);
+        try (OutputStreamWriter w = new OutputStreamWriter(new FileOutputStream(out), StandardCharsets.UTF_8)) {
+            w.write("{\"total\":" + fs.size() + "}\n");
+            int n = 0;
+            for (Function f : fs) {
+                if (n++ >= max || monitor.isCancelled()) break;
+                DecompileResults r = di.decompileFunction(f, timeout, monitor);
+                boolean ok = r.decompileCompleted() && r.getDecompiledFunction() != null;
+                w.write("{\"ok\":" + ok + ",\"name\":" + q(f.getName()) + ",\"entry\":" + q("0x" + f.getEntryPoint().toString())
+                    + ",\"size\":" + f.getBody().getNumAddresses()
+                    + ",\"code\":" + q(ok ? r.getDecompiledFunction().getC() : null)
+                    + ",\"error\":" + q(ok ? null : r.getErrorMessage()) + "}\n");
+            }
+        }
+        di.dispose();
+    }
+}
+"""
+
+
 def _headless(install: Path) -> Path:
     return install / "support" / ("analyzeHeadless.bat" if os.name == "nt" else "analyzeHeadless")
 
@@ -109,10 +174,32 @@ def _ghidra_version(install: Path) -> str | None:
     return None
 
 
-def _java() -> str | None:
+_JAVA_EXE = "java.exe" if os.name == "nt" else "java"
+_JAVA_VERSIONS: dict[str, int | None] = {}
+
+
+def java_major(java: str) -> int | None:
+    """Major version of a java executable (``java -version``), cached per path."""
+    if java not in _JAVA_VERSIONS:
+        try:
+            r = subprocess.run([java, "-version"], capture_output=True, text=True, timeout=30)
+            m = re.search(r'version "(\d+)(?:\.(\d+))?', (r.stderr or "") + (r.stdout or ""))
+            v = int(m.group(1)) if m else None
+            _JAVA_VERSIONS[java] = (int(m.group(2)) if v == 1 and m.group(2) else v) if m else None
+        except (OSError, subprocess.SubprocessError):
+            _JAVA_VERSIONS[java] = None
+    return _JAVA_VERSIONS[java]
+
+
+def _java(tools_dir: Path | None = None) -> str | None:
+    """Java for Ghidra: the pinned JDK 21 under <tools>/jdk21 first, then JAVA_HOME, then PATH."""
+    cands: list[Path] = []
+    if tools_dir is not None:
+        cands.append(Path(tools_dir) / "jdk21" / "bin" / _JAVA_EXE)
     jh = os.environ.get("JAVA_HOME")
     if jh:
-        p = Path(jh) / "bin" / ("java.exe" if os.name == "nt" else "java")
+        cands.append(Path(jh) / "bin" / _JAVA_EXE)
+    for p in cands:
         if p.is_file():
             return str(p)
     return shutil.which("java")
@@ -126,25 +213,37 @@ class GhidraBackend(BackendAdapter):
 
     def install_dir(self) -> Path | None:
         env = os.environ.get("GHIDRA_INSTALL_DIR")
-        return Path(env) if env else None
+        if env:
+            return Path(env)
+        local = Path(self.settings.tools_dir) / "ghidra"
+        return local if _headless(local).is_file() else None
+
+    def java(self) -> str | None:
+        return _java(Path(self.settings.tools_dir))
 
     def tool_probe(self) -> ToolProbe:
         common = dict(license=GHIDRA_LICENSE, source=GHIDRA_SOURCE, pinned=GHIDRA_PINNED, integration="cli",
-                      prerequisites=["GHIDRA_INSTALL_DIR", "JDK 21+"])
+                      prerequisites=["GHIDRA_INSTALL_DIR or Tools page: Ghidra", "JDK 21+ (Tools page: Temurin JDK 21)"])
         install = self.install_dir()
         if install is None:
             return ToolProbe("ghidra", Availability.MISSING,
-                             detail="GHIDRA_INSTALL_DIR is not set; full Ghidra headless is optional (rizin covers native analysis)",
+                             detail="GHIDRA_INSTALL_DIR is not set and Ghidra is not installed in the tools folder; full Ghidra "
+                                    "headless is optional (rizin covers native analysis)",
                              **common)
         headless = _headless(install)
         if not headless.is_file():
             return ToolProbe("ghidra", Availability.MISSING, path=str(install),
                              detail=f"GHIDRA_INSTALL_DIR={install} has no {headless.relative_to(install)}", **common)
         version = _ghidra_version(install)
-        java = _java()
+        java = self.java()
         if not java:
             return ToolProbe("ghidra", Availability.DETECTED, path=str(headless), version=version,
-                             detail="Ghidra found but no Java runtime (set JAVA_HOME or put java on PATH)", **common)
+                             detail="Ghidra found but no Java runtime (install Temurin JDK 21 from the Tools page, or set JAVA_HOME)", **common)
+        major = java_major(java)
+        if major is not None and major < 21:
+            return ToolProbe("ghidra", Availability.DETECTED, path=str(headless), version=version,
+                             detail=f"Ghidra {version} needs JDK 21+, found Java {major} at {java} (install Temurin JDK 21 from the Tools page)",
+                             **common)
         if not version:
             return ToolProbe("ghidra", Availability.DETECTED, path=str(headless),
                              detail="Ghidra found but application.properties has no application.version", **common)
@@ -158,7 +257,9 @@ class GhidraBackend(BackendAdapter):
             backend_id=self.backend_id, title="Ghidra headless (optional)", formats=["pe", "elf", "macho"],
             platforms=["linux", "windows", "macos"], profiles=["native_pe", "native_elf"],
             operations=[Operation("decompile", "Decompile one function with Ghidra headless; untrusted output",
-                                  {"case_id": "str", "module_id": "str", "function": "str"}, {"decompiled": "object"})],
+                                  {"case_id": "str", "module_id": "str", "function": "str"}, {"decompiled": "object"}),
+                        Operation("decompile_all", "Whole-program Ghidra headless run: decompile up to N functions, largest first",
+                                  {"case_id": "str", "module_id": "str", "max_functions": "int"}, {"functions": "list"})],
             tools=[self.tool_probe()],
             resources={"ram_mb": 4096, "disk_mb": 1500, "time": "minutes per module (full auto-analysis)"},
             experimental=True,
@@ -173,7 +274,13 @@ class GhidraBackend(BackendAdapter):
         assert install is not None
         with tempfile.TemporaryDirectory(prefix="rs-ghidra-") as proj:
             argv = [str(_headless(install)), proj, "rs", "-import", str(binary), "-deleteProject", *extra]
-            kwargs: dict[str, Any] = {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT, "stdin": subprocess.DEVNULL}
+            env = dict(os.environ)
+            java = self.java()
+            if java:   # make Ghidra's launcher pick this JDK (PATH java first, JAVA_HOME second)
+                jhome = Path(java).parent.parent
+                env["JAVA_HOME"] = str(jhome)
+                env["PATH"] = str(jhome / "bin") + os.pathsep + env.get("PATH", "")
+            kwargs: dict[str, Any] = {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT, "stdin": subprocess.DEVNULL, "env": env}
             if os.name == "nt":
                 kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
             else:
@@ -190,6 +297,46 @@ class GhidraBackend(BackendAdapter):
                 kill_tree(proc)
                 raise
             return proc.returncode, out[-cap:].decode("utf-8", "replace")
+
+    def decompile_all_path(self, binary: Path, *, max_functions: int = 200, per_function_timeout: int = 60,
+                           timeout: float = 3600) -> dict[str, Any]:
+        """Whole-program Ghidra run on a file: auto-analysis, then decompile up to ``max_functions`` (largest first)."""
+        import time as _time
+        with tempfile.TemporaryDirectory(prefix="rs-ghidra-all-") as sd:
+            script_dir = Path(sd)
+            (script_dir / "RebuildDecompileAll.java").write_text(DECOMPILE_ALL_SCRIPT, "utf-8")
+            out = script_dir / "out.jsonl"
+            t0 = _time.monotonic()
+            rc, log = self._run_headless(Path(binary), ["-scriptPath", str(script_dir), "-postScript", "RebuildDecompileAll.java",
+                                                        str(out), str(int(max_functions)), str(int(per_function_timeout))], timeout=timeout)
+            secs = round(_time.monotonic() - t0, 1)
+            if not out.is_file():
+                raise RuntimeError(f"ghidra produced no output (exit {rc}): {log[-600:]}")
+            lines = [json.loads(x) for x in out.read_text("utf-8").splitlines() if x.strip()]
+        head, funcs = (lines[0], lines[1:]) if lines and "total" in lines[0] else ({"total": None}, lines)
+        return {"total_functions": head.get("total"), "functions": funcs, "decompiled": sum(1 for f in funcs if f.get("ok")),
+                "failed": sum(1 for f in funcs if not f.get("ok")), "seconds": secs, "exit_code": rc,
+                "ghidra_version": self.tool_probe().version}
+
+    def op_decompile_all(self, ctx: Any, *, case_id: str, module_id: str, max_functions: int = 200,
+                         per_function_timeout: int = 60, timeout: float = 3600) -> OperationResult:
+        try:
+            cases = native.cases_of(ctx)
+            module, path = native.module_file(cases, case_id, module_id)
+            res = self.decompile_all_path(path, max_functions=max(1, min(int(max_functions), 5000)),
+                                          per_function_timeout=max(5, min(int(per_function_timeout), 600)), timeout=timeout)
+            cap = self.settings.limits.max_subprocess_output_bytes
+            items = [{**{k: f.get(k) for k in ("ok", "name", "entry", "size", "error")},
+                      "decompiled": native.untrusted_text(f.get("code"), cap)} for f in res["functions"]]
+            body = {**{k: v for k, v in res.items() if k != "functions"}, "functions": items, "decompiler": f"ghidra-{res['ghidra_version']}"}
+            inputs = {"op": "decompile_all", "module_sha256": module["sha256"], "ghidra_version": res["ghidra_version"],
+                      "max_functions": max_functions}
+            ev = native.store_evidence(cases, case_id, module_id, "native.decompile_all.ghidra",
+                                       f"Ghidra whole-program decompile ({res['decompiled']} functions)", body, inputs,
+                                       untrusted=True, producer="ghidra")
+            return OperationResult(ok=True, data=body, evidence_ids=[ev["evidence_id"]])
+        except Exception as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
 
     def smoke(self) -> ToolProbe:
         probe = self.tool_probe()

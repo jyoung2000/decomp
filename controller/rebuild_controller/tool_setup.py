@@ -63,6 +63,9 @@ FRIENDLY = {
     "rust": ("Rust compiler (private)", "Optional. Needed to build rebuilt programs as Windows .exe files (Rust remakes). Installed privately inside Rebuild Studio (no administrator rights, no Visual Studio). Large: about 150 MB to download and 850 MB of disk."),
     "cfr": ("CFR (optional)", "Optional. Needed to recover Java programs (.jar files)."),
     "jadx": ("jadx (optional)", "Optional. Needed to recover Android apps (.apk files)."),
+    "temurin-jdk21": ("Private Java 21 (optional)", "Optional. Runs the optional Ghidra decompiler. Installed privately inside Rebuild Studio, not on your PC. About 200 MB."),
+    "ghidra": ("Ghidra (optional)", "Optional. A second decompiler for native programs, next to the built-in one. Large: about 570 MB to download. Needs Private Java 21."),
+    "upx": ("UPX (optional)", "Optional. Unpacks programs compressed with UPX so they can be analyzed. Runs only when you allow it, on a copy (your file is never changed)."),
 }
 
 

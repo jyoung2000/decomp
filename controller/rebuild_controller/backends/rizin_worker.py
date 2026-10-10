@@ -50,7 +50,8 @@ RZ_GHIDRA_PINNED = "v0.9.0"
 RZ_GHIDRA_LICENSE = "LGPL-3.0 (plugin) + Apache-2.0 (Ghidra decompiler)"
 RZ_GHIDRA_SOURCE = "https://github.com/rizinorg/rz-ghidra"
 
-DEFAULT_ANALYSIS = {"command": "aaa", "analysis.timeout": 300}
+# "passes": post-analysis passes from rizin_passes (pdata function starts, import-thunk names, shipped signature packs).
+DEFAULT_ANALYSIS = {"command": "aaa", "analysis.timeout": 300, "passes": ["sigpacks", "pdata", "relocptrs", "thunks"]}
 DEFAULT_IDLE_TIMEOUT = 300.0
 DEFAULT_COMMAND_TIMEOUT = 120.0
 LOAD_TIMEOUT = 60.0
@@ -457,6 +458,8 @@ class RizinSession:
         # re-created rizin process never serves un-annotated output. Set by RizinBackend for case-scoped sessions.
         self.annotator: Callable[["RizinSession", Callable[[], None] | None], Any] | None = None
         self.annotation_report: dict[str, Any] | None = None
+        # A verified PDB for this file ({"path", "key", "source"}); loaded with idp before every (re-)analysis.
+        self.pdb: dict[str, Any] | None = None
 
     # -- ownership ------------------------------------------------------
     @contextmanager
@@ -578,14 +581,26 @@ class RizinSession:
         if cmd not in ("aa", "aaa", "aaaa"):
             raise ValueError(f"unsupported analysis command {cmd!r}")
         atimeout = int(s.get("analysis.timeout", 300))
+        pdb_report = None
+        if self.pdb:
+            pp = str(Path(self.pdb["path"]).resolve()).replace("\\", "/")
+            if '"' not in pp and not any(ord(c) < 32 for c in pp):
+                self._exec(f'idp "{pp}"', timeout=300, poll=poll)
+                pdb_report = {k: self.pdb.get(k) for k in ("key", "source", "name")}
         self._exec(f"e analysis.timeout={atimeout:d}", timeout=30, poll=poll)
         start = time.monotonic()
         self._exec(cmd, timeout=atimeout + 60, poll=poll)
         elapsed = time.monotonic() - start
+        passes_report = None
+        if s.get("passes"):
+            from . import rizin_passes
+            passes_report = rizin_passes.run_passes(self, list(s["passes"]), poll)
         self._analyzed = dict(s)
         self._functions = None
         self._analysis_report = {"settings": dict(s), "elapsed_seconds": round(elapsed, 3),
-                                 "possibly_partial": bool(atimeout and elapsed >= atimeout), "generation": self.generation}
+                                 "possibly_partial": bool(atimeout and elapsed >= atimeout), "generation": self.generation,
+                                 "passes": passes_report, "passes_seconds": round(time.monotonic() - start - elapsed, 3),
+                                 "pdb": pdb_report}
         if self.annotator is not None:
             self.annotation_report = self.annotator(self, poll)
             self._functions = None
@@ -629,6 +644,13 @@ class RizinSession:
 
     def entrypoints(self, poll=None) -> tuple[Any, bool]:
         return self._run("iej", poll=poll)
+
+    def relocations(self, poll=None) -> tuple[Any, bool]:
+        return self._run("irj", poll=poll, timeout=300)
+
+    def all_xrefs(self, poll=None) -> tuple[Any, bool]:
+        """Every cross reference rizin knows after analysis (axlj): [{from, to, type}]."""
+        return self._run("axlj", poll=poll, needs_analysis=True, timeout=300)
 
     def functions(self, poll=None) -> tuple[list[dict[str, Any]], bool]:
         with self.owned():
@@ -995,6 +1017,12 @@ OPERATIONS = [
     Operation("add_comment", "Comment at an address; persisted annotation", {"case_id": "str", "module_id": "str", "addr": "str", "text": "str"}, {"change": "object"}),
     Operation("apply_struct", "Declare C struct/union/enum/typedef; persisted annotation", {"case_id": "str", "module_id": "str", "declaration": "str"}, {"change": "object"}),
     Operation("patch_bytes", "Patch bytes in a COPY inside the work folder (never the original); needs confirm", {"case_id": "str", "module_id": "str", "addr": "str", "data_hex": "str", "confirm": "bool"}, {"copy_path": "str"}),
+    Operation("relocations", "Relocations (irj)", {"case_id": "str", "module_id": "str"}, {"relocations": "list"}),
+    Operation("packer_report", "Packer/entropy/overlay/section-anomaly report (static, no rizin)", {"case_id": "str", "module_id": "str"}, {"report": "object"}),
+    Operation("unpack", "Unpack a UPX-packed module with the pinned upx -d into the case work folder (never in place); needs confirm", {"case_id": "str", "module_id": "str", "confirm": "bool"}, {"unpacked": "object"}),
+    Operation("fetch_pdb", "Opt-in: download the module's PDB from a symbol server into the work folder; kept only if GUID+age match", {"case_id": "str", "module_id": "str", "confirm": "bool"}, {"path": "str"}),
+    Operation("xref_index", "Build the SQLite cross-index functions<->strings<->xrefs (+ call edges) in the work folder", {"case_id": "str", "module_id": "str"}, {"counts": "object"}),
+    Operation("search_index", "Search the cross-index: strings (with referencing functions) and function names", {"case_id": "str", "module_id": "str", "query": "str"}, {"strings": "list", "functions": "list"}),
     Operation("admin_raw", "Run a raw rizin command (admin/debug only)", {"case_id": "str", "module_id": "str", "cmd": "str"}, {"text": "str"}, dangerous=True),
 ]
 
@@ -1003,9 +1031,10 @@ class RizinBackend(BackendAdapter):
     backend_id = "rizin"
 
     def __init__(self, settings: Settings | None = None, *, idle_timeout: float = DEFAULT_IDLE_TIMEOUT,
-                 analysis: dict[str, Any] | None = None):
+                 analysis: dict[str, Any] | None = None, use_pdb: bool = True):
         self.settings = settings or get_settings()
         self.analysis = dict(analysis or DEFAULT_ANALYSIS)
+        self.use_pdb = use_pdb   # a verified sidecar PDB (same GUID+age as the PE) is used automatically
         self.pool = SessionPool(self.settings.limits, idle_timeout=idle_timeout)
         self._tool: RizinTool | None = None
 
@@ -1117,16 +1146,36 @@ class RizinBackend(BackendAdapter):
         if tool is None or not tool.version:
             raise RizinError("rizin is not available on this host (see doctor)")
         module, path = self.module_path(cases, case_id, module_id)
+        copy = self.analysis_copy(cases, case_id, module_id, module)
+        if copy is not None:   # consented unpack: analyse the unpacked copy in the work folder; the original stays as is
+            path, module = copy["path"], {**module, "sha256": copy["sha256"], "original_sha256": module["sha256"]}
         sess = self.pool.get(tool, path, module["sha256"], self.analysis, scope=f"{case_id}:{module_id}")
+        if sess.pdb is None and copy is None and self.use_pdb:
+            sess.pdb = self._pdb_for(path, (module.get("meta") or {}).get("pdb"), self.work_dir(cases, case_id, module_id))
         if sess.annotator is None:
             work = self.work_dir(cases, case_id, module_id)
             sess.annotator = lambda s, poll: annotations.apply_all(s, annotations.load(cases, case_id, module_id)[1], work, poll)
         if not getattr(sess, "_sha_checked", False):
             actual = sha256_file(path)
+            if copy is not None and actual != module["sha256"]:
+                raise RizinError(f"unpacked copy of {module['rel_path']} changed on disk (sha256 {actual[:12]} != {module['sha256'][:12]})")
             if actual != module["sha256"]:
                 raise RizinError(f"module {module['rel_path']} changed on disk since inventory (sha256 {actual[:12]} != {module['sha256'][:12]})")
             sess._sha_checked = True  # type: ignore[attr-defined]
         return module, sess
+
+    def analysis_copy(self, cases: Any, case_id: str, module_id: str, module: dict[str, Any]) -> dict[str, Any] | None:
+        """The consented unpacked copy recorded on the module (meta.analysis_copy), if it is inside this module's work
+        folder and still exists. Anything else is ignored (the original is analysed)."""
+        meta = (module.get("meta") or {}).get("analysis_copy")
+        if not isinstance(meta, dict) or not meta.get("rel") or not meta.get("sha256"):
+            return None
+        from ..paths import is_within
+        work = self.work_dir(cases, case_id, module_id).resolve()
+        p = (work / meta["rel"]).resolve()
+        if not is_within(p, work) or not p.is_file():
+            return None
+        return {"path": p, "sha256": meta["sha256"], "meta": meta}
 
     def work_dir(self, cases: Any, case_id: str, module_id: str) -> Path:
         """The session's private work folder (patched copies, generated type headers). Never the user's files."""
@@ -1139,7 +1188,30 @@ class RizinBackend(BackendAdapter):
         if tool is None or not tool.version:
             raise RizinError("rizin is not available on this host")
         p = resolve_final(path)
-        return self.pool.get(tool, p, sha256 or sha256_file(p), self.analysis)
+        sess = self.pool.get(tool, p, sha256 or sha256_file(p), self.analysis)
+        if sess.pdb is None and self.use_pdb and sess._analyzed is None:
+            sess.pdb = self._pdb_for(p, None, None)
+        return sess
+
+    @staticmethod
+    def _pdb_for(path: Path, meta: dict[str, Any] | None, work: Path | None) -> dict[str, Any] | None:
+        """A PDB whose GUID and age match the PE: a downloaded one recorded on the module (work folder), else a sidecar."""
+        from . import pdb as pdbmod
+        try:
+            cv = pdbmod.codeview(path)
+            if not cv:
+                return None
+            if isinstance(meta, dict) and meta.get("rel") and work is not None:
+                from ..paths import is_within
+                cand = (work / meta["rel"]).resolve()
+                if is_within(cand, work.resolve()) and cand.is_file() and pdbmod.matches(cv, cand):
+                    return {"path": str(cand), "key": cv["key"], "name": cv["pdb_name"], "source": "symbol server (work folder)"}
+            side = pdbmod.find_sidecar(path, cv)
+            if side is not None:
+                return {"path": str(side), "key": cv["key"], "name": cv["pdb_name"], "source": "next to the program"}
+        except (OSError, ValueError):
+            return None
+        return None
 
     def cancel_module(self, cases: Any, case_id: str, module_id: str) -> bool:
         """Kill the rizin process tree serving a module (the session is re-created on next use)."""
@@ -1172,6 +1244,8 @@ class RizinBackend(BackendAdapter):
             poll = native.poll_of(ctx)
             module, sess = self.session_for(cases, case_id, module_id)
             extra = dict(extra_inputs(sess)) if extra_inputs else {}
+            if analysis and sess.pdb:   # symbols from a verified PDB change analysis output: part of the cache key
+                extra["pdb"] = sess.pdb["key"]
             if analysis:  # analysis-derived output changes when annotations change: they are part of the cache key
                 extra["annotations_rev"] = annotations.load(cases, case_id, module_id)[0]
             inputs = self._inputs(sess.tool, module, op, args, analysis=analysis, extra=extra or None)
@@ -1806,6 +1880,143 @@ class RizinBackend(BackendAdapter):
             return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
 
     # -- dangerous ----------------------------------------------------------------
+    def op_relocations(self, ctx: Any, *, case_id: str, module_id: str) -> OperationResult:
+        def body(s, poll):
+            data, t = s.relocations(poll)
+            return {"relocations": data or [], "count": len(data or [])}, t, {}
+        return self._op(ctx, case_id, module_id, op="relocations", args={}, analysis=False, untrusted=True,
+                        title="Relocations", body_fn=body)
+
+    def op_packer_report(self, ctx: Any, *, case_id: str, module_id: str) -> OperationResult:
+        """Static packer check of the ORIGINAL module file (never the unpacked copy)."""
+        from . import packer
+        try:
+            cases = native.cases_of(ctx)
+            module, path = self.module_path(cases, case_id, module_id)
+            rep = packer.packer_report(path)
+            copy = self.analysis_copy(cases, case_id, module_id, module)
+            body = {"report": rep, "analysis_copy": (copy or {}).get("meta")}
+            inputs = {"op": "packer_report", "module_sha256": module["sha256"], "copy": (copy or {}).get("sha256")}
+            hit = native.cached_evidence(cases, case_id, module_id, "native.packer_report", inputs)
+            if hit is not None:
+                return OperationResult(ok=True, data={**body, "cached": True}, evidence_ids=[hit["evidence_id"]])
+            ev = native.store_evidence(cases, case_id, module_id, "native.packer_report", f"Packer check: {rep['summary']}",
+                                       body, inputs, untrusted=False, producer="rebuild-studio")
+            return OperationResult(ok=True, data={**body, "cached": False}, evidence_ids=[ev["evidence_id"]])
+        except (InvalidTarget, KeyError, ValueError, OSError) as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
+
+    def op_unpack(self, ctx: Any, *, case_id: str, module_id: str, confirm: bool = False) -> OperationResult:
+        """Consented unpack (UPX only, pinned upx -d) into <case>/re/<module>/unpacked/. Later analysis of this module uses
+        the unpacked copy; the original file is never written (its sha256 is re-checked)."""
+        from . import packer
+        if not confirm:
+            return OperationResult(ok=False, error="unpacking runs the pinned upx -d on a copy in the case work folder; "
+                                                   "pass confirm=true to allow it")
+        try:
+            cases = native.cases_of(ctx)
+            module, path = self.module_path(cases, case_id, module_id)
+            work = self.work_dir(cases, case_id, module_id)
+            _p, info = packer.prepare_for_analysis(path, work / "unpacked", allow_unpack=True, tools_dir=self.settings.tools_dir)
+            res = info.get("unpack") or {}
+            if not info["report"]["packed"]:
+                return OperationResult(ok=False, error="not packed: " + info["report"]["summary"])
+            if not res.get("ok"):
+                return OperationResult(ok=False, error=res.get("reason") or "unpack failed")
+            rel = Path(res["unpacked_path"]).resolve().relative_to(work.resolve()).as_posix()
+            copy = {"rel": rel, "sha256": res["unpacked_sha256"], "packer": info["report"]["packer"],
+                    "tool": f"upx {res.get('tool_version')}", "tool_sha256": res.get("tool_sha256"),
+                    "original_sha256": res["original_sha256"], "consent": "confirm=true"}
+            meta = dict(module.get("meta") or {})
+            meta["analysis_copy"] = copy
+            cases.add_module(case_id, module["rel_path"], module["sha256"], module["size"], module["format"], module["profile"],
+                             module.get("arch"), meta=meta)
+            for s in self.pool.sessions():   # sessions on the packed file are retired; the next call opens the copy
+                if s.path == path:
+                    s.kill()
+            body = {"unpacked": copy, "packer_report": info["report"], "unpacked_report": res.get("unpacked_report")}
+            ev = native.store_evidence(cases, case_id, module_id, "native.unpack", f"Unpacked {module['rel_path']} ({copy['packer']})",
+                                       body, {"op": "unpack", "module_sha256": module["sha256"], "tool_sha256": res.get("tool_sha256")},
+                                       untrusted=False, producer="upx")
+            return OperationResult(ok=True, data=body, evidence_ids=[ev["evidence_id"]])
+        except (InvalidTarget, KeyError, ValueError, OSError) as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
+
+    def op_fetch_pdb(self, ctx: Any, *, case_id: str, module_id: str, confirm: bool = False,
+                     server: str | None = None) -> OperationResult:
+        """Opt-in: download this module's PDB from a symbol server (default Microsoft's) into the work folder. Allowed when
+        the case setting ``symbol_server`` is true or ``confirm=true``; kept only if its GUID and age match the PE."""
+        from . import pdb as pdbmod
+        try:
+            cases = native.cases_of(ctx)
+            module, path = self.module_path(cases, case_id, module_id)
+            allowed = bool(confirm) or bool((cases.get_case(case_id).get("settings") or {}).get("symbol_server"))
+            if not allowed:
+                return OperationResult(ok=False, error="symbol-server download is off for this project (setting symbol_server) "
+                                                       "; pass confirm=true to allow it once")
+            cv = pdbmod.codeview(path)
+            if not cv:
+                return OperationResult(ok=False, error="the program names no PDB (no CodeView RSDS record)")
+            work = self.work_dir(cases, case_id, module_id)
+            res = pdbmod.download(cv, work / "pdb", server=server or pdbmod.DEFAULT_SERVER)
+            body = {"codeview": cv, **res}
+            if res.get("ok"):
+                meta = dict(module.get("meta") or {})
+                meta["pdb"] = {"rel": Path(res["path"]).resolve().relative_to(work.resolve()).as_posix(), "key": cv["key"]}
+                cases.add_module(case_id, module["rel_path"], module["sha256"], module["size"], module["format"], module["profile"],
+                                 module.get("arch"), meta=meta)
+                for s in self.pool.sessions():
+                    if s.path == path:
+                        s.kill()
+                        s.pdb = None
+            ev = native.store_evidence(cases, case_id, module_id, "native.pdb", f"PDB {cv['pdb_name']}: {'verified' if res.get('ok') else 'not found'}",
+                                       body, {"op": "fetch_pdb", "module_sha256": module["sha256"], "key": cv["key"]},
+                                       untrusted=False, producer="symbol-server")
+            return OperationResult(ok=bool(res.get("ok")), data=body, error=None if res.get("ok") else res.get("reason"),
+                                   evidence_ids=[ev["evidence_id"]])
+        except (InvalidTarget, KeyError, ValueError, OSError) as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
+
+    def xref_index_path(self, cases: Any, case_id: str, module_id: str) -> Path:
+        return self.work_dir(cases, case_id, module_id) / "xref_index.sqlite"
+
+    def op_xref_index(self, ctx: Any, *, case_id: str, module_id: str) -> OperationResult:
+        from . import xref_index
+
+        def body(s: RizinSession, poll):
+            cases = native.cases_of(ctx)
+            funcs = s.cached_functions(poll)
+            strs, t1 = s.strings(poll)
+            xr, t2 = s.all_xrefs(poll)
+            db = self.xref_index_path(cases, case_id, module_id)
+            from . import rizin_passes
+            ptrs = rizin_passes.reloc_pointers(s.path)
+            info, _ = s.info(poll)
+            delta = (int((info or {}).get("baddr") or 0) - ptrs["image_base"]) if "image_base" in ptrs and (info or {}).get("baddr") else 0
+            counts = xref_index.build(db, functions=funcs, strings=[x for x in strs or [] if isinstance(x, dict)],
+                                      xrefs=[x for x in xr or [] if isinstance(x, dict)],
+                                      pointers=[(a + delta, v + delta) for a, v in ptrs["pairs"]],
+                                      meta={"module_sha256": s.sha256, "rizin": s.tool.version, "analysis": json.dumps(self.analysis)})
+            return {"counts": counts, "path": str(db)}, t1 or t2, {}
+        return self._op(ctx, case_id, module_id, op="xref_index", args={}, analysis=True, untrusted=False,
+                        title="Cross-index (functions, strings, xrefs)", body_fn=body, use_cache=False)
+
+    def op_search_index(self, ctx: Any, *, case_id: str, module_id: str, query: str, limit: int = 50) -> OperationResult:
+        from . import xref_index
+        if not isinstance(query, str) or not query.strip() or len(query) > 200:
+            return OperationResult(ok=False, error="query must be 1..200 characters")
+        try:
+            cases = native.cases_of(ctx)
+            db = self.xref_index_path(cases, case_id, module_id)
+            if not db.is_file():
+                built = self.op_xref_index(ctx, case_id=case_id, module_id=module_id)
+                if not built.ok:
+                    return built
+            res = xref_index.search(db, query, limit=limit)
+            return OperationResult(ok=True, data={"untrusted": True, "note": native.UNTRUSTED_NOTE, **res}, truncated=res["truncated"])
+        except (InvalidTarget, KeyError, ValueError, OSError) as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
+
     def admin_raw(self, ctx: Any, *, case_id: str, module_id: str, cmd: str, dangerous_ok: bool = False) -> OperationResult:
         """DANGEROUS raw command for human admins. Not an ``op_*`` method, so ``call()``/MCP/model routes cannot reach it."""
         if not dangerous_ok:

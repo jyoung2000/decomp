@@ -15,8 +15,9 @@ type decompile coverage, decompile failures, strings recall.
 
 usage: python scripts/benchmark.py [--rows a,b] [--config cfg.json] [--out-dir reports] [--no-legacy]
 Config keys (all optional; defaults in DEFAULT_CONFIG):
-  {"name": "default", "analysis": {"command": "aaa", "analysis.timeout": 300},
-   "decompile": {"max_functions": 200}, "strings": true, "imports": true, "dotnet": {"enabled": true, "timeout": 600}}
+  {"name": "default", "analysis": {"command": "aaa", "analysis.timeout": 300, "passes": ["sigpacks", "pdata", "relocptrs", "thunks"]},
+   "decompile": {"max_functions": 200}, "strings": true, "imports": true, "dotnet": {"enabled": true, "timeout": 600},
+   "packer": {"check": true, "unpack": true}}
 A row that cannot run (tool missing, binary missing) is reported as "not run: <reason>", never as 0 or as a pass.
 """
 from __future__ import annotations
@@ -40,14 +41,18 @@ TRUTH_SCHEMA = "rebuild-studio.bench-truth/1"
 REPORT_SCHEMA = "rebuild-studio.benchmark/1"
 DEFAULT_CONFIG: dict[str, Any] = {
     "name": "default",
-    "analysis": {"command": "aaa", "analysis.timeout": 300},
+    "analysis": {"command": "aaa", "analysis.timeout": 300, "passes": ["sigpacks", "pdata", "relocptrs", "thunks"]},
     "decompile": {"max_functions": 200},
     "strings": True,
     "imports": True,
     "dotnet": {"enabled": True, "timeout": 600},
+    "packer": {"check": True, "unpack": True},
+    # Optional second decompiler (full Ghidra headless, whole-program run). Off by default: needs Ghidra 12.1.4 + JDK 21.
+    "ghidra": {"enabled": False, "max_functions": 2000, "per_function_timeout": 60, "skip_rows": ["go_pe_x64", "go_elf_x64"]},
 }
 # A deliberately weaker analyzer: shallow analysis (no call-target recursion) and no decompilation. Used by the guard test.
-WEAK_CONFIG: dict[str, Any] = {"name": "weak", "analysis": {"command": "aa", "analysis.timeout": 300}, "decompile": {"max_functions": 0}}
+WEAK_CONFIG: dict[str, Any] = {"name": "weak", "analysis": {"command": "aa", "analysis.timeout": 300, "passes": []},
+                               "decompile": {"max_functions": 0}}
 
 LEGACY = {
     "pecli": {"kind": "native_pe_x64", "binary": "fixtures/pecli/original/pecli.exe",
@@ -139,6 +144,9 @@ def score_functions(truth_funcs: list[dict], found: list[dict], code_ranges: lis
         want = {canonical(n) for n in [truth[s]["name"], *truth[s].get("aliases", [])]}
         return canonical(got) in want
     named = [s for s in truth if named_ok(s)]
+    # name precision: of the matched functions that carry a non-auto name, how many carry the right one (a wrong name is
+    # worse than fcn.*: it misleads the reader)
+    with_name = [s for s in matched if analyzer_name(found_by_start[s].get("name")) is not None]
     sized = [s for s in matched if truth[s].get("size")]
     size_exact = [s for s in sized if as_int(found_by_start[s].get("size")) == truth[s]["size"]]
     return {
@@ -147,6 +155,7 @@ def score_functions(truth_funcs: list[dict], found: list[dict], code_ranges: lis
         "own_truth": len(own), "own_matched": len(own_matched), "own_recall": ratio(len(own_matched), len(own)),
         "named": len(named), "named_recall": ratio(len(named), len(truth)),
         "own_named_recall": ratio(sum(1 for s in own if s in named), len(own)),
+        "named_precision": ratio(sum(1 for s in with_name if s in named), len(with_name)), "with_name": len(with_name),
         "size_exact": ratio(len(size_exact), len(sized)),
     }
 
@@ -219,6 +228,30 @@ def rizin_backend(cfg: dict):
 
 def run_native(binary: Path, truth: dict | None, cfg: dict, backend) -> dict:
     sw = Stopwatch()
+    pk_cfg = cfg.get("packer") or {}
+    packer_info = None
+    with tempfile.TemporaryDirectory(prefix="rs-bench-unpack-") as work:
+        if pk_cfg.get("check", True):
+            from rebuild_controller.backends import packer
+            binary, packer_info = sw.run("packer", packer.prepare_for_analysis, binary, Path(work),
+                                         allow_unpack=bool(pk_cfg.get("unpack", True)), tools_dir=backend.settings.tools_dir)
+        out = _run_native(binary, truth, cfg, backend, sw)
+        gcfg = cfg.get("ghidra") or {}
+        if truth is not None and gcfg.get("enabled") and truth.get("row") not in (gcfg.get("skip_rows") or []):
+            out["ghidra"] = sw.run("ghidra", run_ghidra, binary, truth, gcfg)
+        if packer_info and (packer_info.get("unpack") or {}).get("ok"):
+            backend.pool.close_all()   # release the unpacked copy before its temp folder is removed (Windows file locks)
+    if truth is not None:
+        rep = (packer_info or {}).get("report") or {}
+        unp = (packer_info or {}).get("unpack") or {}
+        out["packed"] = {"truth": bool(truth.get("packed")), "detected": rep.get("packed") if packer_info else None,
+                         "packer": rep.get("packer"), "unpacked": bool(unp.get("ok")),
+                         "unpack_tool": f"upx {unp.get('tool_version')}" if unp.get("ok") else None,
+                         "note": unp.get("reason") or (rep.get("summary") if packer_info else "packer check disabled by config")}
+    return out
+
+
+def _run_native(binary: Path, truth: dict | None, cfg: dict, backend, sw: "Stopwatch") -> dict:
     sess = backend.session_for_path(binary)
     caps = sess.capabilities()
     analysis = sw.run("analysis", sess.analyze)
@@ -242,10 +275,34 @@ def run_native(binary: Path, truth: dict | None, cfg: dict, backend) -> dict:
         out["imports"] = score_imports(truth["imports"], found_imports) if cfg.get("imports", True) and truth["imports"] else None
         out["strings"] = score_strings(truth["strings"], found_strings) if cfg.get("strings", True) else None
         out["decompile"] = sw.run("decompile", decompile_own, sess, truth, funcs, int(cfg["decompile"].get("max_functions", 200)))
-        out["packed"] = {"truth": bool(truth.get("packed")), "detected": None,
-                         "note": "the analysis pipeline has no packer/entropy check yet (R1); a packed row counts as missed"}
     out["seconds"] = sw.stages
     return out
+
+
+def run_ghidra(binary: Path, truth: dict, gcfg: dict) -> dict:
+    """Ghidra headless whole-program run: function-boundary recall/precision of Ghidra's own function list (as far as
+    max_functions reaches) and real-decompiler coverage of our own source functions."""
+    from rebuild_controller.backends.ghidra import GhidraBackend
+    from rebuild_controller.config import Settings
+    g = GhidraBackend(Settings())
+    probe = g.tool_probe()
+    if probe.version is None or probe.availability.value not in ("installed", "usable", "verified"):
+        return {"status": f"not run: {probe.detail}"}
+    try:
+        res = g.decompile_all_path(binary, max_functions=int(gcfg.get("max_functions", 2000)),
+                                   per_function_timeout=int(gcfg.get("per_function_timeout", 60)), timeout=3600)
+    except Exception as e:
+        return {"status": f"error: {type(e).__name__}: {str(e)[:200]}"}
+    funcs = [{"offset": as_int(f["entry"]), "name": f.get("name"), "size": f.get("size")} for f in res["functions"]]
+    ranges = [(as_int(a), as_int(b)) for a, b in truth.get("code_ranges", [])]
+    fs = score_functions(truth["functions"], funcs, ranges)
+    ok = {as_int(f["entry"]) for f in res["functions"] if f.get("ok") and (f.get("code") or "").strip()}
+    own = [as_int(f["start"]) for f in truth["functions"] if f.get("own")]
+    complete = res["total_functions"] is not None and len(res["functions"]) >= res["total_functions"]
+    return {"status": "ok", "ghidra_version": res["ghidra_version"], "functions_total": res["total_functions"],
+            "decompiled": res["decompiled"], "failed": res["failed"], "list_complete": complete,
+            "recall": fs["recall"], "precision": fs["precision"], "own_coverage": ratio(sum(1 for a in own if a in ok), len(own)),
+            "own_real": sum(1 for a in own if a in ok), "own_functions": len(own), "seconds": res["seconds"]}
 
 
 def decompile_own(sess, truth: dict, funcs: list[dict], limit: int) -> dict:
@@ -409,12 +466,23 @@ def _pct(v: float | None) -> str:
     return "n/a" if v is None else f"{100 * v:.1f}%"
 
 
+def _packed_cell(packed: dict) -> str:
+    det = packed.get("detected")
+    if det is None:
+        return "missed (no packer check)" if packed.get("truth") else "-"
+    if packed.get("truth"):
+        cell = f"yes ({packed.get('packer')})" if det else "missed"
+        return cell + (f", unpacked with {packed['unpack_tool']}" if packed.get("unpacked") else "")
+    return "false positive" if det else "-"
+
+
 def render_markdown(rep: dict) -> str:
     cfg = rep["config"]
-    L = ["# Benchmark scoreboard (R0)", "",
+    L = ["# Benchmark scoreboard (R0 corpus)", "",
          f"Generated {rep['generated_utc']} by `scripts/benchmark.py` with config **{cfg['name']}** "
-         f"(analysis `{cfg['analysis'].get('command')}`, timeout {cfg['analysis'].get('analysis.timeout')} s, "
-         f"decompile budget {cfg['decompile'].get('max_functions')} own functions).", ""]
+         f"(analysis `{cfg['analysis'].get('command')}` + passes `{','.join(cfg['analysis'].get('passes') or []) or 'none'}`, "
+         f"timeout {cfg['analysis'].get('analysis.timeout')} s, decompile budget {cfg['decompile'].get('max_functions')} own functions, "
+         f"packer check {'on' if (cfg.get('packer') or {}).get('check', True) else 'off'}).", ""]
     envd = rep["environment"]
     if envd.get("rizin"):
         L.append(f"Native engine: rizin {envd['rizin']['version']} (commit {str(envd['rizin']['commit'])[:12]}), "
@@ -426,8 +494,8 @@ def render_markdown(rep: dict) -> str:
           "found inside executable sections. Decompiler coverage = own source functions with real rz-ghidra output / all own "
           "source functions in the truth.", "",
           "## Native rows", "",
-          "| Row | Truth fns | Found | Boundary recall | Boundary precision | Own-fn recall | Named recall | Real-decompiler coverage (own) | Decompile failures | Imports recall | Strings recall | Packed detected | Analysis s | Decompile s | Total s |",
-          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+          "| Row | Truth fns | Found | Boundary recall | Boundary precision | Own-fn recall | Named recall | Name precision | Real-decompiler coverage (own) | Decompile failures | Imports recall | Strings recall | Packed detected | Analysis s | Decompile s | Total s |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rep["rows"]:
         if not r["kind"].startswith("native") or r.get("status") != "ok":
             continue
@@ -435,16 +503,30 @@ def render_markdown(rep: dict) -> str:
         d = r.get("decompile") or {}
         s = r.get("seconds", {})
         if f is None:
-            L.append(f"| {r['row']} (partial) | n/a | {r['functions_found']} | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | "
+            L.append(f"| {r['row']} (partial) | n/a | {r['functions_found']} | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | "
                      f"{s.get('analysis', 0):.1f} | - | {r['wall_seconds']:.1f} |")
             continue
         packed = r.get("packed", {})
-        pk = ("missed (no packer check)" if packed.get("detected") is None else ("yes" if packed["detected"] else "no")) if packed.get("truth") else "-"
+        pk = _packed_cell(packed)
         fails = d.get("errors", 0) + d.get("pseudo_only", 0) + d.get("no_function", 0)
         L.append(f"| {r['row']} | {f['truth_functions']} | {f['found_functions']} | {_pct(f['recall'])} | {_pct(f['precision'])} | "
-                 f"{_pct(f['own_recall'])} | {_pct(f['named_recall'])} | {_pct(d.get('coverage'))} ({d.get('real', 0)}/{d.get('own_functions', 0)}) | "
+                 f"{_pct(f['own_recall'])} | {_pct(f['named_recall'])} | {_pct(f.get('named_precision'))} | {_pct(d.get('coverage'))} ({d.get('real', 0)}/{d.get('own_functions', 0)}) | "
                  f"{fails} | {_pct((r.get('imports') or {}).get('recall'))} | {_pct((r.get('strings') or {}).get('recall'))} | {pk} | "
                  f"{s.get('analysis', 0):.1f} | {s.get('decompile', 0):.1f} | {r['wall_seconds']:.1f} |")
+    gh = [r for r in rep["rows"] if r.get("status") == "ok" and isinstance(r.get("ghidra"), dict)]
+    if gh:
+        L += ["", "## Ghidra headless (optional second decompiler)", "",
+              "Whole-program `analyzeHeadless` run per row (auto-analysis, then every function decompiled, largest first). "
+              "Boundary recall/precision use Ghidra's own function list.", "",
+              "| Row | Ghidra | Functions | Boundary recall | Boundary precision | Real-decompiler coverage (own) | Decompile failures | Seconds |",
+              "|---|---|---|---|---|---|---|---|"]
+        for r in gh:
+            g = r["ghidra"]
+            if g.get("status") != "ok":
+                L.append(f"| {r['row']} | {g.get('status')} | | | | | | |")
+                continue
+            L.append(f"| {r['row']} | {g['ghidra_version']} | {g['functions_total']} | {_pct(g['recall'])} | {_pct(g['precision'])} | "
+                     f"{_pct(g['own_coverage'])} ({g['own_real']}/{g['own_functions']}) | {g['failed']} | {g['seconds']:.1f} |")
     L += ["", "## .NET rows", "",
           "| Row | Truth types | Type recall | Truth methods | Method recall | Types decompiled | Decompile failures | Strings recall | Decompile s |",
           "|---|---|---|---|---|---|---|---|---|"]
@@ -463,8 +545,9 @@ def render_markdown(rep: dict) -> str:
     if partial:
         L += ["", "## Partial rows", ""] + [f"* **{r['row']}**: {r['partial']}" for r in partial]
     L += ["", "## Notes", "",
-          "* `Packed detected`: the pipeline has no packer/entropy check yet, so a packed row is reported as missed until R1 adds one.",
-          "* Named recall counts a function as named only when rizin's name at the true start equals a truth name (modulo prefixes, case, punctuation); auto names (`fcn.*`, `entry0`) never count.",
+          "* `Packed detected`: the product's packer check (`backends/packer.py`: section names, UPX magic, entropy, W+X/virtual-only code sections, entry-point and import anomalies). A UPX row is then unpacked with the pinned `upx -d` into a temp work folder (consent = benchmark config `packer.unpack`) and the unpacked copy is what gets scored; `false positive` marks an unpacked row reported as packed.",
+          "* Named recall counts a function as named only when rizin's name at the true start equals a truth name (modulo prefixes, case, punctuation); auto names (`fcn.*`, `entry0`) never count. Name precision = right names / matched functions that carry any non-auto name (a wrong name misleads more than `fcn.*`; rizin's RTTI names such as `method.Foo.virtual_0` count as wrong).",
+          "* Analysis passes (R1, `backends/rizin_passes.py`): `sigpacks` = FLIRT packs built from the MSVC 14.29 runtime libraries and the Rust 1.98.1 std rlibs (`scripts/build_sigpacks.py`, pinned in `rebuild_controller/data/sigpacks/manifest.json`; never built from this corpus); `pdata` = x64 exception-directory function starts (chained entries and EH funclets skipped); `relocptrs` = functions at relocated code pointers no analysed function covers; `thunks` = `jmp [IAT]` thunks named after their import.",
           "* Failures per row are listed in `reports/benchmark.json` (`decompile.failures`, `imports.missing_sample`, `strings.missing`).",
           "* Reproduce: `python fixtures/bench/build_bench.py --verify` (corpus), then `python scripts/benchmark.py` (needs rizin; REBUILD_STUDIO_TOOLS).", ""]
     return "\n".join(L)

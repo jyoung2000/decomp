@@ -206,7 +206,8 @@ class ReWorkbench:
         probe = gh.tool_probe()
         if probe.availability.value not in ("installed", "usable", "verified"):
             raise WorkbenchError("unavailable", f"Ghidra headless is not available: {probe.detail}",
-                                 "Use decompiler='rizin' (rz-ghidra), or set GHIDRA_INSTALL_DIR.")
+                                 "Use decompiler='rizin' (rz-ghidra), or install Ghidra and Temurin JDK 21 from the Tools page "
+                                 "(or set GHIDRA_INSTALL_DIR).")
         res = gh.op_decompile(self.studio, case_id=s["case_id"], module_id=s["module_id"], function=function)
         if res.ok:
             res.data["annotations_applied"] = False

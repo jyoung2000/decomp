@@ -162,7 +162,8 @@ def test_score_dotnet_type_and_method_recall():
 
 def test_config_merge_and_markdown_reports_not_run_rows():
     cfg = bm.merge_config(bm.DEFAULT_CONFIG, {"analysis": {"command": "aa"}, "name": "x"})
-    assert cfg["analysis"] == {"command": "aa", "analysis.timeout": 300} and cfg["decompile"]["max_functions"] == 200
+    assert cfg["analysis"] == {"command": "aa", "analysis.timeout": 300, "passes": ["sigpacks", "pdata", "relocptrs", "thunks"]}
+    assert cfg["decompile"]["max_functions"] == 200 and cfg["packer"] == {"check": True, "unpack": True}
     assert bm.DEFAULT_CONFIG["analysis"]["command"] == "aaa"   # defaults not mutated
     rep = {"generated_utc": "t", "config": cfg, "environment": {}, "rows": [
         {"row": "unity_il2cpp", "kind": "?", "origin": "bench", "status": "not run: needs Unity"}]}
@@ -209,6 +210,12 @@ def test_full_benchmark_run_writes_reports(tmp_path):
         if row["kind"].startswith("native") and r["status"] == "ok":
             assert r["functions"]["recall"] is not None and "analysis" in r["seconds"]
     if by["upx_c_msvc_x64"]["status"] == "ok" and by["c_msvc_x64_o2"]["status"] == "ok":
-        assert by["upx_c_msvc_x64"]["functions"]["recall"] < by["c_msvc_x64_o2"]["functions"]["recall"]
+        upx, plain = by["upx_c_msvc_x64"], by["c_msvc_x64_o2"]
+        assert upx["packed"]["truth"] and upx["packed"]["detected"] and upx["packed"]["packer"] == "UPX"   # reported as packed
+        assert plain["packed"]["detected"] is False
+        if upx["packed"]["unpacked"]:     # pinned UPX installed: recovered after unpack, same analysis as the unpacked build
+            assert upx["functions"]["recall"] == plain["functions"]["recall"]
+        else:
+            assert upx["functions"]["recall"] < plain["functions"]["recall"]
     if by["dotnet_plain"]["status"] == "ok" and by["dotnet_renamed"]["status"] == "ok":
         assert by["dotnet_renamed"]["dotnet"]["type_recall"] < by["dotnet_plain"]["dotnet"]["type_recall"]

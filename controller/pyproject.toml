@@ -32,7 +32,7 @@ rebuild-mcp = "rebuild_controller.mcp.server:main"
 include = ["rebuild_controller*"]
 
 [tool.setuptools.package-data]
-rebuild_controller = ["store/*.sql", "comparators/*.mjs", "mcp/*.json", "data/*.json"]
+rebuild_controller = ["store/*.sql", "comparators/*.mjs", "mcp/*.json", "data/*.json", "data/sigpacks/*.json", "data/sigpacks/*/*/*/*.pat"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
