@@ -362,7 +362,9 @@ function Test-Sidecar([string]$Exe) {
         if ($broken.Count -gt 0) { throw "frozen controller cannot load backends: $($broken -join '; ')" }
         Write-RsLog "sidecar doctor ok: $(@($doc.backends).Count) backends load in the frozen build" 'INFO'
         # R10: the frozen controller must import the dependency health service (the doctor carries its summary).
-        if ($null -eq $doc.dependencies -or $null -ne $doc.dependencies.error) { throw "frozen controller cannot run the dependency health check: $($doc.dependencies.error)" }
+        # StrictMode: a missing property throws, and a healthy report has no 'error' property at all.
+        $depProps = if ($null -ne $doc.dependencies) { $doc.dependencies.PSObject.Properties.Name } else { @() }
+        if ($null -eq $doc.dependencies -or $depProps -contains 'error') { throw "frozen controller cannot run the dependency health check: $(if ($depProps -contains 'error') { $doc.dependencies.error } else { 'no dependencies section in doctor output' })" }
         Write-RsLog "sidecar dependency health ok: $($doc.dependencies.overall) - $($doc.dependencies.sentence)" 'INFO'
     } finally {
         Stop-RsProcessTree $proc.Id
