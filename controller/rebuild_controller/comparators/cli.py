@@ -37,11 +37,18 @@ def host_launcher(launch: dict[str, Any], root: Path) -> tuple[list[str], dict[s
         return [str(exe)], env, "native"
     if kind == "dotnet":
         dll = root / launch["path"]
-        dotnet = shutil.which("dotnet")
+        # a C# rebuild names the host of the SDK that built it (the private SDK ships the matching shared runtime)
+        dotnet = launch.get("dotnet") if launch.get("dotnet") and Path(str(launch["dotnet"])).is_file() else shutil.which("dotnet")
         if not dotnet:
             raise RuntimeError(".NET runtime not installed")
         env.setdefault("DOTNET_CLI_TELEMETRY_OPTOUT", "1"); env.setdefault("DOTNET_NOLOGO", "1")
-        return [dotnet, str(dll)], env, "dotnet"
+        return [str(dotnet), str(dll)], env, "dotnet"
+    if kind == "java":
+        jar = root / launch["jar"]
+        java = launch.get("java") if launch.get("java") and Path(str(launch["java"])).is_file() else shutil.which("java")
+        if not java:
+            raise RuntimeError("Java runtime not installed")
+        return [str(java), "-jar", str(jar)], env, "java"
     if kind == "command":
         argv = [str(root / c) if i == 0 and not Path(c).is_absolute() and (root / c).exists() else c for i, c in enumerate(launch["command"])]
         if argv and not Path(argv[0]).is_absolute():

@@ -36,7 +36,7 @@ def stage_barrier(ctx) -> dict[str, Any]:
     """Runs after every recovery job the inventory fanned out has completed (dynamic dependencies). Summarises recovery."""
     from .jobs import JobState
     st = ctx.services["studio"]
-    done = [j for j in st.jobs.list(ctx.job.case_id) if j.stage in ("analyze_module", "recover_managed", "recover_engine", "recover_web")]
+    done = [j for j in st.jobs.list(ctx.job.case_id) if j.stage in ("analyze_module", "recover_managed", "recover_engine", "recover_web", "recover_jvm")]
     failed = [j.job_id for j in done if j.state == JobState.FAILED]
     st.plan.update_item(st.plan.milestone_id(ctx.job.case_id, "M-RECOVERY"), status="completed" if not failed else "failed")
     return {"recovery_jobs": len(done), "completed": sum(1 for j in done if j.state == JobState.COMPLETED), "failed": failed}

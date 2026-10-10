@@ -13,7 +13,11 @@ executable sections), named-function recall, real-decompiler coverage of our own
 imports recall, notable-strings recall, packed detected, per-stage seconds.  (.NET): type recall, method recall,
 type decompile coverage, decompile failures, strings recall.
 
-usage: python scripts/benchmark.py [--rows a,b] [--config cfg.json] [--out-dir reports] [--no-legacy]
+Native-language rebuild (R4): for .NET rows and javacli the product pipeline rebuilds the recovered C#/Java (target csharp/java,
+AI off) in a temp data folder; the column reports whether it builds, the deterministic fixes applied and, where the fixture has a
+scenario oracle, how many scenarios match. Native-code rows have no original-language source to rebuild (they are Rust ports).
+
+usage: python scripts/benchmark.py [--rows a,b] [--config cfg.json] [--out-dir reports] [--no-legacy] [--only-native-rebuild]
 Config keys (all optional; defaults in DEFAULT_CONFIG):
   {"name": "default", "analysis": {"command": "aaa", "analysis.timeout": 300, "passes": ["sigpacks", "pdata", "relocptrs", "thunks"]},
    "decompile": {"max_functions": 200}, "strings": true, "imports": true, "dotnet": {"enabled": true, "timeout": 600},
@@ -47,6 +51,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "imports": True,
     "dotnet": {"enabled": True, "timeout": 600},
     "packer": {"check": True, "unpack": True},
+    "native_rebuild": {"enabled": True, "timeout": 900},
     # Optional second decompiler (full Ghidra headless, whole-program run). Off by default: needs Ghidra 12.1.4 + JDK 21.
     "ghidra": {"enabled": False, "max_functions": 2000, "per_function_timeout": 60, "skip_rows": ["go_pe_x64", "go_elf_x64"]},
 }
@@ -60,7 +65,8 @@ LEGACY = {
                              "only functions-found / imports / strings found are reported"},
     "dotnetapp": {"kind": "dotnet", "binary": "fixtures/dotnetapp/original/dotnetapp.dll",
                   "why_partial": "names are not obfuscated, so the assembly's own metadata is the type/method truth"},
-    "javacli": {"kind": "jvm", "not_scored": "not scored by R0 metrics: JVM jar (CFR path); parity is measured by its scenario oracle"},
+    "javacli": {"kind": "jvm", "not_scored": "not scored by R0 metrics: JVM jar (CFR path); parity is measured by its scenario oracle",
+                "binary": "fixtures/javacli/original/javacli.jar"},
     "godotgame": {"kind": "godot", "not_scored": "not scored by R0 metrics: Godot PCK (GDRE path); recovery is checked by expected/resources.json"},
     "webapp": {"kind": "web", "not_scored": "not scored by R0 metrics: web/asar (no native code); parity is measured by its Playwright oracle"},
 }
@@ -384,6 +390,114 @@ def run_dotnet(binary: Path, truth: dict | None, cfg: dict, backend) -> dict:
     return out
 
 
+# ================================================================================================ native-language rebuild (R4)
+NATIVE_REBUILD_ORACLES = {"dotnetapp": "fixtures/dotnetapp/expected/scenarios.json", "javacli": "fixtures/javacli/expected/scenarios.json"}
+NATIVE_REBUILD_TARGET = {"dotnet": "csharp", "jvm": "java"}
+_TOOL_DIRS = ("ilspycmd", "dotnet", "dotnet-sdk", "cfr", "jre", "jdk21")
+
+
+def _tool_roots() -> list[Path]:
+    roots = []
+    if os.environ.get("REBUILD_STUDIO_TOOLS"):
+        roots.append(Path(os.environ["REBUILD_STUDIO_TOOLS"]))
+    if os.environ.get("LOCALAPPDATA"):
+        roots.append(Path(os.environ["LOCALAPPDATA"]) / "RebuildStudio" / "tools")
+    return [r for r in roots if r.is_dir()]
+
+
+def merged_tools_dir(dest: Path) -> tuple[Path, list[Path]]:
+    """One tools folder for the pipeline (ILSpy, private .NET runtime/SDK, CFR, JRE, JDK 21) when they live in different tool
+    folders: directory junctions on Windows (read-only use, removed afterwards), else the first tools folder."""
+    roots = _tool_roots()
+    if os.name != "nt" or not roots:
+        return (roots[0] if roots else dest), []
+    import _winapi
+    dest.mkdir(parents=True, exist_ok=True)
+    links = []
+    for name in _TOOL_DIRS:
+        for r in roots:
+            if (r / name).is_dir():
+                _winapi.CreateJunction(str(r / name), str(dest / name))
+                links.append(dest / name)
+                break
+    return dest, links
+
+
+def run_native_rebuild(row: str, kind: str, source_root: Path, cfg: dict) -> dict:
+    """Run the product pipeline (inventory -> recovery -> native_rebuild -> deliver) with AI off; report what the verifier said."""
+    from rebuild_controller.config import Limits, Settings, set_settings
+    from rebuild_controller.jobs import JobState
+    from rebuild_controller.services import StudioServices
+    target = NATIVE_REBUILD_TARGET[kind]
+    oracle = REPO / NATIVE_REBUILD_ORACLES[row] if row in NATIVE_REBUILD_ORACLES else None
+    timeout = int((cfg.get("native_rebuild") or {}).get("timeout", 900))
+    t0 = time.perf_counter()
+    with tempfile.TemporaryDirectory(prefix="rs-bench-r4-", ignore_cleanup_errors=True) as tmp:
+        tools, links = merged_tools_dir(Path(tmp) / "tools")
+        try:
+            s = Settings(data_dir=Path(tmp) / "data", limits=Limits(lease_timeout_seconds=300, worker_heartbeat_seconds=0, max_stage_seconds=timeout))
+            s.tools_dir = tools
+            s.ensure_dirs()
+            set_settings(s)
+            st = StudioServices(s)
+            try:
+                case = st.create_case(name=f"bench-{row}", source_root=str(source_root), output_root=str(Path(tmp) / "out"), target_language=target,
+                                      output_type="exe", ai_policy={"mode": "no_ai"},
+                                      launch_profile={"baseline_file": str(oracle)} if oracle else {})
+                cid = case["case_id"]
+                st.start_rebuild(cid)
+                for _ in range(400):
+                    n = st.runner.run_pending()
+                    if n == 0 and not st.jobs.list(None, [JobState.QUEUED, JobState.RUNNING]):
+                        break
+                jobs = {j.stage: j for j in st.jobs.list(cid)}
+                nr = jobs.get("native_rebuild")
+                if nr is None or nr.state != JobState.COMPLETED:
+                    bad = next((j for j in st.jobs.list(cid) if j.state != JobState.COMPLETED), None)
+                    why = (nr.error if nr else (bad.error if bad else "no native_rebuild job")) or "not completed"
+                    return {"status": f"failed: {str(why).splitlines()[0][:200]}", "target": target, "seconds": round(time.perf_counter() - t0, 1)}
+                r = nr.result or {}
+                cand = st.candidates.get(r["final_candidate"])
+                build = (cand.get("meta") or {}).get("build") or {}
+                return {"status": "ok", "target": target, "built": bool(r.get("built")), "verified": bool(r.get("verified")),
+                        "scenarios": r.get("scenarios"), "passed": r.get("passed"), "oracle": bool(oracle),
+                        "repairs": len(r.get("deterministic_repairs") or []), "repair_notes": r.get("deterministic_repairs") or [],
+                        "rounds": len(r.get("rounds") or []), "ai_used": False, "toolchain": build.get("toolchain"),
+                        "seconds": round(time.perf_counter() - t0, 1)}
+            finally:
+                st.stop()
+        finally:
+            for ln in links:
+                try:
+                    os.rmdir(ln)          # removes the junction only, never the tool folder it points to
+                except OSError:
+                    pass
+
+
+def native_rebuild_cell(r: dict) -> str:
+    nr = r.get("native_rebuild")
+    if str(r.get("kind", "")).startswith("native"):
+        return "n/a (no original-language source; Rust port)"
+    if not isinstance(nr, dict):
+        return "not run"
+    if nr.get("status") != "ok":
+        return str(nr.get("status", "not run"))
+    lang = {"csharp": "C#", "java": "Java"}.get(nr["target"], nr["target"])
+    if not nr["built"]:
+        return f"{lang}: does not build ({nr['repairs']} fixes)"
+    sc = f", {nr['passed']}/{nr['scenarios']} scenarios" if nr.get("oracle") and nr.get("scenarios") else ", no scenario oracle"
+    return f"{lang}: builds{sc}, {nr['repairs']} fixes, no AI"
+
+
+def _native_rebuild_safe(row: dict, cfg: dict) -> dict:
+    try:
+        out = run_native_rebuild(row["row"], row["kind"], Path(row["binary"]).parent, cfg)
+    except Exception as e:  # noqa: BLE001 - reported, never a silent pass
+        out = {"status": f"error: {type(e).__name__}: {str(e)[:200]}"}
+    print(f"[benchmark] {row['row']}: native-language rebuild: {native_rebuild_cell({'kind': row['kind'], 'native_rebuild': out})}", file=sys.stderr)
+    return out
+
+
 # ================================================================================================ driver
 def discover_rows(selected: list[str] | None, legacy: bool) -> list[dict]:
     rows = []
@@ -398,6 +512,8 @@ def discover_rows(selected: list[str] | None, legacy: bool) -> list[dict]:
             e = {"row": name, "kind": r["kind"], "origin": "fixture"}
             if "not_scored" in r:
                 e["not_run"] = r["not_scored"]
+                if r.get("binary"):
+                    e["binary"] = REPO / r["binary"]
             else:
                 e.update(binary=REPO / r["binary"], truth=None, partial=r["why_partial"])
             rows.append(e)
@@ -418,6 +534,8 @@ def run_benchmark(rows: list[dict], cfg: dict) -> dict:
                 res["partial"] = row["partial"]
             if "not_run" in row:
                 res["status"] = row["not_run"]
+                if row["kind"] in NATIVE_REBUILD_TARGET and row.get("binary") and (cfg.get("native_rebuild") or {}).get("enabled", True):
+                    res["native_rebuild"] = _native_rebuild_safe(row, cfg)
                 results.append(res)
                 continue
             if not row["binary"].is_file():
@@ -448,6 +566,8 @@ def run_benchmark(rows: list[dict], cfg: dict) -> dict:
                             net, net_info = ilspy_backend()
                             env["ilspy"] = net_info
                         res.update(run_dotnet(row["binary"], truth, cfg, net) if net else {"status": f"not run: {net_info}"})
+                    if (cfg.get("native_rebuild") or {}).get("enabled", True):
+                        res["native_rebuild"] = _native_rebuild_safe(row, cfg)
                 else:
                     res["status"] = f"not run: no scorer for kind {row['kind']}"
             except Exception as e:  # report and continue with the other rows
@@ -494,8 +614,8 @@ def render_markdown(rep: dict) -> str:
           "found inside executable sections. Decompiler coverage = own source functions with real rz-ghidra output / all own "
           "source functions in the truth.", "",
           "## Native rows", "",
-          "| Row | Truth fns | Found | Boundary recall | Boundary precision | Own-fn recall | Named recall | Name precision | Real-decompiler coverage (own) | Decompile failures | Imports recall | Strings recall | Packed detected | Analysis s | Decompile s | Total s |",
-          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+          "| Row | Truth fns | Found | Boundary recall | Boundary precision | Own-fn recall | Named recall | Name precision | Real-decompiler coverage (own) | Decompile failures | Imports recall | Strings recall | Packed detected | Analysis s | Decompile s | Total s | Native-language rebuild |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rep["rows"]:
         if not r["kind"].startswith("native") or r.get("status") != "ok":
             continue
@@ -504,7 +624,7 @@ def render_markdown(rep: dict) -> str:
         s = r.get("seconds", {})
         if f is None:
             L.append(f"| {r['row']} (partial) | n/a | {r['functions_found']} | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | "
-                     f"{s.get('analysis', 0):.1f} | - | {r['wall_seconds']:.1f} |")
+                     f"{s.get('analysis', 0):.1f} | - | {r['wall_seconds']:.1f} | {native_rebuild_cell(r)} |")
             continue
         packed = r.get("packed", {})
         pk = _packed_cell(packed)
@@ -512,7 +632,7 @@ def render_markdown(rep: dict) -> str:
         L.append(f"| {r['row']} | {f['truth_functions']} | {f['found_functions']} | {_pct(f['recall'])} | {_pct(f['precision'])} | "
                  f"{_pct(f['own_recall'])} | {_pct(f['named_recall'])} | {_pct(f.get('named_precision'))} | {_pct(d.get('coverage'))} ({d.get('real', 0)}/{d.get('own_functions', 0)}) | "
                  f"{fails} | {_pct((r.get('imports') or {}).get('recall'))} | {_pct((r.get('strings') or {}).get('recall'))} | {pk} | "
-                 f"{s.get('analysis', 0):.1f} | {s.get('decompile', 0):.1f} | {r['wall_seconds']:.1f} |")
+                 f"{s.get('analysis', 0):.1f} | {s.get('decompile', 0):.1f} | {r['wall_seconds']:.1f} | {native_rebuild_cell(r)} |")
     gh = [r for r in rep["rows"] if r.get("status") == "ok" and isinstance(r.get("ghidra"), dict)]
     if gh:
         L += ["", "## Ghidra headless (optional second decompiler)", "",
@@ -528,19 +648,38 @@ def render_markdown(rep: dict) -> str:
             L.append(f"| {r['row']} | {g['ghidra_version']} | {g['functions_total']} | {_pct(g['recall'])} | {_pct(g['precision'])} | "
                      f"{_pct(g['own_coverage'])} ({g['own_real']}/{g['own_functions']}) | {g['failed']} | {g['seconds']:.1f} |")
     L += ["", "## .NET rows", "",
-          "| Row | Truth types | Type recall | Truth methods | Method recall | Types decompiled | Decompile failures | Strings recall | Decompile s |",
-          "|---|---|---|---|---|---|---|---|---|"]
+          "| Row | Truth types | Type recall | Truth methods | Method recall | Types decompiled | Decompile failures | Strings recall | Decompile s | Native-language rebuild |",
+          "|---|---|---|---|---|---|---|---|---|---|"]
     for r in rep["rows"]:
         if r["kind"] != "dotnet" or r.get("status") != "ok":
             continue
         dn, d = r["dotnet"], r["decompile"]
         L.append(f"| {r['row']}{' (partial)' if r.get('partial') else ''} | {dn['truth_types']} | {_pct(dn['type_recall'])} | {dn['truth_methods']} | "
                  f"{_pct(dn['method_recall'])} | {_pct(d['coverage'])} ({d['types_decompiled'] + d['types_with_errors']}/{d['types_total']}) | "
-                 f"{d['failures']} | {_pct((r.get('strings') or {}).get('recall'))} | {r['seconds'].get('decompile', 0):.1f} |")
+                 f"{d['failures']} | {_pct((r.get('strings') or {}).get('recall'))} | {r['seconds'].get('decompile', 0):.1f} | {native_rebuild_cell(r)} |")
+    nrows = [r for r in rep["rows"] if isinstance(r.get("native_rebuild"), dict)]
+    if nrows:
+        L += ["", "## Native-language rebuild (R4)", "",
+              "The product pipeline with AI off: the recovered C# (ILSpy) / Java (CFR) is the candidate, built with the private .NET SDK / "
+              "JDK in the sandbox after deterministic fixes, then run against the fixture's frozen scenario oracle where there is one. "
+              "Only the verifier's verdict counts."
+              + (f" Measured {rep['native_rebuild_generated_utc']}." if rep.get("native_rebuild_generated_utc") else ""), "",
+              "| Row | Target | Builds | Scenarios matched | Deterministic fixes | AI | Toolchain | Seconds |", "|---|---|---|---|---|---|---|---|"]
+        for r in nrows:
+            nr = r["native_rebuild"]
+            if nr.get("status") != "ok":
+                L.append(f"| {r['row']} | {nr.get('target', '')} | {nr.get('status')} | | | | | |")
+                continue
+            sc = f"{nr['passed']}/{nr['scenarios']}" if nr.get("oracle") and nr.get("scenarios") is not None else "no oracle"
+            L.append(f"| {r['row']} | {nr['target']} | {'yes' if nr['built'] else 'no'} | {sc} | {nr['repairs']} | {'yes' if nr.get('ai_used') else 'none'} | "
+                     f"{nr.get('toolchain') or ''} | {nr['seconds']:.1f} |")
+        notes = [(r["row"], n) for r in nrows for n in (r["native_rebuild"].get("repair_notes") or [])]
+        if notes:
+            L += ["", "Deterministic fixes applied:", ""] + [f"* {row}: {n}" for row, n in notes]
     L += ["", "## Rows not run or not scored", "", "| Row | Status |", "|---|---|"]
     for r in rep["rows"]:
         if r.get("status") != "ok":
-            L.append(f"| {r['row']} | {r.get('status')} |")
+            L.append(f"| {r['row']} | {r.get('status')}" + ("; native-language rebuild: see that section" if isinstance(r.get("native_rebuild"), dict) else "") + " |")
     partial = [r for r in rep["rows"] if r.get("partial") and r.get("status") == "ok"]
     if partial:
         L += ["", "## Partial rows", ""] + [f"* **{r['row']}**: {r['partial']}" for r in partial]
@@ -549,7 +688,8 @@ def render_markdown(rep: dict) -> str:
           "* Named recall counts a function as named only when rizin's name at the true start equals a truth name (modulo prefixes, case, punctuation); auto names (`fcn.*`, `entry0`) never count. Name precision = right names / matched functions that carry any non-auto name (a wrong name misleads more than `fcn.*`; rizin's RTTI names such as `method.Foo.virtual_0` count as wrong).",
           "* Analysis passes (R1, `backends/rizin_passes.py`): `sigpacks` = FLIRT packs built from the MSVC 14.29 runtime libraries and the Rust 1.98.1 std rlibs (`scripts/build_sigpacks.py`, pinned in `rebuild_controller/data/sigpacks/manifest.json`; never built from this corpus); `pdata` = x64 exception-directory function starts (chained entries and EH funclets skipped); `relocptrs` = functions at relocated code pointers no analysed function covers; `thunks` = `jmp [IAT]` thunks named after their import.",
           "* Failures per row are listed in `reports/benchmark.json` (`decompile.failures`, `imports.missing_sample`, `strings.missing`).",
-          "* Reproduce: `python fixtures/bench/build_bench.py --verify` (corpus), then `python scripts/benchmark.py` (needs rizin; REBUILD_STUDIO_TOOLS).", ""]
+          "* Reproduce: `python fixtures/bench/build_bench.py --verify` (corpus), then `python scripts/benchmark.py` (needs rizin; REBUILD_STUDIO_TOOLS).",
+          "* Native-language rebuild (R4): `python scripts/benchmark.py --only-native-rebuild` re-measures only that column (needs ILSpy + .NET SDK, CFR + JDK) and keeps the other measurements.", ""]
     return "\n".join(L)
 
 
@@ -559,11 +699,23 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", type=Path, help="JSON file with analyzer knobs (merged over the defaults)")
     ap.add_argument("--out-dir", type=Path, default=REPO / "reports")
     ap.add_argument("--no-legacy", action="store_true", help="skip the original acceptance fixtures")
+    ap.add_argument("--only-native-rebuild", action="store_true",
+                    help="keep the other measurements in <out-dir>/benchmark.json and (re)run only the native-language rebuild column")
     a = ap.parse_args(argv)
     override = json.loads(a.config.read_text(encoding="utf-8")) if a.config else None
     cfg = merge_config(DEFAULT_CONFIG, override)
     rows = discover_rows([r for r in a.rows.split(",") if r] if a.rows else None, not a.no_legacy)
-    rep = run_benchmark(rows, cfg)
+    if a.only_native_rebuild:
+        rep = json.loads((a.out_dir / "benchmark.json").read_text(encoding="utf-8"))
+        by = {r["row"]: r for r in rows}
+        for r in rep["rows"]:
+            src = by.get(r["row"])
+            if src and src["kind"] in NATIVE_REBUILD_TARGET and src.get("binary"):
+                r["native_rebuild"] = _native_rebuild_safe(src, cfg)
+        rep.setdefault("config", {})["native_rebuild"] = cfg["native_rebuild"]
+        rep["native_rebuild_generated_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    else:
+        rep = run_benchmark(rows, cfg)
     a.out_dir.mkdir(parents=True, exist_ok=True)
     (a.out_dir / "benchmark.json").write_text(json.dumps(rep, indent=1) + "\n", encoding="utf-8", newline="\n")
     (a.out_dir / "benchmark.md").write_text(render_markdown(rep), encoding="utf-8", newline="\n")

@@ -461,7 +461,17 @@ class DependencyHealth:
 
         def node() -> str | None:
             return shutil.which("node")
-        return {"rizin": rizin, "rust": rust, "node": node}
+
+        def dotnet_sdk() -> str | None:      # a .NET 8+ SDK on PATH builds C# rebuilds too (R4)
+            from .builders.dotnet import system_sdk
+            s = system_sdk()
+            return f"{s['dotnet']} (SDK {s['sdk']})" if s else None
+
+        def jdk() -> str | None:             # a javac on JAVA_HOME/PATH compiles Java rebuilds (R4); Ghidra still asks for the private JDK 21
+            from .builders.java import system_jdk
+            j = system_jdk()
+            return j["javac"] if j else None
+        return {"rizin": rizin, "rust": rust, "node": node, "dotnet-sdk": dotnet_sdk, "temurin-jdk21": jdk}
 
     # -- per project ---------------------------------------------------------------------------------------------------
     def profile_of(self, case: dict[str, Any]) -> str:

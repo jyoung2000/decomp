@@ -34,6 +34,10 @@
     "go_pe_x64",
     "go_elf_x64"
    ]
+  },
+  "native_rebuild": {
+   "enabled": true,
+   "timeout": 900
   }
  },
  "environment": {
@@ -438,7 +442,25 @@
     "recall": 1.0,
     "missing": []
    },
-   "wall_seconds": 0.787
+   "wall_seconds": 0.787,
+   "native_rebuild": {
+    "status": "ok",
+    "target": "csharp",
+    "built": true,
+    "verified": false,
+    "scenarios": null,
+    "passed": null,
+    "oracle": false,
+    "repairs": 2,
+    "repair_notes": [
+     "benchnet.csproj: target framework netcoreapp8.0 -> net8.0 (ILSpy writes the pre-.NET 5 moniker)",
+     "Properties/AssemblyInfo.cs: removed compiler-reserved attribute(s) RefSafetyRules (ILSpy prints them; csc refuses them)"
+    ],
+    "rounds": 1,
+    "ai_used": false,
+    "toolchain": ".NET SDK 8.0.425 (private SDK)",
+    "seconds": 4.3
+   }
   },
   {
    "row": "dotnet_renamed",
@@ -494,7 +516,25 @@
     "recall": 1.0,
     "missing": []
    },
-   "wall_seconds": 0.469
+   "wall_seconds": 0.469,
+   "native_rebuild": {
+    "status": "ok",
+    "target": "csharp",
+    "built": false,
+    "verified": false,
+    "scenarios": null,
+    "passed": null,
+    "oracle": false,
+    "repairs": 2,
+    "repair_notes": [
+     "benchnet.csproj: target framework netcoreapp8.0 -> net8.0 (ILSpy writes the pre-.NET 5 moniker)",
+     "Properties/AssemblyInfo.cs: removed compiler-reserved attribute(s) RefSafetyRules (ILSpy prints them; csc refuses them)"
+    ],
+    "rounds": 1,
+    "ai_used": false,
+    "toolchain": null,
+    "seconds": 3.2
+   }
   },
   {
    "row": "go_elf_x64",
@@ -972,13 +1012,50 @@
    "seconds": {
     "decompile": 0.421
    },
-   "wall_seconds": 0.441
+   "wall_seconds": 0.441,
+   "native_rebuild": {
+    "status": "ok",
+    "target": "csharp",
+    "built": true,
+    "verified": true,
+    "scenarios": 9,
+    "passed": 9,
+    "oracle": true,
+    "repairs": 4,
+    "repair_notes": [
+     "dotnetapp.csproj: target framework netcoreapp8.0 -> net8.0 (ILSpy writes the pre-.NET 5 moniker)",
+     "dotnetapp.csproj: InvariantGlobalization=true, PredefinedCulturesOnly=true from the original's runtimeconfig.json",
+     "Properties/AssemblyInfo.cs: removed compiler-reserved attribute(s) RefSafetyRules (ILSpy prints them; csc refuses them)",
+     "NotesApp/Menus.cs: restored 3 'case null:' label(s) ILSpy dropped from string switches (the IL tests null and the constant with the same branch target)"
+    ],
+    "rounds": 1,
+    "ai_used": false,
+    "toolchain": ".NET SDK 8.0.425 (private SDK)",
+    "seconds": 4.8
+   }
   },
   {
    "row": "javacli",
    "kind": "jvm",
    "origin": "fixture",
-   "status": "not scored by R0 metrics: JVM jar (CFR path); parity is measured by its scenario oracle"
+   "status": "not scored by R0 metrics: JVM jar (CFR path); parity is measured by its scenario oracle",
+   "native_rebuild": {
+    "status": "ok",
+    "target": "java",
+    "built": true,
+    "verified": true,
+    "scenarios": 11,
+    "passed": 11,
+    "oracle": true,
+    "repairs": 1,
+    "repair_notes": [
+     "rebuild-java.json: main class dev.rebuild.ledger.Main, javac --release 17 (class files version 61), jar javacli.jar"
+    ],
+    "rounds": 1,
+    "ai_used": false,
+    "toolchain": "javac (private JDK 21)",
+    "seconds": 5.0
+   }
   },
   {
    "row": "godotgame",
@@ -992,5 +1069,6 @@
    "origin": "fixture",
    "status": "not scored by R0 metrics: web/asar (no native code); parity is measured by its Playwright oracle"
   }
- ]
+ ],
+ "native_rebuild_generated_utc": "2026-10-10T18:28:28Z"
 }

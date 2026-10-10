@@ -128,6 +128,40 @@
       },
       "install_dir": "dotnet"
     },
+    "dotnet-sdk": {
+      "version": "8.0.425",
+      "role": "Optional: .NET 8 SDK (dotnet build) for rebuilding .NET programs in C# (R4 'native-language rebuild'): the C# recovered by ILSpy is compiled with it and checked against the scenarios before any AI is involved. Official Microsoft zip for SDK 8.0.425 (runtime 8.0.31, the same release as the dotnet-runtime pin), installed side by side under tools\\dotnet-sdk; no machine-wide install, no PATH change. Builds run in the sandbox with DOTNET_ROOT/DOTNET_CLI_HOME/NUGET_PACKAGES inside the case folder. Without it the app falls back to a .NET 8+ SDK already on PATH.",
+      "license": "MIT (.NET SDK); bundled components carry their own licenses (ThirdPartyNotices.txt in the archive)",
+      "optional": true,
+      "source": {
+        "docs": "https://dotnet.microsoft.com/download/dotnet/8.0",
+        "release_metadata": "https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json",
+        "release": "8.0.31",
+        "sdk": "8.0.425"
+      },
+      "artifact": {
+        "name": "dotnet-sdk-8.0.425-win-x64.zip",
+        "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.425/dotnet-sdk-8.0.425-win-x64.zip",
+        "size_bytes": 285157731,
+        "sha256": "cd6eb1df826dd168108e2c427673f9d627b7e0631963eeedf0fa7aef0913c53f",
+        "verify_required": false,
+        "hash_provenance": "2026-10-10 on Windows 11 (R4): downloaded from builds.dotnet.microsoft.com; SHA-512 matched the official value in https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json (release 8.0.31, sdk 8.0.425, file dotnet-sdk-win-x64.zip); sha256 computed locally from the same verified bytes.",
+        "sha512_official": "f0b6f15bf6f1a0507205c0cb102ab99e1dee875c4682c8ed94665be1d580186a06b21455e83b3a01a0ff7f4cd887b67420f2e2fe09ed985534a4cea488ae1af9"
+      },
+      "footprint": {
+        "disk_bytes": 748618050,
+        "note": "285 MB download, about 750 MB unpacked (SDK, shared runtimes and the win-x64 apphost pack, so builds need no NuGet download)."
+      },
+      "layout": {
+        "archive_root": "",
+        "entry": "dotnet.exe",
+        "entry_sha256": "111da7b604cd196b49167cfeecdaef4034b58cc7de71a91cbf9e162c9e8b0931",
+        "version_args": [
+          "--list-sdks"
+        ]
+      },
+      "install_dir": "dotnet-sdk"
+    },
     "temurin-jre": {
       "version": "17.0.20.1+1",
       "role": "Optional: Java runtime for CFR and jadx (Java/Android code recovery). Eclipse Temurin 17 JRE, installed side by side under tools\\jre like the .NET runtime; no machine-wide install. Without it the app falls back to a JDK/JRE 8+ already on PATH/JAVA_HOME.",
@@ -256,7 +290,7 @@
     },
     "temurin-jdk21": {
       "version": "21.0.12.1+1",
-      "role": "Optional: Java 21 runtime for the optional Ghidra headless decompiler (Ghidra 12 needs JDK 21+; the Temurin 17 JRE above is too old). Eclipse Temurin 21 JDK, installed side by side under tools\\jdk21; no machine-wide install, no PATH change (Rebuild Studio sets JAVA_HOME only for the Ghidra process).",
+      "role": "Optional: Java 21 JDK. (1) javac for rebuilding Java programs in Java (R4 'native-language rebuild': the CFR-recovered sources are compiled with --release matching the original class files, then checked against the scenarios before any AI is involved); (2) the runtime for the optional Ghidra headless decompiler (Ghidra 12 needs JDK 21+; the Temurin 17 JRE above is too old). Eclipse Temurin 21 JDK, installed side by side under tools\\jdk21; no machine-wide install, no PATH change (Rebuild Studio sets JAVA_HOME only for the processes it starts). Without it Java rebuilds fall back to a javac on JAVA_HOME/PATH.",
       "license": "GPL-2.0-with-classpath-exception",
       "optional": true,
       "source": {

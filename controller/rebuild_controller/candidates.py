@@ -17,12 +17,13 @@ MAX_PROPOSED_FILES = 2000
 MAX_PROPOSED_BYTES = 64 * 1024 * 1024
 
 
-def tree_manifest(root: Path) -> dict[str, Any]:
+def tree_manifest(root: Path, *, source: bool = False) -> dict[str, Any]:
+    skip = ("target/", "obj/", "bin/", "build/") if source else ("target/",)    # a source tree's build output is not source
     files = []
     for p in sorted(root.rglob("*")):
         if p.is_file() and not p.is_symlink():
             rel = p.relative_to(root).as_posix()
-            if rel.startswith("target/") or "/node_modules/" in ("/" + rel):
+            if rel.startswith(skip) or "/node_modules/" in ("/" + rel):
                 continue
             files.append({"path": rel, "size": p.stat().st_size, "sha256": sha256_file(p)})
     return {"files": files, "count": len(files), "tree_sha": stable_json_hash([(f["path"], f["sha256"]) for f in files])}
@@ -45,9 +46,12 @@ class CandidateStore:
         src = root / "source"
         src.mkdir(parents=True, exist_ok=True)
         if source_dir is not None:
+            # build output is never source: cargo's target/ (can be gigabytes), MSBuild's bin/ obj/ (C#), the Java build/ dir
+            skip_top = {"csharp": ("target", "bin", "obj"), "java": ("target", "build")}.get(target_language, ("target",))
+
             def _skip(d: str, names: list[str]) -> set[str]:   # cargo's build dir is never source (can be gigabytes)
                 top = Path(d) == Path(source_dir)
-                return {n for n in names if n in ("node_modules", ".git") or (top and n == "target")}
+                return {n for n in names if n in ("node_modules", ".git") or (top and n in skip_top)}
             shutil.copytree(source_dir, src, dirs_exist_ok=True, ignore=_skip)
         self.db.insert("candidates", {"candidate_id": cid, "case_id": case_id, "revision": rev, "target_language": target_language,
                                       "output_type": output_type, "source_dir": str(src), "dist_dir": None, "build_hash": None,
@@ -96,7 +100,7 @@ class CandidateStore:
 
     def mark_built(self, candidate_id: str, dist_dir: Path, *, build_log_evidence: str | None = None) -> dict[str, Any]:
         man = tree_manifest(dist_dir)
-        src_man = tree_manifest(Path(self.get(candidate_id)["source_dir"]))
+        src_man = tree_manifest(Path(self.get(candidate_id)["source_dir"]), source=True)
         build_hash = stable_json_hash({"dist": man["tree_sha"], "source": src_man["tree_sha"]})[:16]
         c = self.get(candidate_id)
         ev = self.cases.add_evidence(c["case_id"], "candidate_manifest", f"Candidate {candidate_id} manifest",

@@ -171,6 +171,28 @@ def test_config_merge_and_markdown_reports_not_run_rows():
     assert "| unity_il2cpp | not run: needs Unity |" in md
 
 
+def test_markdown_has_the_native_language_rebuild_column_and_section():
+    cfg = bm.merge_config(bm.DEFAULT_CONFIG, {})
+    assert cfg["native_rebuild"] == {"enabled": True, "timeout": 900}
+    nr_ok = {"status": "ok", "target": "csharp", "built": True, "verified": True, "scenarios": 9, "passed": 9, "oracle": True, "repairs": 2,
+             "repair_notes": ["a.csproj: x"], "ai_used": False, "toolchain": ".NET SDK 8.0.425 (private SDK)", "seconds": 4.2}
+    dn = {"truth_types": 4, "type_recall": 1.0, "truth_methods": 7, "method_recall": 1.0}
+    dec = {"coverage": 1.0, "types_decompiled": 4, "types_with_errors": 0, "types_total": 4, "failures": 0}
+    rep = {"generated_utc": "t", "config": cfg, "environment": {}, "rows": [
+        {"row": "dotnetapp", "kind": "dotnet", "origin": "fixture", "status": "ok", "dotnet": dn, "decompile": dec, "seconds": {"decompile": 0.4},
+         "native_rebuild": nr_ok},
+        {"row": "dotnet_renamed", "kind": "dotnet", "origin": "bench", "status": "ok", "dotnet": dn, "decompile": dec, "seconds": {},
+         "native_rebuild": {**nr_ok, "built": False, "oracle": False, "scenarios": None, "passed": None}},
+        {"row": "javacli", "kind": "jvm", "origin": "fixture", "status": "not scored by R0 metrics: x",
+         "native_rebuild": {**nr_ok, "target": "java", "scenarios": 11, "passed": 11}}]}
+    md = bm.render_markdown(rep)
+    assert "| Decompile s | Native-language rebuild |" in md and "| C#: builds, 9/9 scenarios, 2 fixes, no AI |" in md
+    assert "| C#: does not build (2 fixes) |" in md
+    assert "## Native-language rebuild (R4)" in md and "| javacli | java | yes | 11/11 | 2 | none |" in md and "* dotnetapp: a.csproj: x" in md
+    assert "| javacli | not scored by R0 metrics: x; native-language rebuild: see that section |" in md
+    assert bm.native_rebuild_cell({"kind": "native_pe_x64"}).startswith("n/a")
+
+
 def test_discover_rows_lists_every_fixture():
     rows = {r["row"]: r for r in bm.discover_rows(None, True)}
     for name in ("pecli", "dotnetapp", "javacli", "godotgame", "webapp", *_manifest()["rows"]):

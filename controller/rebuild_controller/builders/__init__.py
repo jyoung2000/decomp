@@ -10,6 +10,12 @@ def build(ctx: StageContext, target_language: str, source_dir, dist_dir) -> dict
     if target_language in ("rust", "rust_bevy"):
         from .rust import build_rust
         return build_rust(ctx, source_dir, dist_dir, bevy=(target_language == "rust_bevy"))
+    if target_language == "csharp":
+        from .dotnet import build_csharp
+        return build_csharp(ctx, source_dir, dist_dir)
+    if target_language == "java":
+        from .java import build_java
+        return build_java(ctx, source_dir, dist_dir)
     if target_language == "web":
         from .web import build_web
         return build_web(ctx, source_dir, dist_dir)

@@ -46,7 +46,7 @@ class CaseCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     source_root: str
     output_root: str
-    target_language: str = Field(pattern="^(rust|rust_bevy|web|auto)$")
+    target_language: str = Field(pattern="^(rust|rust_bevy|web|csharp|java|auto)$")
     output_type: str = Field(pattern="^(exe|installer|portable|web|pwa)$")
     ai_policy: dict[str, Any] = Field(default_factory=lambda: {"mode": "no_ai"})
     launch_profile: dict[str, Any] = Field(default_factory=lambda: {"execute_original": False})
@@ -130,7 +130,7 @@ def _outcome(studio: StudioServices, case_id: str) -> dict[str, Any] | None:
 
 
 class ForecastRequest(BaseModel):
-    target_language: str = Field(default="auto", pattern="^(rust|rust_bevy|web|auto)$")
+    target_language: str = Field(default="auto", pattern="^(rust|rust_bevy|web|csharp|java|auto)$")
     output_type: str = Field(default="exe", pattern="^(exe|installer|portable|web|pwa)$")
     ai_policy: dict[str, Any] = Field(default_factory=lambda: {"mode": "no_ai"})
     launch_profile: dict[str, Any] = Field(default_factory=dict)
@@ -312,7 +312,7 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     def capabilities():
         from ..reconstruct import _unsupported_combo
         combos = []
-        for lang in ("rust", "rust_bevy", "web", "auto"):
+        for lang in ("rust", "rust_bevy", "web", "csharp", "java", "auto"):
             for out in ("exe", "installer", "portable", "web", "pwa"):
                 reason = None if lang == "auto" else _unsupported_combo("unknown", lang, out)
                 combos.append({"target_language": lang, "output_type": out, "state": "unsupported" if reason else "supported", "reason": reason})

@@ -28,7 +28,7 @@ pwsh scripts/windows/Build-RebuildStudio.ps1   # Windows: UI + sidecar + NSIS in
 
 ## CLI
 ```
-rebuildctl rebuild --source <folder> --output <folder> --language rust|rust_bevy|web|auto --type exe|installer|portable|web|pwa [--ai no_ai|assist_on_failure|assisted] [--execute-original] [--wait]
+rebuildctl rebuild --source <folder> --output <folder> --language rust|rust_bevy|web|csharp|java|auto --type exe|installer|portable|web|pwa [--ai no_ai|assist_on_failure|assisted] [--execute-original] [--wait]
 rebuildctl status <case_id> | jobs <case_id> | cancel <case_id> | resume <case_id>
 rebuildctl evidence search <case_id> <query> | evidence get <evidence_id>
 rebuildctl export-plan <case_id>       # project-plan.json + project-plan.html under <output>/reports/

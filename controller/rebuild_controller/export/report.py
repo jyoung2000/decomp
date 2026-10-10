@@ -36,7 +36,9 @@ def build_report(st, case_id: str, candidate_id: str | None) -> dict[str, Any]:
         "outcome": ({"state": outcome["state"], "label": outcome["label"], "scaffold_only": outcome["scaffold_only"], "scope_statement": outcome["scope_statement"],
                      "outstanding": outcome["outstanding"]} if outcome else None), "ai_attempts": attempts,
         "generated_at": now_iso(), "case": {k: case[k] for k in ("case_id", "name", "source_root", "output_root", "target_language", "output_type", "status", "ai_policy")},
-        "candidate": ({k: cand[k] for k in ("candidate_id", "revision", "build_hash", "build_status", "verification", "last_known_good")} | {"author": cand["meta"].get("author"), "origin": cand["meta"].get("origin")}) if cand else None,
+        "candidate": ({k: cand[k] for k in ("candidate_id", "revision", "build_hash", "build_status", "verification", "last_known_good")}
+                      | {"author": cand["meta"].get("author"), "origin": cand["meta"].get("origin"), "target_language": cand.get("target_language"),
+                         "deterministic_repairs": list(cand["meta"].get("deterministic_repairs") or [])}) if cand else None,
         "parity": {"full_parity": summary["full_parity"], "features_total": summary["total"], "verified": summary["verify"]["verified"], "partial": summary["verify"]["partial"],
                    "failed": summary["verify"]["failed"], "untested": summary["verify"]["untested"], "stale": summary["verify"]["stale"],
                    "critical_incomplete": summary["critical_incomplete"], "scope_note": "feature counts are semantic features, not files/functions; undiscovered scope is not counted"},
@@ -80,6 +82,11 @@ def render_markdown(rep: dict[str, Any]) -> str:
     if rep["candidate"]:
         c = rep["candidate"]
         lines += ["", f"## Candidate r{c['revision']} `{c['candidate_id']}`", f"build hash `{c['build_hash']}`, build {c['build_status']}, verification **{c['verification']}**, last known good: {c['last_known_good']}"]
+        if c.get("origin") == "native_recovered":
+            lang = {"csharp": "C#", "java": "Java"}.get(c.get("target_language") or "", c.get("target_language") or "")
+            lines.append(f"Native-language rebuild: the {lang} recovered from the original by a decompiler, rebuilt as-is"
+                         + (f"; deterministic fixes ({len(c['deterministic_repairs'])}):" if c.get("deterministic_repairs") else "; no fixes were needed."))
+            lines += [f"- {x}" for x in c.get("deterministic_repairs") or []]
         if c.get("author"):
             lines.append(f"Source authored by: **{c['author']}**" + (" (an external model client proposed these files through the MCP interface; the verifier decided)" if c["author"] == "model" else ""))
     lines += ["", "## Features", "", "| Feature | Origin | Critical | Implementation | Verification |", "|---|---|---|---|---|"]

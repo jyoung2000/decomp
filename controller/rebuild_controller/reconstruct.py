@@ -33,7 +33,13 @@ def choose_target(case: dict[str, Any], profile: str, evidence: dict[str, Any]) 
     if profile == "godot":
         reasons.append("game engine profile with scenes/input/audio: Rust + Bevy ranked first")
         return "rust_bevy", reasons
-    if profile in ("native_pe", "native_elf", "dotnet", "unity_mono"):
+    if profile == "dotnet":
+        reasons.append(".NET program: the C# recovered by ILSpy is rebuilt in C# first (compile, then the scenarios); AI only repairs what fails")
+        return "csharp", reasons
+    if profile == "jvm":
+        reasons.append("Java program: the Java recovered by CFR is rebuilt in Java first (javac, then the scenarios); AI only repairs what fails")
+        return "java", reasons
+    if profile in ("native_pe", "native_elf", "unity_mono"):
         reasons.append("native/managed program with OS integration or file I/O: Rust ranked first")
         return "rust", reasons
     reasons.append("unknown profile: Rust as safest native default")
@@ -59,6 +65,22 @@ def reconstruct(ctx: StageContext) -> dict[str, Any]:
         raise StageError(unsupported, blocker=unsupported)
     plan_rev = st.plan.current_revision(cid_case)
     feats = st.ledger.list(cid_case)
+    from .native_rebuild import NATIVE_TARGETS, TARGET_TITLE, create_native_candidate
+    if target in NATIVE_TARGETS:
+        lang = TARGET_TITLE[target]
+        ctx.log(f"Rebuilding in the original language: the recovered {lang} is the starting candidate (build, then the scenarios; AI only for what fails)")
+        cand, prep = create_native_candidate(st, case, target, plan_rev, profile, ctx)
+        for n in prep["notes"]:
+            ctx.log(f"Deterministic fix before the first build: {n}")
+        for f in feats:
+            if f["impl_status"] == "planned":
+                st.ledger.set_impl(f["feature_id"], "in_progress")
+        j = st.jobs.create(cid_case, "native_rebuild", f"Build and verify the recovered {lang}", {"candidate_id": cand["candidate_id"]},
+                           depends_on=[ctx.job.job_id], milestone_id="M-BUILD")
+        st.plan.link_job(st.plan.milestone_id(cid_case, "M-BUILD"), j.job_id)
+        st.plan.update_item(st.plan.milestone_id(cid_case, "M-IMPL"), status="running", blockers=[], files=[cand["source_dir"]])
+        return {"candidate_id": cand["candidate_id"], "target": target, "source": f"recovered {lang} (native-language rebuild)", "reasons": reasons,
+                "native_job": j.job_id, "deterministic_repairs": prep["notes"]}
     if target == "web" and profile in ("web", "electron"):
         ctx.log("Porting the recovered web site to a web candidate (no AI needed)…")
         cand = _port_web(st, case, plan_rev)
@@ -126,6 +148,11 @@ def reconstruct(ctx: StageContext) -> dict[str, Any]:
 
 
 def _unsupported_combo(profile: str, target: str, output_type: str) -> str | None:
+    if target in ("csharp", "java"):
+        if output_type in ("web", "pwa"):
+            return f"output type {output_type} requires the HTML/CSS/JS target; the {'C#' if target == 'csharp' else 'Java'} target builds a program"
+        from .native_rebuild import unsupported_native
+        return unsupported_native(profile, target)
     if target == "web" and profile in ("native_pe", "native_elf"):
         return "Native code with OS integration cannot be mechanically ported to a browser app; choose Rust or provide an AI-assisted interpretation with explicit scope"
     if output_type in ("web", "pwa") and target in ("rust", "rust_bevy"):

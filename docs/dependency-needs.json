@@ -24,9 +24,11 @@
   "targets": {
     "rust": {"title": "Rust (.exe)", "required": ["rust"]},
     "rust_bevy": {"title": "Rust + Bevy (.exe)", "required": ["rust"]},
-    "web": {"title": "HTML/CSS/JS"}
+    "web": {"title": "HTML/CSS/JS"},
+    "csharp": {"title": "C# (rebuilt from the recovered C#)", "required": ["dotnet-sdk"]},
+    "java": {"title": "Java (rebuilt from the recovered Java)", "required": ["temurin-jdk21"]}
   },
-  "auto_target": {"web": ["web", "electron"], "rust_bevy": ["godot"], "default": "rust"},
+  "auto_target": {"web": ["web", "electron"], "rust_bevy": ["godot"], "csharp": ["dotnet"], "java": ["jvm"], "default": "rust"},
   "ai": {
     "local": {"title": "AI on this PC", "services": ["local_ai_server"]}
   },

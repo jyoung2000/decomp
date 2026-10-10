@@ -7,7 +7,7 @@ import { dateTime } from '../lib/format';
 import { setSelectedCase, useSelectedCase } from '../lib/selection';
 import { useApi, useResource, useStoreSelector } from '../lib/store';
 
-const TARGET: Record<string, string> = { rust: 'Rust', rust_bevy: 'Rust + Bevy', web: 'HTML/CSS/JS', auto: 'Auto' };
+const TARGET: Record<string, string> = { rust: 'Rust', rust_bevy: 'Rust + Bevy', web: 'HTML/CSS/JS', csharp: 'C#', java: 'Java', auto: 'Auto' };
 
 export function ProjectsView() {
   const api = useApi();

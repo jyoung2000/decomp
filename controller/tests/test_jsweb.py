@@ -67,7 +67,7 @@ def test_probe_native_engine_installed_and_optional_tools_do_not_lower_availabil
     asar = next(t for t in optional if t.name == "asar")
     if asar.availability == Availability.INSTALLED:
         assert asar.version == "4.3.1" and asar.pinned == "4.3.1" and asar.license == "MIT" and asar.integrity.startswith("sha512-")
-        assert Path(asar.path).parts[-3:] == ("node_modules", ".bin", "asar")
+        assert Path(asar.path).parts[-3:-1] == ("node_modules", ".bin") and Path(asar.path).stem == "asar"   # asar.cmd on Windows
     node = next(t for t in optional if t.name == "node")
     if node.availability == Availability.INSTALLED:
         assert node.version.startswith("22.")
@@ -140,7 +140,7 @@ def test_inspect_asar_listing_matches_real_asar_cli(backend):
     if cli is None:
         pytest.skip("@electron/asar CLI not installed")
     out = subprocess.run([str(cli), "list", str(ELECTRON / "resources" / "app.asar")], capture_output=True, text=True, check=True, timeout=60).stdout
-    cli_files = {ln.strip().lstrip("/") for ln in out.splitlines() if ln.strip()}
+    cli_files = {ln.strip().replace(chr(92), "/").lstrip("/") for ln in out.splitlines() if ln.strip()}   # Windows CLI prints \paths
     d = backend.inspect(ELECTRON / "resources" / "app.asar").data
     assert d["root_kind"] == "asar"
     inside = {f["path"].split("!/", 1)[1] for f in d["files"]["items"] if "!/" in f["path"]}

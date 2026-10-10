@@ -36,7 +36,12 @@ def deliver(ctx: StageContext) -> dict[str, Any]:
         shutil.rmtree(staging)
     (staging / "source").mkdir(parents=True)
     src = Path(cand["source_dir"])
-    shutil.copytree(src, staging / "source", dirs_exist_ok=True, ignore=shutil.ignore_patterns("target", "node_modules", ".preview-state"))
+    build_dirs = {"csharp": ("bin", "obj"), "java": ("build",)}.get(cand.get("target_language") or "", ())   # build output, not source
+
+    def _ignore(d: str, names: list[str]) -> set[str]:
+        out = set(shutil.ignore_patterns("target", "node_modules", ".preview-state")(d, names))
+        return out | ({n for n in names if n in build_dirs} if Path(d) == src else set())
+    shutil.copytree(src, staging / "source", dirs_exist_ok=True, ignore=_ignore)
     if cand["dist_dir"] and Path(cand["dist_dir"]).exists():
         shutil.copytree(cand["dist_dir"], staging / "dist", dirs_exist_ok=True)
     else:

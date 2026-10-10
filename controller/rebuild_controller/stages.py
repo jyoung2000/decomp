@@ -52,6 +52,8 @@ def register_stages(reg: StageRegistry) -> None:
     reg.add("repair", stage_repair)
     reg.add("implement_loop", stage_implement_loop)
     reg.add("recover_jvm", stage_recover_jvm)
+    from .native_rebuild import stage_native_rebuild
+    reg.add("native_rebuild", stage_native_rebuild)
     reg.add("deliver", stage_deliver)
     from .pipeline import stage_barrier
     reg.add("barrier", stage_barrier)
@@ -598,13 +600,19 @@ def build_candidate_impl(ctx: StageContext, cid: str) -> dict[str, Any]:
     launch = info["launch"]
     if launch["type"] == "web":
         plaunch = {"type": "browser", "root": str(final / launch.get("root", ".")), "entry": launch.get("entry", "index.html")}
+    elif launch["type"] == "dotnet":   # C# rebuild: the SDK's host runs the assembly (the apphost .exe needs a machine-wide runtime)
+        plaunch = {"type": "native", "command": [str(launch.get("dotnet") or "dotnet"), str(final / launch["path"])], "cwd": str(final),
+                   "env": dict(launch.get("env") or {})}
+    elif launch["type"] == "java":
+        plaunch = {"type": "native", "command": [str(launch.get("java") or "java"), "-jar", str(final / launch["jar"])], "cwd": str(final)}
     else:
         plaunch = {"type": "native", "command": [str(final / launch["path"])], "cwd": str(final)}
     feats = st.ledger.list(case["case_id"])
     st.previews.publish(case["case_id"], cid, kind="real", title=f"Candidate r{c['revision']} ({cand['target_language']})", launch=plaunch,
                         available=[f["title"] for f in feats if f["impl_status"] in ("runnable", "in_progress")] or ["runnable build"],
                         incomplete=[f["title"] for f in feats if f["impl_status"] in ("blocked", "unsupported", "planned")],
-                        requirements=["Windows 10/11 x64" if launch["type"] == "exe" else "any modern browser"],
+                        requirements=[{"exe": "Windows 10/11 x64", "dotnet": ".NET 8 runtime (included in the .NET SDK used for the build)",
+                                       "java": "Java runtime (the JDK used for the build)"}.get(launch["type"], "any modern browser")],
                         steps=[f"Try: {f['title']}" for f in feats[:5]], plan_revision=st.plan.current_revision(case["case_id"]))
     st.feedback.mark_stale_for_candidate(case["case_id"], cid)
     st.plan.update_item(st.plan.milestone_id(case["case_id"], "M-BUILD"), status="completed", files=[str(final)])

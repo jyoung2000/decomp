@@ -22,7 +22,7 @@ import { ScenariosTab } from './workspace/Scenarios';
 import { ConsentCard, PERMISSION_RE } from '../components/ConsentCard';
 import { PreflightCard, usePreflight } from '../components/Preflight';
 
-const TARGET: Record<string, string> = { rust: 'Rust', rust_bevy: 'Rust + Bevy', web: 'HTML/CSS/JS', auto: 'Auto' };
+const TARGET: Record<string, string> = { rust: 'Rust', rust_bevy: 'Rust + Bevy', web: 'HTML/CSS/JS', csharp: 'C#', java: 'Java', auto: 'Auto' };
 
 export function WorkspaceView() {
   const { caseId = '' } = useParams();

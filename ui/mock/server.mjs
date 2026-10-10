@@ -913,7 +913,7 @@ async function handle(req, res) {
   // mock-only control + static demo pages (no auth; loopback dev tool)
   if (p.startsWith('/__mock/')) return mockControl(req, res, url);
 
-  const isApi = /^\/(health|events|doctor|capabilities|cases|jobs|evidence|candidates|previews|feedback|connections|routes|budgets|ai|knowledge|settings|hermes|tools)(\/|$)/.test(p);
+  const isApi = /^\/(health|events|doctor|capabilities|cases|jobs|evidence|candidates|previews|feedback|connections|routes|budgets|ai|knowledge|settings|hermes|tools|implementation)(\/|$)/.test(p);
   if (!isApi) {
     if (m === 'GET' && serveStatic(req, res, p)) return;
     return send(res, 404, 'not found');
@@ -950,6 +950,7 @@ async function handle(req, res) {
   }
   if (p === '/doctor') return send(res, 200, doctor(url.searchParams.get('smoke') === '1'));
   if (p === '/capabilities') return send(res, 200, capabilities());
+  if (p === '/implementation/forecast' && m === 'POST') return send(res, 200, forecast(body ?? {}));
   if (p === '/cases' && m === 'GET') return send(res, 200, [...S.cases.values()].map(caseWithCounts).sort((a, b) => b.created_at.localeCompare(a.created_at)));
   if (p === '/cases' && m === 'POST') return createCase(res, body);
 
@@ -1285,6 +1286,8 @@ const DEP_TOOLS = [
   { name: 'gdre', title: 'GDRE Tools', purpose: 'Needed to recover Godot games (.pck files).', size: 42_619_156, requires: [], optional: false },
   { name: 'dotnet-runtime', title: 'Private .NET runtime', purpose: 'Runs the .NET recovery tool.', size: 33_322_727, requires: [], optional: false },
   { name: 'ilspycmd', title: 'ILSpy', purpose: 'Needed to recover .NET programs.', size: 4_183_395, requires: ['dotnet-runtime'], optional: false },
+  { name: 'dotnet-sdk', title: '.NET SDK (private)', purpose: 'Optional. Needed to rebuild .NET programs in C#.', size: 285_157_731, requires: [], optional: true },
+  { name: 'temurin-jdk21', title: 'Private Java 21 (optional)', purpose: 'Optional. Compiles Java rebuilds and runs the optional Ghidra decompiler.', size: 205_073_461, requires: [], optional: true },
   { name: 'rust', title: 'Rust compiler (private)', purpose: 'Needed to build rebuilt programs as Windows .exe files.', size: 159_721_664, requires: [], optional: true },
   { name: 'node', title: 'Node.js (optional)', purpose: 'Optional. Unpacks Electron apps and runs browser behaviour tests.', size: 35_556_852, requires: [], optional: true },
   { name: 'playwright-core', title: 'Browser test library (optional)', purpose: 'Optional. Compares web apps in a browser.', size: 2_208_739, requires: ['node'], optional: true },
@@ -1297,6 +1300,8 @@ function depEmptyQueue() {
 }
 function depNeeds(c) {
   if (c.target_language === 'web') return { required: [], optional: ['node'], profile: 'web', title: 'Web apps' };
+  if (c.target_language === 'csharp') return { required: ['ilspycmd', 'dotnet-sdk'], optional: [], profile: 'dotnet', title: '.NET programs' };
+  if (c.target_language === 'java') return { required: ['temurin-jdk21'], optional: [], profile: 'jvm', title: 'Java programs (.jar)' };
   return { required: ['rizin', 'rust'], optional: [], profile: 'native_pe', title: 'Windows programs (.exe/.dll)' };
 }
 function depOrder(names) {
@@ -1522,9 +1527,40 @@ function createFeedback(res, cid, b) {
   return send(res, 200, f);
 }
 
+// R4: the same states/fields as controller implement.forecast (simplified: no AI route lookups beyond the policy mode).
+const TARGET_TITLES = { rust: 'Rust', rust_bevy: 'Rust + Bevy', web: 'HTML/CSS/JS', csharp: 'C#', java: 'Java', auto: 'Auto' };
+function forecast(b) {
+  const target = b.target_language || 'auto';
+  const profile = b.profile ?? null;
+  const ai = (b.ai_policy?.mode ?? 'no_ai') !== 'no_ai';
+  const nativeFor = { dotnet: 'csharp', jvm: 'java' };
+  const rec = profile ? nativeFor[profile] ?? (profile === 'web' || profile === 'electron' ? 'web' : profile === 'godot' ? 'rust_bevy' : 'rust') : null;
+  const native = target === 'csharp' || target === 'java' ? target : target === 'auto' ? nativeFor[profile] ?? null : null;
+  const base = { can_produce_implementation: false, will_use_ai: false, verifiable: !!(b.launch_profile?.baseline_file || b.launch_profile?.execute_original),
+    details: [], blockers: [], next_actions: [], route: null, max_attempts: 0, budget_usd: null, profile, target_language: target, recommended_target: rec };
+  if (native) {
+    const lang = TARGET_TITLES[native];
+    return { ...base, state: 'native_rebuild', effective_target: native, can_produce_implementation: true, ai_on_failure: ai,
+      summary: `Rebuild in the original language: the ${lang} that ${native === 'csharp' ? 'ILSpy' : 'CFR'} recovers is compiled and checked against the recorded scenarios first, with deterministic fixes before any AI. This is the likely path to a verified rebuild.`,
+      likely_path: `${lang} is the likely path to a verified rebuild for this program.`,
+      details: [ai ? 'Only if scenarios still fail is AI used, to repair just what fails.' : 'No AI: if every scenario passes, no AI is needed at all; anything that still fails is reported.'] };
+  }
+  if (target === 'web') return { ...base, state: 'deterministic_port', effective_target: 'web', can_produce_implementation: true, summary: 'Web project: the recovered site is ported deterministically; no AI is needed to produce a runnable result.' };
+  const out = { ...base, state: ai ? 'ai_ready' : 'scaffold_only', effective_target: target === 'auto' ? rec ?? 'rust' : target, will_use_ai: ai, can_produce_implementation: ai,
+    summary: ai ? 'AI connected: the app will try up to 3 implementation attempts, each built and compared with the recorded original behaviour.'
+      : 'No AI connected: you will get recovered evidence and a Rust scaffold that does not implement the program yet.' };
+  if (rec === 'csharp' || rec === 'java') {
+    out.likely_path = `For a verified rebuild, choose ${TARGET_TITLES[rec]}: the ${TARGET_TITLES[rec]} recovered from this program is rebuilt as-is and checked against the scenarios first. ${TARGET_TITLES[out.effective_target]} is a port, a new program that has to be written (by AI) from scratch.`;
+    out.details.unshift(out.likely_path);
+  } else if (!profile && target === 'auto') {
+    out.likely_path = 'Auto picks the original language when it can: .NET programs are rebuilt in C#, Java programs in Java (compile and check first, AI only for what fails); web apps are ported as-is; other programs get a Rust port.';
+  }
+  return out;
+}
+
 function capabilities() {
   const out = [];
-  const T = ['rust', 'rust_bevy', 'web', 'auto'];
+  const T = ['rust', 'rust_bevy', 'web', 'csharp', 'java', 'auto'];
   const O = ['exe', 'installer', 'portable', 'web', 'pwa'];
   for (const t of T)
     for (const o of O) {
@@ -1533,6 +1569,10 @@ function capabilities() {
       if ((t === 'rust' || t === 'rust_bevy') && (o === 'web' || o === 'pwa')) {
         state = t === 'rust_bevy' && o === 'web' ? 'experimental' : 'unsupported';
         reason = state === 'unsupported' ? 'native Rust targets are not packaged as web apps' : 'Bevy WebAssembly builds are experimental';
+      }
+      if ((t === 'csharp' || t === 'java') && (o === 'web' || o === 'pwa')) {
+        state = 'unsupported';
+        reason = `output type ${o} requires the HTML/CSS/JS target; the ${t === 'csharp' ? 'C#' : 'Java'} target builds a program`;
       }
       if (t === 'web' && (o === 'exe' || o === 'installer')) {
         state = 'unsupported';

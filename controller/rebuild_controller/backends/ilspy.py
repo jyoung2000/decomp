@@ -699,6 +699,20 @@ class ILSpyBackend(BackendAdapter):
             eids.append(eid)
         return OperationResult(ok=True, data=body, evidence_ids=eids, truncated=body["types"]["truncated"])
 
+    def il_listing(self, module_path: Path | str, type_name: str, *, ctx: Any = None, timeout: float = 60) -> str | None:
+        """IL disassembly of one type (``ilspycmd -il -t``). Used to check a decompiled construct against the IL (R4 rules). None when
+        the tool is missing or fails."""
+        exe, ver = self._tool_version()
+        mp = Path(module_path)
+        if exe is None or not ver or not mp.is_file() or not re.fullmatch(r"[\w.`+<>$-]{1,512}", type_name):
+            return None
+        try:
+            r = run_bounded(ctx, [*_argv(exe, self.settings), "--disable-updatecheck", "-il", "-t", type_name, str(mp)], limits=self.settings.limits,
+                            env=_dotnet_env(self.settings), timeout=timeout)
+        except StageError:
+            return None
+        return r.text if r.returncode == 0 else None
+
     def decompile(self, module_path: Path | str, out_dir: Path | str, *, ctx: Any = None, studio: Any = None,
                   case_id: str | None = None, module_id: str | None = None, source_root: Path | str | None = None,
                   timeout: float = 600, language_version: str | None = None, reference_dir: Path | str | None = None,

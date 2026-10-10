@@ -20,7 +20,7 @@ from .. import __version__
 from . import controller_status
 
 ID_RE = re.compile(r"^[a-z]{2,8}_[0-9a-f]{12,40}$")
-LANGUAGES = ("auto", "rust", "rust_bevy", "web")
+LANGUAGES = ("auto", "rust", "rust_bevy", "web", "csharp", "java")
 OUTPUT_TYPES = ("exe", "installer", "portable", "web", "pwa")
 AI_MODES = ("no_ai", "assist_on_failure", "assisted")
 ACTIVE_STATES = {"queued", "running", "blocked"}

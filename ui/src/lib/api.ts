@@ -6,7 +6,7 @@ import type {
   CaseLog, AiActivity, AiPolicy, Ladder, LadderPresetId, ModelCatalogItem, PresetResult,
   IsolationInfo, OriginalConsent, RecordResult, ScenarioList, UserScenario, UserScenarioBody,
   DownloadedModel, HfRepoFiles, HfSearchResult, LocalAiConfig, LocalAiSnapshot, LocalJob, McpClient, McpConfig,
-  DependencyReport, DepQueue, DepSettings, Preflight,
+  DependencyReport, DepQueue, DepSettings, Preflight, ImplementationForecast, OutputType, TargetLanguage,
 } from './types';
 
 /** Error with the controller's three-part explanation: what happened, what is affected, what to do next. */
@@ -94,6 +94,8 @@ export class Api {
     this.get<ControllerEvent[]>(`/events?since=${since}${caseId ? `&case_id=${encodeURIComponent(caseId)}` : ''}`);
   doctor = (smoke = false) => this.get<DoctorReport>(`/doctor?smoke=${smoke ? 1 : 0}`);
   capabilities = () => this.get<Capabilities>('/capabilities');
+  forecast = (b: { target_language: TargetLanguage; output_type: OutputType; ai_policy?: unknown; launch_profile?: unknown; profile?: string | null }) =>
+    this.post<ImplementationForecast>('/implementation/forecast', b);
   toolsSetup = () => this.get<ToolSetupSnapshot>('/tools/setup');
   installTool = (name: string) => this.post<ToolSetupEntry>(`/tools/setup/${encodeURIComponent(name)}/install`);
   installToolFromFile = (name: string, path: string) => this.post<ToolSetupEntry>(`/tools/setup/${encodeURIComponent(name)}/install-from-file`, { path });

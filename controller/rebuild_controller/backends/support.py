@@ -71,7 +71,7 @@ SUPPORT: dict[str, dict[str, Any]] = {
         "title": ".NET assembly", "status": "supported", "backend": "ilspy",
         "can_recover": ["C# source per type from IL metadata (ILSpy), with a per-type recovery report"],
         "cannot_recover": ["original comments and exact formatting", "code that was obfuscated or encrypted (decompiles with error markers)"],
-        "rebuild": "The recovered C# is reference code; the rebuild is a re-implementation judged by the scenario comparator.",
+        "rebuild": "Target C# (Auto default): the recovered C# itself is rebuilt with the .NET SDK after deterministic fixes and judged by the scenario comparator; AI only repairs what still fails. A Rust port is optional.",
         "verification": "fixture dotnetapp (tests/test_ilspy.py)", "blocker": "", "next_action": "",
     },
     "unity_mono": {
@@ -123,7 +123,7 @@ SUPPORT: dict[str, dict[str, Any]] = {
                         "manifest, main class, class file versions, multi-release layout"],
         "cannot_recover": ["comments, original formatting and (when built without -g) real local variable names",
                            "readable code from obfuscated jars", "Kotlin/Scala/Groovy as the original language (output is Java-shaped and may not compile)"],
-        "rebuild": "The recovered Java is reference code (the fixture test recompiles it with javac and replays the frozen scenarios); the delivered rebuild is judged by the scenario comparator against the original.",
+        "rebuild": "Target Java (Auto default): the recovered Java itself is recompiled with javac (--release from the class files) into a jar and judged by the scenario comparator against the original; AI only repairs what still fails.",
         "verification": "fixture javacli (tests/test_jvm.py: CFR decompile + javac recompile + 11/11 oracle scenarios)", "blocker": "",
         "next_action": "Needs a Java runtime for CFR: Temurin JRE from the dependency lock or any JDK/JRE 8+ on PATH.",
     },

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { OriginalRunExplainer, useIsolation } from '../components/ConsentCard';
 import { ErrorCallout } from '../components/ErrorCallout';
@@ -8,14 +8,16 @@ import { PathField } from '../components/PathField';
 import { useToast } from '../components/Toasts';
 import { setSelectedCase } from '../lib/selection';
 import { useApi, useResource } from '../lib/store';
-import type { LaunchKind, NewCaseBody, OutputType, TargetLanguage } from '../lib/types';
+import type { ImplementationForecast, LaunchKind, NewCaseBody, OutputType, TargetLanguage } from '../lib/types';
 import { buildLaunchProfile, comboState, emptyForm, validateNewProject, type FieldError, type NewProjectForm } from '../lib/validate';
 
 const TARGETS: { id: TargetLanguage; label: string; sub: string }[] = [
-  { id: 'rust', label: 'Rust', sub: 'Native code, CLI or desktop' },
-  { id: 'rust_bevy', label: 'Rust + Bevy', sub: 'Games and real-time apps' },
-  { id: 'web', label: 'HTML / CSS / JS', sub: 'Runs in a browser' },
-  { id: 'auto', label: 'Auto', sub: 'Decide after discovery' },
+  { id: 'auto', label: 'Auto', sub: 'Decide after discovery (original language first)' },
+  { id: 'csharp', label: 'C#', sub: '.NET programs: rebuild the recovered C# as-is' },
+  { id: 'java', label: 'Java', sub: 'Java programs (.jar): rebuild the recovered Java as-is' },
+  { id: 'web', label: 'HTML / CSS / JS', sub: 'Web and Electron apps; runs in a browser' },
+  { id: 'rust', label: 'Rust', sub: 'Port: native code, CLI or desktop' },
+  { id: 'rust_bevy', label: 'Rust + Bevy', sub: 'Port: games and real-time apps' },
 ];
 const OUTPUTS: { id: OutputType; label: string; sub: string }[] = [
   { id: 'exe', label: 'Executable', sub: 'Single .exe' },
@@ -52,6 +54,32 @@ export function NewProjectView() {
     const e = err(field);
     return e ? `${e.what} ${e.next}` : null;
   };
+
+  // What this selection will produce, and which target is the likely path to a verified rebuild (POST /implementation/forecast).
+  const [forecast, setForecast] = useState<ImplementationForecast | null>(null);
+  const policyKey = JSON.stringify([f.ai_mode, f.ai_locality, f.budget_usd, f.ai_approve_unknown, f.ai_overrides]);
+  useEffect(() => {
+    if (!f.target_language || !f.output_type) {
+      setForecast(null);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(() => {
+      api
+        .forecast({
+          target_language: f.target_language as TargetLanguage,
+          output_type: f.output_type as OutputType,
+          ai_policy: formToPolicy({ mode: f.ai_mode, locality: f.ai_locality ?? 'any', budget_usd: f.budget_usd, approve_unknown_pricing: !!f.ai_approve_unknown, overrides: f.ai_overrides ?? {} }),
+        })
+        .then((r) => alive && setForecast(r))
+        .catch(() => alive && setForecast(null));
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, f.target_language, f.output_type, policyKey]);
 
   const capsNote = useMemo(() => {
     if (caps.error) return 'The controller did not report which target/output combinations are supported; it will validate the combination when you create the project.';
@@ -188,6 +216,14 @@ export function NewProjectView() {
                 {capsNote ?? 'Combinations the controller marks unsupported are disabled; hover a choice to see why.'}
               </span>
             </div>
+            {forecast && (
+              <div className={`callout ${forecast.state === 'unsupported' ? 'bad' : 'info'}`} role="status" aria-live="polite" data-testid="target-forecast">
+                <div className="ttl">What this target will produce</div>
+                <p className="small">{forecast.summary}</p>
+                {forecast.likely_path && !forecast.summary.includes(forecast.likely_path) && <p className="small" data-testid="likely-path"><strong>{forecast.likely_path}</strong></p>}
+                {forecast.toolchain && !forecast.toolchain.available && forecast.toolchain.message && <p className="small">{forecast.toolchain.message}</p>}
+              </div>
+            )}
           </div>
         </fieldset>
 

@@ -881,7 +881,7 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
                          "user named may be used. launch_profile.execute_original allows running the original program and is refused "
                          "unless the server was started with --allow-execute-original.", read_only=False)
     async def create_case(name: CaseName, source_root: RootPath, output_root: RootPath,
-                          target_language: Literal["rust", "rust_bevy", "web", "auto"] = "auto",
+                          target_language: Literal["rust", "rust_bevy", "web", "csharp", "java", "auto"] = "auto",
                           output_type: Literal["exe", "installer", "portable", "web", "pwa"] = "exe",
                           ai_policy: Optional[AiPolicyIn] = None,
                           launch_profile: Optional[LaunchProfileIn] = None) -> CallToolResult:

@@ -292,7 +292,7 @@ def test_asar_listing_matches_real_cli():
     if cli is None:
         pytest.skip("@electron/asar CLI not installed")
     r = subprocess.run([str(cli), "list", str(REAL_ASAR)], capture_output=True, text=True, check=True, timeout=60)
-    cli_paths = {ln.strip().lstrip("/") for ln in r.stdout.splitlines() if ln.strip()}
+    cli_paths = {ln.strip().replace(chr(92), "/").lstrip("/") for ln in r.stdout.splitlines() if ln.strip()}   # Windows CLI prints \paths
     lst = list_archive(REAL_ASAR, limits=LIM)
     native = {m.name for m in lst.members}
     assert native == cli_paths and lst.format == "asar" and not lst.truncated and lst.declared_entries == len(cli_paths)

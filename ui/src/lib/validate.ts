@@ -85,7 +85,7 @@ export function validateNewProject(f: NewProjectForm, caps?: Capabilities | null
     else if (isInside(f.source_root, f.output_root)) e.push({ field: 'output_root', what: 'The source folder is inside the output folder.', affected: 'Publishing outputs could overwrite or delete original files.', next: 'Choose an output folder that does not contain the source.' });
   }
 
-  if (!f.target_language) e.push({ field: 'target_language', what: 'No target language was selected.', affected: 'Reconstruction and build cannot be planned.', next: 'Pick Rust, Rust + Bevy, HTML/CSS/JS or Auto.' });
+  if (!f.target_language) e.push({ field: 'target_language', what: 'No target language was selected.', affected: 'Reconstruction and build cannot be planned.', next: 'Pick Rust, Rust + Bevy, HTML/CSS/JS, C#, Java or Auto.' });
   if (!f.output_type) e.push({ field: 'output_type', what: 'No output type was selected.', affected: 'The build step does not know what to package.', next: 'Pick an output type.' });
   else {
     const st = comboState(caps, f.target_language, f.output_type);

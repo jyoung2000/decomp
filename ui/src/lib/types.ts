@@ -65,7 +65,26 @@ export interface Job {
   updated_at?: string;
 }
 
-export type TargetLanguage = 'rust' | 'rust_bevy' | 'web' | 'auto';
+export type TargetLanguage = 'rust' | 'rust_bevy' | 'web' | 'csharp' | 'java' | 'auto';
+
+/** POST /implementation/forecast (and `implementation_forecast` on cases): what this selection will produce, in plain words. */
+export interface ImplementationForecast {
+  state: 'scaffold_only' | 'ai_ready' | 'ai_blocked' | 'deterministic_port' | 'native_rebuild' | 'unsupported';
+  summary: string;
+  details: string[];
+  blockers: string[];
+  next_actions?: string[];
+  can_produce_implementation: boolean;
+  will_use_ai: boolean;
+  /** native_rebuild: AI is used only to repair what still fails after the recovered source was built and verified */
+  ai_on_failure?: boolean;
+  verifiable?: boolean;
+  effective_target?: TargetLanguage | null;
+  recommended_target?: TargetLanguage | null;
+  /** which target is the likely path to a verified rebuild, in plain words */
+  likely_path?: string | null;
+  toolchain?: { available: boolean; tool?: string | null; title?: string | null; message?: string } | null;
+}
 export type OutputType = 'exe' | 'installer' | 'portable' | 'web' | 'pwa';
 export type AiMode = 'no_ai' | 'assist_on_failure' | 'assisted' | 'inherit' | 'custom';
 
