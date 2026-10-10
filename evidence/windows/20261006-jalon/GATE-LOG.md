@@ -108,6 +108,7 @@ sha256 was checked against the build each time (last: c1bd68f5… = commit 219dc
 | 4 | project override qwen2.5:14b first, 3 | qwen JSON had an unescaped quote; gemma4 spent 16k tokens thinking, no text; 0/7 | JSON-schema format + think:false (e7287e9) |
 | 5 | same, 6 | attempt 1 built→syntax error; repair refused (17.5k prompt + 16k reserve > 32k) | output reserve shrinks to fit (219dcef) |
 | 6 | same, 6 | all 6 attempts answered (384–543 s each, $0) and were compiled; none compiled cleanly (escape bug ×4, then E0599); 0/7 | — (model capability) |
+| 7 | override qwen2.5-coder:14b (pulled to D:\Ollama\models via the app) first, 6 | every attempt answered (399–459 s, $0); attempt 1 mismatched `}`; attempts 2–5 returned byte-identical main.rs (sha256 d93edee1…) so the same error repeated; attempt 6 changed the code and hit E0277; 0/7 | identical repair answers are not detected → planned in R5 |
 
 Verdict, every run: "Scaffold only: not a working remake", Behavior verified 0 of 7 — delivered and labelled honestly; the
 verifier, not the model, decided. Not achieved: a working .NET → Rust remake with the local models on this RTX 4070 12 GB.
