@@ -494,12 +494,116 @@ function mockFunctionDetail(cid, mid, addrIn, kind, q) {
     return [200, { function: f.name, addr: f.addr, decompiler: fallback ? 'pdc(pseudo)' : 'rz-ghidra(pdg)', is_real_decompiler: !fallback, engine: 'rizin', requested: decompiler,
       decompiled: { untrusted: true, text, truncated: false, total_bytes: text.length }, ...common }];
   }
+  if (kind === 'xrefs') {
+    const limit = Number(q.get('limit') || 200);
+    if (!(limit >= 1 && limit <= 1000)) return [400, { error: { code: 'validation', message: 'limit: Input should be between 1 and 1000', next_action: 'correct the highlighted fields and retry' } }];
+    return [200, { ...mockXrefs(m, f, limit), ...common, cached: false }];
+  }
+  if (kind === 'callgraph') {
+    const direction = q.get('direction') || 'callees';
+    const depth = Number(q.get('depth') || 2);
+    const maxNodes = Number(q.get('max_nodes') || 200);
+    if (!['callees', 'callers', 'both'].includes(direction) || !(depth >= 1 && depth <= 5) || !(maxNodes >= 1 && maxNodes <= 500)) return [400, { error: { code: 'validation', message: 'direction must be callees, callers or both; depth 1..5; max_nodes 1..500', next_action: 'correct the highlighted fields and retry' } }];
+    const g = mockCallGraph(m, f, direction, depth, maxNodes);
+    return [200, { ...g, max_nodes: maxNodes, ...common, truncated: g.node_limit_hit }];
+  }
   const offset = Math.max(0, Number(q.get('offset') || 0));
   const limit = Math.min(2000, Math.max(1, Number(q.get('limit') || 500)));
   const ops = mockOps(f);
   if (f.name === 'main') ops[3] = { ...ops[3], user_comment: 'Splits argv into a command and its options.' };
   const page = ops.slice(offset, offset + limit);
   return [200, { function: f.name, addr: f.addr, ops: page, total: ops.length, offset, returned: page.length, more: offset + limit < ops.length, ...common }];
+}
+// ---- R6 piece 3: references and the bounded call graph. Same shapes as the controller's /xrefs (MCP xrefs_to / xrefs_from with
+// scope=function) and /callgraph (MCP call_graph) routes. InventoryTool.exe: entry0 -> main -> fcn.parse_args -> main is a cycle;
+// main -> the function at index 12 calls 230 functions, so main's graph at depth 2 hits the default 200-function cap.
+function mockCallEdges(m) {
+  S.fnEdges ??= new Map();
+  if (S.fnEdges.has(m.module_id)) return S.fnEdges.get(m.module_id);
+  const rows = mockFunctionRows(m);
+  const by = (i) => rows[i]?._off;
+  const imp = (name) => rows.find((f) => f.name.endsWith(name))?._off;
+  const callees = new Map();
+  const add = (a, ...bs) => { if (a === undefined) return; const l = callees.get(a) ?? []; for (const b of bs) if (b !== undefined && !l.includes(b)) l.push(b); callees.set(a, l); };
+  if (/\.dll$/i.test(m.rel_path)) {
+    add(by(0), by(1));
+    add(by(1), by(2), by(5));
+    add(by(2), by(4), by(3));
+    add(by(4), by(2));                      // ItemStore_Find <-> ItemStore_Open: a cycle
+    for (let i = 6; i < rows.length - 2; i++) add(by(i), by(i + 2));
+  } else {
+    add(by(0), by(1), by(10));
+    add(by(1), by(2), by(3), imp('printf'), by(11), by(12));
+    add(by(2), by(11), imp('malloc'), by(1));   // parse_args -> main: a cycle
+    add(by(3), imp('printf'));
+    add(by(11), by(13), by(14), imp('CreateFileW'), imp('ReadFile'));
+    for (let i = 16; i < 246; i++) add(by(12), by(i));
+    for (let i = 13; i < 16; i++) add(by(i), by(i + 3), i === 15 ? imp('Sleep') : undefined);
+  }
+  S.fnEdges.set(m.module_id, callees);
+  return callees;
+}
+function mockXrefs(m, f, limit) {
+  const rows = mockFunctionRows(m);
+  const at = new Map(rows.map((r) => [r._off, r]));
+  const hx = (v) => '0x' + v.toString(16);
+  const edges = mockCallEdges(m);
+  const to = [];
+  for (const [caller, list] of edges) {
+    const k = list.indexOf(f._off);
+    if (k < 0) continue;
+    const c = at.get(caller);
+    to.push({ from: hx(caller + 0x10 + k * 7), to: f.addr, type: 'CALL', kind: 'call', fcn_addr: c.addr, fcn_name: c.name });
+  }
+  if (f.name === 'main') to.push({ from: '0x14005e010', to: f.addr, type: 'DATA', kind: 'data', fcn_addr: null, fcn_name: null });
+  if (rows.indexOf(f) === 10) to.push({ from: hx(rows[11]._off + 0x30), to: f.addr, type: 'CODE', kind: 'jump', fcn_addr: rows[11].addr, fcn_name: rows[11].name });
+  const from = (edges.get(f._off) ?? []).map((t, k) => {
+    const c = at.get(t);
+    return { from: hx(f._off + 0x10 + k * 7), to: c.addr, type: 'CALL', kind: 'call', to_fcn_addr: c.addr, to_fcn_name: c.name };
+  });
+  if (f.name === 'main') {
+    const strs = ['usage: %s <command> [options]', 'list', 'add', 'unknown command: %s\n', "<script>alert('program text is shown as plain text')</script>"];
+    strs.forEach((t, k) => from.push({ from: hx(f._off + 0x60 + k * 9), to: hx(0x14005a000 + k * 0x40), type: 'DATA', kind: 'string', to_fcn_addr: null, to_fcn_name: null, string: t }));
+    from.push({ from: hx(f._off + 0xa0), to: '0x14005e1a8', type: 'DATA', kind: 'data', to_fcn_addr: null, to_fcn_name: null, name: 'KERNEL32.dll!GetLastError' });
+    from.push({ from: hx(f._off + 0xb0), to: '0x14005c040', type: 'DATA', kind: 'data', to_fcn_addr: null, to_fcn_name: null });
+    from.push({ from: hx(f._off + 0xc0), to: hx(rows[3]._off + 0x10), type: 'CODE', kind: 'jump', to_fcn_addr: rows[3].addr, to_fcn_name: rows[3].name });
+  }
+  const dir = (list, d) => ({ addr: f.addr, direction: d, refs: list.slice(0, limit), total: list.length, more: list.length > limit });
+  return { addr: f.addr, function: f.name, scope: 'function', internal_jumps: f.name.startsWith('sym.imp.') ? 0 : Math.max(1, Math.round(f.nbbs / 2)), to: dir(to, 'to'), from: dir(from, 'from'), limit };
+}
+function mockCallGraph(m, f, direction, depth, maxNodes) {
+  // the controller's breadth-first walk (rizin_worker.op_call_graph): nodes are unique, edges caller -> callee, cut at max_nodes
+  const rows = mockFunctionRows(m);
+  const at = new Map(rows.map((r) => [r._off, r]));
+  const edges = mockCallEdges(m);
+  const callers = new Map();
+  for (const [a, list] of edges) for (const b of list) callers.set(b, [...(callers.get(b) ?? []), a]);
+  const hx = (v) => '0x' + v.toString(16);
+  const nodes = new Map([[f._off, { addr: f.addr, name: f.name, depth: 0 }]]);
+  const seen = new Set();
+  const out = [];
+  let frontier = [f._off], cut = false;
+  for (let d = 1; d <= depth; d++) {
+    const next = [];
+    for (const cur of frontier) {
+      const links = [];
+      if (direction !== 'callers') for (const b of edges.get(cur) ?? []) links.push([cur, b]);
+      if (direction !== 'callees') for (const a of callers.get(cur) ?? []) links.push([a, cur]);
+      for (const [a, b] of links) {
+        const other = a === cur ? b : a;
+        if (!nodes.has(other)) {
+          if (nodes.size >= maxNodes) { cut = true; continue; }
+          nodes.set(other, { addr: hx(other), name: at.get(other)?.name ?? null, depth: d });
+          next.push(other);
+        }
+        const key = a + '>' + b;
+        if (!seen.has(key)) { seen.add(key); out.push([a, b]); }
+      }
+    }
+    frontier = next;
+  }
+  out.sort((x, y) => (x[0] - y[0]) || (x[1] - y[1]));
+  return { root: f.addr, direction, depth, nodes: [...nodes.values()], edges: out.filter(([a, b]) => nodes.has(a) && nodes.has(b)).map(([a, b]) => ({ from: hx(a), to: hx(b) })), node_limit_hit: cut };
 }
 function mockAnnotations(cid, parts, m, body) {
   const mid = parts[1];
@@ -1213,7 +1317,7 @@ async function handle(req, res) {
       return send(res, r[0], r[1]);
     }
     {
-      const fm = /^modules\/([^/]+)\/functions\/([^/]+)(?:\/(decompiled|disassembly))?$/.exec(sub);
+      const fm = /^modules\/([^/]+)\/functions\/([^/]+)(?:\/(decompiled|disassembly|xrefs|callgraph))?$/.exec(sub);
       if (fm && m === 'GET') {
         const r = mockFunctionDetail(cid, fm[1], decodeURIComponent(fm[2]), fm[3] || 'detail', url.searchParams);
         return send(res, r[0], r[1]);

@@ -15,6 +15,7 @@ Design notes
 """
 from __future__ import annotations
 
+import bisect
 import collections
 import hashlib
 import json
@@ -930,6 +931,35 @@ def normalize_target(target: Any) -> str:
     return f"0x{addr:x}" if addr is not None else validate_symbol(target)
 
 
+XREF_KINDS = {"CALL": "call", "CODE": "jump", "DATA": "data", "STRING": "string"}
+XREF_MAX_ROWS = 2000
+XREF_STRING_CHARS = 200
+
+
+def function_owner(funcs: list[dict[str, Any]]) -> Callable[[int], dict[str, Any] | None]:
+    """Address -> the analysed function containing it. rizin 0.9 axtj rows carry no containing function. A function's
+    min..max bound can span unrelated code (one far block makes an 18-byte function cover 23 KB on pecli), so among the
+    functions whose bounds contain the address the one with the nearest entry at or below it wins."""
+    rows = sorted(((f.get("minbound", f["offset"]), f.get("maxbound", f["offset"] + (f.get("size") or 0)), f["offset"], f)
+                   for f in funcs if isinstance(f, dict) and isinstance(f.get("offset"), int)), key=lambda r: r[2])
+    entries = [r[2] for r in rows]
+
+    def owner(x: int) -> dict[str, Any] | None:
+        i = bisect.bisect_right(entries, x)
+        for lo, hi, off, f in reversed(rows[:i]):           # nearest entry at or below x first
+            if lo <= x < hi or off == x:
+                return f
+            if x - off > 0x100000:                           # far away: stop scanning (bounded work per lookup)
+                break
+        for lo, hi, off, f in rows[i:]:                      # entry above x but a block below it (rare)
+            if lo <= x < hi:
+                return f
+            if off - x > 0x100000:
+                break
+        return None
+    return owner
+
+
 # =============================================================================================== pool
 class SessionPool:
     """Sessions keyed by (resolved path, sha256). An idle reaper closes sessions unused for ``idle_timeout`` seconds."""
@@ -1040,7 +1070,7 @@ OPERATIONS = [
     Operation("entrypoints", "Entry points (iej)", {"case_id": "str", "module_id": "str"}, {"entrypoints": "list"}),
     Operation("analyze", "Run analysis (aaa with timeout); cached by module sha + rizin version + settings", {"case_id": "str", "module_id": "str"}, {"analysis": "object"}),
     Operation("functions", "Analysed functions (aflj)", {"case_id": "str", "module_id": "str"}, {"functions": "list"}),
-    Operation("xrefs", "Cross references to/from an address (axtj/axfj)", {"case_id": "str", "module_id": "str", "addr": "str"}, {"to": "list", "from": "list"}),
+    Operation("xrefs", "Cross references to/from an address (axtj/axfj) or a whole function (scope=function: afxj)", {"case_id": "str", "module_id": "str", "addr": "str", "scope": "str"}, {"to": "list", "from": "list"}),
     Operation("callgraph", "Callees (agc json) and callers of a function", {"case_id": "str", "module_id": "str", "function": "str"}, {"callees": "list", "callers": "list"}),
     Operation("disasm", "Function disassembly (pdfj); untrusted", {"case_id": "str", "module_id": "str", "function": "str"}, {"disasm": "object"}),
     Operation("decompile", "Decompile a function: rz-ghidra pdgj if loaded, else labelled pseudo output; untrusted", {"case_id": "str", "module_id": "str", "function": "str"}, {"decompiled": "object"}),
@@ -1377,19 +1407,77 @@ class RizinBackend(BackendAdapter):
         return self._op(ctx, case_id, module_id, op="functions", args={}, analysis=True, untrusted=True,
                         title="Functions (aflj)", body_fn=body)
 
-    def op_xrefs(self, ctx: Any, *, case_id: str, module_id: str, addr: str | int) -> OperationResult:
+    def op_xrefs(self, ctx: Any, *, case_id: str, module_id: str, addr: str | int, scope: str = "address") -> OperationResult:
+        """Cross references of one address (``scope='address'``: axtj/axfj at it) or of a whole function
+        (``scope='function'``: references to its entry, and every reference made from its code (afxj), minus jumps that stay
+        inside it). Each row gets ``kind`` (call | jump | data | string) and the containing function of the referencing
+        address (``fcn_addr``/``fcn_name``) or, for references made from the function, of the target (``to_fcn_*``), plus the
+        import name (``name``) or string text (``string``, clipped) of a data target. At most ``XREF_MAX_ROWS`` rows each."""
         try:
             target = normalize_target(addr)
+            if scope not in ("address", "function"):
+                raise InvalidTarget("scope must be address or function")
         except InvalidTarget as e:
             return OperationResult(ok=False, error=f"invalid target: {e}")
+        strings: dict[int, str] = {}
+        imports: dict[int, str] = {}
+        if scope == "function":         # both cached as evidence (shared with the briefing); a failure only loses labels
+            st = self.op_strings(ctx, case_id=case_id, module_id=module_id, limit=MAX_STRINGS)
+            if st.ok:
+                strings = {x["vaddr"]: str(x.get("string") or "") for x in (st.data or {}).get("strings") or []
+                           if isinstance(x, dict) and isinstance(x.get("vaddr"), int)}
+            im = self.op_imports(ctx, case_id=case_id, module_id=module_id)
+            if im.ok:
+                imports = {x["plt"]: (f"{x['libname']}!" if x.get("libname") else "") + str(x.get("name") or "")
+                           for x in (im.data or {}).get("imports") or [] if isinstance(x, dict) and isinstance(x.get("plt"), int)}
 
         def body(s, poll):
-            a, _ = s.resolve(addr, need_function=False, poll=poll)
+            if scope == "function":
+                _, fn = s.resolve(addr, need_function=True, poll=poll)
+                a = fn["offset"]
+            else:
+                a, fn = s.resolve(addr, need_function=False, poll=poll)
             to, t1 = s.xrefs_to(a, poll)
-            frm, t2 = s.xrefs_from(a, poll)
-            return {"addr": native.hexaddr(a), "to": to or [], "from": frm or []}, t1 or t2, {"address": native.hexaddr(a)}
-        return self._op(ctx, case_id, module_id, op="xrefs", args={"target": target}, analysis=True, untrusted=False,
-                        title=f"Xrefs {target}", body_fn=body)
+            frm, t2 = (s.function_refs if scope == "function" else s.xrefs_from)(a, poll)
+            owner = function_owner(s.cached_functions(poll))
+            internal = 0
+
+            def kind(x: dict[str, Any]) -> str:
+                k = XREF_KINDS.get(str(x.get("type") or "").upper(), "data")
+                return "string" if k == "data" and x.get("to") in strings else k
+
+            to_rows = []
+            for x in to or []:
+                if not isinstance(x, dict) or not isinstance(x.get("from"), int):
+                    continue
+                o = owner(x["from"])
+                to_rows.append({**{k: x[k] for k in ("from", "to", "type", "opcode", "refname") if k in x}, "kind": kind(x),
+                                "fcn_addr": o["offset"] if o else None, "fcn_name": o.get("name") if o else None})
+            from_rows = []
+            for x in frm or []:
+                if not isinstance(x, dict) or not isinstance(x.get("to"), int):
+                    continue
+                o = owner(x["to"])
+                if scope == "function" and x.get("type") == "CODE" and o is not None and o["offset"] == a:
+                    internal += 1           # a jump inside the function: control flow, shown in the disassembly
+                    continue
+                row = {**{k: x[k] for k in ("from", "to", "type", "opcode", "refname") if k in x}, "kind": kind(x),
+                       "to_fcn_addr": o["offset"] if o else None, "to_fcn_name": o.get("name") if o else None}
+                if x["to"] in imports:
+                    row["name"] = imports[x["to"]]
+                if row["kind"] == "string":
+                    row["string"] = native.clip(strings[x["to"]], XREF_STRING_CHARS)
+                from_rows.append(row)
+            over = len(to_rows) > XREF_MAX_ROWS or len(from_rows) > XREF_MAX_ROWS
+            out: dict[str, Any] = {"addr": native.hexaddr(a), "scope": scope, "to": to_rows[:XREF_MAX_ROWS],
+                                   "from": from_rows[:XREF_MAX_ROWS], "to_total": len(to_rows), "from_total": len(from_rows)}
+            if fn:
+                out["function"] = fn.get("name")
+            if scope == "function":
+                out["internal_jumps"] = internal
+            return out, t1 or t2 or over, {"address": native.hexaddr(a)}
+        return self._op(ctx, case_id, module_id, op="xrefs", args={"target": target, "scope": scope, "shape": 2}, analysis=True,
+                        untrusted=True, title=f"Xrefs {target}" + (" (whole function)" if scope == "function" else ""), body_fn=body)
 
     def op_callgraph(self, ctx: Any, *, case_id: str, module_id: str, function: str | int) -> OperationResult:
         try:

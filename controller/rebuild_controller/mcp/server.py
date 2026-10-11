@@ -818,19 +818,6 @@ def _filter(rows: list[Any], contains: Optional[str], keys: tuple[str, ...]) -> 
     return [r for r in rows if isinstance(r, dict) and any(n in str(r.get(k) or "").lower() for k in keys)]
 
 
-def _hexify_refs(rows: list[Any]) -> list[dict[str, Any]]:
-    out = []
-    for r in rows or []:
-        if not isinstance(r, dict):
-            continue
-        x = {k: v for k, v in r.items() if k in ("from", "to", "addr", "type", "perm", "opcode", "fcn_addr", "fcn_name", "refname", "name")}
-        for k in ("from", "to", "addr", "fcn_addr"):
-            if isinstance(x.get(k), int):
-                x[k] = "0x%x" % x[k]
-        out.append(x)
-    return out
-
-
 def _sdk_version() -> str:
     try:
         from importlib.metadata import version
@@ -1080,27 +1067,37 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
             return rt.t_re(session_id, "disassemble", addr=target, count=count, length=length)(s)
         return await run("disassemble", body)
 
-    def _xrefs(direction: str, session_id: str, address: Optional[str], name: Optional[str], limit: int):
+    def _xrefs(direction: str, session_id: str, address: Optional[str], name: Optional[str], limit: int, scope: str):
         def body(s: StudioLike) -> Outcome:
             target = _target(address, name)
 
             def shape(d: dict[str, Any]) -> dict[str, Any]:
-                rows = _hexify_refs(d.get(direction) or [])
-                return {"addr": d.get("addr"), "direction": direction, "refs": rows[:limit], "total": len(rows),
-                        "evidence_ids": d.get("evidence_ids", []), "_truncated": len(rows) > limit}
-            return rt.t_re(session_id, "xrefs", shape, addr=target)(s)
+                # one helper with the app's References view (GET /cases/{c}/modules/{m}/functions/{addr}/xrefs)
+                from ..re_workbench import shape_xrefs
+                p = shape_xrefs(d, direction, limit)
+                out = {"addr": p["addr"], "direction": direction, "scope": d.get("scope", scope), "refs": p["refs"],
+                       "total": p["total"], "evidence_ids": d.get("evidence_ids", []), "_truncated": p["more"]}
+                if d.get("function") is not None:
+                    out["function"] = d["function"]
+                return out
+            return rt.t_re(session_id, "xrefs", shape, addr=target, scope=scope)(s)
         return body
 
-    @spec("xrefs_to", "References TO an address or symbol (who calls/reads/writes it): from, type (CALL/CODE/DATA/STRING), "
-                      "containing function.", read_only=True)
-    async def xrefs_to(session_id: SID, address: Addr = None, name: Name = None,
-                       limit: Annotated[int, Field(ge=1, le=1000)] = 200) -> CallToolResult:
-        return await run("xrefs_to", _xrefs("to", session_id, address, name, limit))
+    XrefScope = Literal["address", "function"]
 
-    @spec("xrefs_from", "References FROM an address (the instruction or data at it) to other addresses.", read_only=True)
+    @spec("xrefs_to", "References TO an address or symbol (who calls/reads/writes it): from, type (CALL/CODE/DATA/STRING), "
+                      "kind (call/jump/data/string), containing function (fcn_addr, fcn_name). scope=function resolves the "
+                      "function containing the address and lists references to its entry.", read_only=True)
+    async def xrefs_to(session_id: SID, address: Addr = None, name: Name = None,
+                       limit: Annotated[int, Field(ge=1, le=1000)] = 200, scope: XrefScope = "address") -> CallToolResult:
+        return await run("xrefs_to", _xrefs("to", session_id, address, name, limit, scope))
+
+    @spec("xrefs_from", "References FROM an address (the instruction or data at it) to other addresses. scope=function lists "
+                        "every reference made from the whole function's code (calls, outside jumps, data, strings with their "
+                        "text, imports by name) with the target's function (to_fcn_addr, to_fcn_name).", read_only=True)
     async def xrefs_from(session_id: SID, address: Addr = None, name: Name = None,
-                         limit: Annotated[int, Field(ge=1, le=1000)] = 200) -> CallToolResult:
-        return await run("xrefs_from", _xrefs("from", session_id, address, name, limit))
+                         limit: Annotated[int, Field(ge=1, le=1000)] = 200, scope: XrefScope = "address") -> CallToolResult:
+        return await run("xrefs_from", _xrefs("from", session_id, address, name, limit, scope))
 
     @spec("call_graph", "Bounded call graph from one function (breadth-first): callees, callers or both; depth 1..5; at most "
                         "max_nodes nodes (node_limit_hit=true when cut).", read_only=True)

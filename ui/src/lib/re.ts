@@ -152,3 +152,135 @@ export const reFunctionApi = (api: Api) => {
       api.get<DisasmPage>(`${base(caseId, moduleId, addr)}/disassembly?offset=${offset}&limit=${limit}`),
   };
 };
+
+// ---- piece 3: references and the bounded call graph of one function. Same workbench calls and shaping as the MCP xrefs_to /
+// xrefs_from tools with scope=function (re_workbench.shape_xrefs) and call_graph. Names and string text are untrusted program data.
+export type RefKind = 'call' | 'jump' | 'data' | 'string';
+
+export interface XrefRow {
+  /** the referencing instruction (or data) address */
+  from: string;
+  /** the referenced address */
+  to: string;
+  type?: string;
+  kind: RefKind;
+  /** "Called from": the function containing `from` */
+  fcn_addr?: string | null;
+  fcn_name?: string | null;
+  /** "Calls / uses": the function containing `to` */
+  to_fcn_addr?: string | null;
+  to_fcn_name?: string | null;
+  /** import name of a data target (library!name) */
+  name?: string;
+  /** text of a string target (clipped by the controller) */
+  string?: string;
+}
+
+export interface XrefDirection {
+  addr: string;
+  direction: 'to' | 'from';
+  refs: XrefRow[];
+  total: number;
+  more: boolean;
+}
+
+export interface FunctionXrefs {
+  addr: string;
+  function?: string | null;
+  /** jumps that stay inside the function (not listed; they are control flow) */
+  internal_jumps: number;
+  to: XrefDirection;
+  from: XrefDirection;
+  limit: number;
+  truncated?: boolean;
+  untrusted: true;
+}
+
+export type GraphDirection = 'callees' | 'callers' | 'both';
+
+export interface CallGraphNode {
+  addr: string;
+  name?: string | null;
+  depth: number;
+}
+
+export interface CallGraph {
+  root: string;
+  direction: GraphDirection;
+  depth: number;
+  max_nodes: number;
+  nodes: CallGraphNode[];
+  /** caller -> callee */
+  edges: { from: string; to: string }[];
+  node_limit_hit: boolean;
+  truncated?: boolean;
+  untrusted: true;
+}
+
+export const XREF_LIMIT = 200;
+export const XREF_LIMIT_MAX = 1000;
+export const GRAPH_NODE_CAPS = [50, 100, 200, 500];
+
+export const reRefsApi = (api: Api) => {
+  const base = (c: string, m: string, a: string) => `/cases/${enc(c)}/modules/${enc(m)}/functions/${enc(a)}`;
+  return {
+    xrefs: (caseId: string, moduleId: string, addr: string, limit = XREF_LIMIT) =>
+      api.get<FunctionXrefs>(`${base(caseId, moduleId, addr)}/xrefs?limit=${limit}`),
+    callGraph: (caseId: string, moduleId: string, addr: string, q: { direction: GraphDirection; depth: number; maxNodes: number }) =>
+      api.get<CallGraph>(`${base(caseId, moduleId, addr)}/callgraph?direction=${q.direction}&depth=${q.depth}&max_nodes=${q.maxNodes}`),
+  };
+};
+
+/** One item of the call-graph tree. A function is expanded once, at its shallowest place; later places are leaves marked
+ * `repeat: 'cycle'` (it is one of its own ancestors: the calls loop back) or `repeat: 'seen'` (expanded elsewhere). This keeps
+ * the tree no larger than the graph's nodes + edges, even with cycles and diamonds. With direction 'both' an item's children
+ * are what it calls and what calls it, each labelled by `relation` (the edge it came through is not repeated backwards). */
+export interface CallTreeNode {
+  id: string;
+  addr: string;
+  name: string | null;
+  /** how this item relates to its parent: the parent calls it, or it calls the parent */
+  relation?: 'calls' | 'called-by';
+  repeat?: 'cycle' | 'seen';
+  /** at the requested depth: its own calls/callers were not followed */
+  frontier?: boolean;
+  children: CallTreeNode[];
+}
+
+export function buildCallTree(g: CallGraph): CallTreeNode {
+  const names = new Map(g.nodes.map((n) => [n.addr, n.name ?? null]));
+  const depthOf = new Map(g.nodes.map((n) => [n.addr, n.depth]));
+  const callees = new Map<string, string[]>();
+  const callers = new Map<string, string[]>();
+  for (const e of g.edges) {
+    callees.set(e.from, [...(callees.get(e.from) ?? []), e.to]);
+    callers.set(e.to, [...(callers.get(e.to) ?? []), e.from]);
+  }
+  const root: CallTreeNode = { id: g.root, addr: g.root, name: names.get(g.root) ?? null, children: [] };
+  const expanded = new Set([g.root]);
+  const queue: { node: CallTreeNode; ancestors: Set<string>; parent?: string }[] = [{ node: root, ancestors: new Set([g.root]) }];
+  while (queue.length) {
+    const { node, ancestors, parent } = queue.shift()!;
+    const links: { addr: string; relation: 'calls' | 'called-by' }[] = [];
+    if (g.direction !== 'callers')
+      for (const a of callees.get(node.addr) ?? []) if (!(node.relation === 'called-by' && a === parent)) links.push({ addr: a, relation: 'calls' });
+    if (g.direction !== 'callees')
+      for (const a of callers.get(node.addr) ?? []) if (!(node.relation === 'calls' && a === parent)) links.push({ addr: a, relation: 'called-by' });
+    for (const { addr, relation } of links) {
+      const child: CallTreeNode = { id: `${node.id}>${relation === 'calls' ? '' : '<'}${addr}`, addr, name: names.get(addr) ?? null, relation, children: [] };
+      if (ancestors.has(addr)) child.repeat = 'cycle';
+      else if (expanded.has(addr)) child.repeat = 'seen';
+      else {
+        expanded.add(addr);
+        queue.push({ node: child, ancestors: new Set([...ancestors, addr]), parent: node.addr });
+      }
+      node.children.push(child);
+    }
+  }
+  const mark = (n: CallTreeNode) => {
+    if (!n.repeat && !n.children.length && depthOf.get(n.addr) === g.depth) n.frontier = true;
+    n.children.forEach(mark);
+  };
+  root.children.forEach(mark);
+  return root;
+}

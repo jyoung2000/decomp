@@ -6,31 +6,14 @@ import { LocalTabs } from '../../components/Tabs';
 import { ApiError } from '../../lib/api';
 import { DISASM_PAGE, reFunctionApi, type Decompiled, type Decompiler, type DecompilerInfo, type DisasmPage, type FunctionDetail } from '../../lib/re';
 import { useApi } from '../../lib/store';
+import { CallGraphView, DEFAULT_GRAPH, ReferencesView, type FnNav, type GraphSettings } from './FunctionRefs';
+import { useLoad } from './useLoad';
 
-export type CodeView = 'decompiled' | 'disassembly';
+export type CodeView = 'decompiled' | 'disassembly' | 'references' | 'callgraph';
+export const CODE_VIEWS: CodeView[] = ['decompiled', 'disassembly', 'references', 'callgraph'];
 
 const n = (v: number) => v.toLocaleString('en-US');
 const bytes = (v: number) => `${n(v)} byte${v === 1 ? '' : 's'}`;
-
-/** Loads one request keyed by `key`; stale answers (an older selection) are dropped. */
-function useLoad<T>(key: string, load: () => Promise<T>) {
-  const [state, setState] = useState<{ key: string; data?: T; error?: unknown } | null>(null);
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    let alive = true;
-    setState(null);
-    load().then(
-      (data) => alive && setState({ key, data }),
-      (error) => alive && setState({ key, error }),
-    );
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, tick]);
-  const current = state && state.key === key ? state : null;
-  return { data: current?.data, error: current?.error, loading: !current, reload: () => setTick((t) => t + 1) };
-}
 
 function CopyButton({ text, what, testId }: { text: string; what: string; testId: string }) {
   const [msg, setMsg] = useState('');
@@ -58,8 +41,17 @@ function CopyButton({ text, what, testId }: { text: string; what: string; testId
   );
 }
 
-/** R6 piece 2: the side pane of the function selected in the Functions table — header, decompiled code (rizin or Ghidra)
- * and disassembly. All text is binary-derived and untrusted: it is rendered as plain text, never as HTML. */
+/** Back/Forward inside the pane: the functions opened in it, newest last. */
+export interface PaneHistory {
+  canBack: boolean;
+  canForward: boolean;
+  back: () => void;
+  forward: () => void;
+}
+
+/** R6 side pane of the function selected in the Functions table — header, decompiled code (rizin or Ghidra), disassembly
+ * (piece 2), references and a bounded call graph (piece 3; links select another function, with Back/Forward). All text is
+ * binary-derived and untrusted: it is rendered as plain text, never as HTML. */
 export function FunctionPane({
   caseId,
   moduleId,
@@ -69,6 +61,8 @@ export function FunctionPane({
   onView,
   onDecompiler,
   onClose,
+  nav,
+  history,
 }: {
   caseId: string;
   moduleId: string;
@@ -78,29 +72,66 @@ export function FunctionPane({
   onView: (v: CodeView) => void;
   onDecompiler: (d: Decompiler) => void;
   onClose: () => void;
+  nav: FnNav;
+  history: PaneHistory;
 }) {
   const api = useApi();
   const re = useMemo(() => reFunctionApi(api), [api]);
   const detail = useLoad<FunctionDetail>(`${moduleId}|${addr}`, () => re.detail(caseId, moduleId, addr));
   const paneRef = useRef<HTMLElement>(null);
+  const headRef = useRef<HTMLHeadingElement>(null);
+  const [graph, setGraph] = useState<GraphSettings>(DEFAULT_GRAPH);
+  const [announce, setAnnounce] = useState('');
+  const firstAddr = useRef(addr);
+
+  // moving to another function from inside the pane (a link, Enter in the call graph, Back/Forward) puts focus on its name
+  useEffect(() => {
+    if (addr === firstAddr.current) return;
+    firstAddr.current = addr;
+    const active = document.activeElement as HTMLElement | null;
+    if (active?.classList.contains('fn-hist') && !(active as HTMLButtonElement).disabled) return;   // repeated Back/Forward
+    if (!active || active === document.body || paneRef.current?.contains(active)) headRef.current?.focus();
+  }, [addr]);
+  const h = detail.data?.header;
+  useEffect(() => {
+    if (h) setAnnounce(`Function ${h.name} at ${h.addr}.`);
+  }, [h]);
 
   const onKey = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
       onClose();
+    } else if (e.altKey && e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (history.canBack) history.back();
+      else setAnnounce('No earlier function in this pane.');
+    } else if (e.altKey && e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (history.canForward) history.forward();
+      else setAnnounce('No later function in this pane.');
     }
   };
-  const h = detail.data?.header;
   return (
     <section ref={paneRef} className="fn-pane card" aria-labelledby="fn-pane-h" onKeyDown={onKey} data-testid="fn-pane">
       <div className="row fn-pane-head">
-        <h3 id="fn-pane-h" className="mono wrap-any" data-testid="fn-pane-name">
+        <h3 id="fn-pane-h" ref={headRef} tabIndex={-1} className="mono wrap-any" data-testid="fn-pane-name">
           {h?.name ?? addr}
         </h3>
-        <button type="button" className="btn sm" onClick={onClose} aria-label="Close the function pane (Escape)" data-testid="fn-pane-close">
-          ✕ Close
-        </button>
+        <div className="row fn-pane-actions">
+          <button type="button" className="btn sm fn-hist" onClick={history.back} disabled={!history.canBack} data-tooltip={history.canBack ? 'Alt+Left' : 'No earlier function opened in this pane'} aria-label="Back to the previous function (Alt+Left)" aria-keyshortcuts="Alt+ArrowLeft" data-testid="fn-back">
+            ‹ Back
+          </button>
+          <button type="button" className="btn sm fn-hist" onClick={history.forward} disabled={!history.canForward} data-tooltip={history.canForward ? 'Alt+Right' : 'No later function: go Back first'} aria-label="Forward to the next function (Alt+Right)" aria-keyshortcuts="Alt+ArrowRight" data-testid="fn-forward">
+            Forward ›
+          </button>
+          <button type="button" className="btn sm" onClick={onClose} aria-label="Close the function pane (Escape)" data-testid="fn-pane-close">
+            ✕ Close
+          </button>
+        </div>
+      </div>
+      <div className="sr-only" role="status" aria-live="polite" data-testid="fn-pane-announce">
+        {announce}
       </div>
       {detail.error ? (
         <ErrorCallout error={detail.error} title="This function could not be opened" onRetry={detail.reload} />
@@ -138,17 +169,24 @@ export function FunctionPane({
         tabs={[
           { id: 'decompiled', label: 'Decompiled' },
           { id: 'disassembly', label: 'Disassembly' },
+          { id: 'references', label: 'References' },
+          { id: 'callgraph', label: 'Call graph' },
         ]}
       />
       <div role="tabpanel" id={`panel-${view}`} aria-labelledby={`tab-${view}`} className="fn-panel">
         {view === 'decompiled' ? (
           <DecompiledView key={`${addr}|${decompiler}`} caseId={caseId} moduleId={moduleId} addr={addr} decompiler={decompiler} decompilers={detail.data?.decompilers} onDecompiler={onDecompiler} />
-        ) : (
+        ) : view === 'disassembly' ? (
           <DisassemblyView key={addr} caseId={caseId} moduleId={moduleId} addr={addr} />
+        ) : view === 'references' ? (
+          <ReferencesView key={addr} caseId={caseId} moduleId={moduleId} addr={addr} nav={nav} />
+        ) : (
+          <CallGraphView key={addr} caseId={caseId} moduleId={moduleId} addr={addr} nav={nav} settings={graph} onSettings={setGraph} />
         )}
       </div>
       <p className="xs muted">
-        Names, code and comments here come from the analysed program and are shown as plain text. Escape closes this pane.
+        Names, code, strings and comments here come from the analysed program and are shown as plain text. Escape closes this pane; Alt+Left and Alt+Right go back and forward
+        between the functions opened in it.
       </p>
     </section>
   );

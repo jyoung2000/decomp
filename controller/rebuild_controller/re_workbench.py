@@ -330,3 +330,34 @@ def page_disasm(data: dict[str, Any], offset: int, limit: int) -> dict[str, Any]
     page = ops[offset:offset + limit]
     return {"function": data.get("function"), "addr": data.get("addr"), "ops": page, "total": len(ops), "offset": offset,
             "returned": len(page), "more": offset + limit < len(ops)}
+
+
+# ---------------------------------------------------------------------- cross references (shared by MCP xrefs_to/xrefs_from and the app; R6 piece 3)
+XREF_ROW_FIELDS = ("from", "to", "addr", "type", "kind", "perm", "opcode", "fcn_addr", "fcn_name", "to_fcn_addr", "to_fcn_name",
+                   "refname", "name", "string")
+XREF_LIMIT_MAX = 1000
+XREF_SCOPES = ("address", "function")
+
+
+def hexify_refs(rows: list[Any]) -> list[dict[str, Any]]:
+    """Rows of ``op_xrefs`` with a fixed field set and addresses as 0x-hex strings."""
+    out = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        x = {k: r[k] for k in XREF_ROW_FIELDS if k in r}
+        for k in ("from", "to", "addr", "fcn_addr", "to_fcn_addr"):
+            if isinstance(x.get(k), int):
+                x[k] = "0x%x" % x[k]
+        out.append(x)
+    return out
+
+
+def shape_xrefs(data: dict[str, Any], direction: str, limit: int) -> dict[str, Any]:
+    """One direction (``to`` = references to it, ``from`` = references it makes) of ``op_xrefs`` output, at most ``limit``
+    rows: ``{addr, direction, refs, total, more}``. ``total`` counts rows the backend dropped at its own cap too."""
+    if direction not in ("to", "from") or not 1 <= int(limit) <= XREF_LIMIT_MAX:
+        raise WorkbenchError("rejected", f"direction must be to or from and limit 1..{XREF_LIMIT_MAX}.", "")
+    rows = hexify_refs(list(data.get(direction) or []))
+    total = max(len(rows), int(data.get(f"{direction}_total") or 0))
+    return {"addr": data.get("addr"), "direction": direction, "refs": rows[:limit], "total": total, "more": total > limit}

@@ -357,3 +357,182 @@ def test_function_detail_routes_on_pecli_match_the_mcp_tools(studio, tmp_path):
 
     r = c.get(f"{base}/0x10/decompiled")
     assert r.status_code == 404 and r.json()["error"]["code"] == "function_not_found"
+
+
+# =============================================================================================== piece 3: references + call graph
+XREFS = {"addr": "0x401000", "scope": "function", "function": "entry0", "internal_jumps": 4, "to_total": 3, "from_total": 4,
+         "to": [{"from": 0x402010, "to": 0x401000, "type": "CALL", "kind": "call", "fcn_addr": 0x402000, "fcn_name": "main"},
+                {"from": 0x403020, "to": 0x401000, "type": "CODE", "kind": "jump", "fcn_addr": 0x403000, "fcn_name": "thunk"},
+                {"from": 0x405000, "to": 0x401000, "type": "DATA", "kind": "data", "fcn_addr": None, "fcn_name": None, "secret": 1}],
+         "from": [{"from": 0x401004, "to": 0x402000, "type": "CALL", "kind": "call", "to_fcn_addr": 0x402000, "to_fcn_name": "main"},
+                  {"from": 0x401008, "to": 0x406000, "type": "DATA", "kind": "string", "to_fcn_addr": None, "to_fcn_name": None,
+                   "string": "<b>hello</b>"},
+                  {"from": 0x40100c, "to": 0x407000, "type": "DATA", "kind": "data", "to_fcn_addr": None, "to_fcn_name": None,
+                   "name": "KERNEL32.dll!ExitProcess"},
+                  {"from": 0x401010, "to": 0x404000, "type": "CODE", "kind": "jump", "to_fcn_addr": 0x404000, "to_fcn_name": "tail"}]}
+# entry0 -> main -> entry0 is a cycle; the cap cut a branch under main
+GRAPH = {"root": "0x401000", "direction": "callees", "depth": 3, "node_limit_hit": True,
+         "nodes": [{"addr": "0x401000", "name": "entry0", "depth": 0}, {"addr": "0x402000", "name": "main", "depth": 1},
+                   {"addr": "0x404000", "name": "tail", "depth": 1}],
+         "edges": [{"from": "0x401000", "to": "0x402000"}, {"from": "0x401000", "to": "0x404000"},
+                   {"from": "0x402000", "to": "0x401000"}]}
+
+
+class XrefBackend(DetailBackend):
+    def __init__(self):
+        super().__init__()
+        self.xref_calls: list[tuple[str, str]] = []
+        self.graph_calls: list[dict] = []
+
+    def op_xrefs(self, ctx, *, case_id, module_id, addr, scope="address"):
+        self.xref_calls.append((addr, scope))
+        if addr != "0x401000":
+            return OperationResult(ok=False, error=f"invalid target: no analysed function contains {addr}")
+        return OperationResult(ok=True, data={**json.loads(json.dumps(XREFS)), "cached": False}, evidence_ids=["ev_x"])
+
+    def op_call_graph(self, ctx, *, case_id, module_id, function, depth=2, direction="callees", max_nodes=200):
+        self.graph_calls.append({"function": function, "depth": depth, "direction": direction, "max_nodes": max_nodes})
+        return OperationResult(ok=True, data={**json.loads(json.dumps(GRAPH)), "direction": direction, "depth": depth,
+                                              "cached": True}, evidence_ids=["ev_g"], truncated=True)
+
+
+def test_shape_xrefs_hexifies_keeps_fixed_fields_and_caps():
+    from rebuild_controller.re_workbench import shape_xrefs
+    p = shape_xrefs(XREFS, "to", 2)
+    assert p["total"] == 3 and p["more"] is True and len(p["refs"]) == 2 and p["direction"] == "to"
+    assert p["refs"][0] == {"from": "0x402010", "to": "0x401000", "type": "CALL", "kind": "call", "fcn_addr": "0x402000",
+                            "fcn_name": "main"}
+    assert "secret" not in shape_xrefs(XREFS, "to", 10)["refs"][2]
+    f = shape_xrefs(XREFS, "from", 10)["refs"]
+    assert f[1]["string"] == "<b>hello</b>" and f[2]["name"] == "KERNEL32.dll!ExitProcess" and f[3]["to_fcn_addr"] == "0x404000"
+    # the backend's own cap: total reports what it saw, more is set
+    capped = shape_xrefs({**XREFS, "to_total": 2500}, "to", 1000)
+    assert capped["total"] == 2500 and capped["more"] is True
+    with pytest.raises(WorkbenchError):
+        shape_xrefs(XREFS, "sideways", 1)
+    with pytest.raises(WorkbenchError):
+        shape_xrefs(XREFS, "to", 0)
+
+
+def test_xrefs_and_call_graph_routes(studio, tmp_path, monkeypatch):
+    case = _case(studio, tmp_path)
+    mid = studio.cases.add_module(case["case_id"], "a.exe", "0" * 64, 66, "pe", "native_pe")
+    fake = XrefBackend()
+    monkeypatch.setattr(studio.re, "backend", lambda: fake)
+    c = _client(studio)
+    base = f"/cases/{case['case_id']}/modules/{mid}/functions"
+    r = c.get(f"{base}/401000/xrefs")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "not_analyzed" and fake.xref_calls == []
+    assert c.get(f"{base}/401000/callgraph").json()["error"]["code"] == "not_analyzed" and fake.graph_calls == []
+    studio.cases.add_evidence(case["case_id"], "native.functions", "functions", body={"functions": []}, module_id=mid)
+
+    r = c.get(f"{base}/401000/xrefs", params={"limit": 2})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert fake.xref_calls[-1] == ("0x401000", "function")
+    assert d["function"] == "entry0" and d["addr"] == "0x401000" and d["internal_jumps"] == 4 and d["limit"] == 2
+    assert d["to"]["total"] == 3 and d["to"]["more"] is True and [x["kind"] for x in d["to"]["refs"]] == ["call", "jump"]
+    assert d["to"]["refs"][0]["fcn_name"] == "main" and d["to"]["refs"][0]["from"] == "0x402010"
+    assert d["from"]["total"] == 4 and d["from"]["refs"][1]["string"] == "<b>hello</b>"         # plain text in JSON
+    assert d["untrusted"] is True and d["note"] and d["evidence_ids"] == ["ev_x"] and d["session_id"].startswith("res_")
+    assert c.get(f"{base}/401000/xrefs", params={"limit": 1001}).status_code == 400
+    nf = c.get(f"{base}/0x10/xrefs")
+    assert nf.status_code == 404 and nf.json()["error"]["code"] == "function_not_found" and nf.json()["error"]["next_action"]
+    assert c.get(f"{base}/zz/xrefs").status_code == 400
+
+    g = c.get(f"{base}/0x401000/callgraph", params={"direction": "both", "depth": 3, "max_nodes": 3})
+    assert g.status_code == 200, g.text
+    gd = g.json()
+    assert fake.graph_calls[-1] == {"function": "0x401000", "depth": 3, "direction": "both", "max_nodes": 3}
+    assert gd["node_limit_hit"] is True and gd["truncated"] is True and gd["cached"] is True and gd["max_nodes"] == 3
+    assert {"from": "0x402000", "to": "0x401000"} in gd["edges"]                                 # the cycle edge is kept
+    assert len({n["addr"] for n in gd["nodes"]}) == len(gd["nodes"]) == 3
+    assert gd["untrusted"] is True and gd["root"] == "0x401000"
+    assert c.get(f"{base}/0x401000/callgraph").json()["direction"] == "callees"                  # defaults
+    assert fake.graph_calls[-1] == {"function": "0x401000", "depth": 2, "direction": "callees", "max_nodes": 200}
+    for bad in ({"depth": 0}, {"depth": 6}, {"max_nodes": 0}, {"max_nodes": 501}, {"direction": "up"}):
+        assert c.get(f"{base}/0x401000/callgraph", params=bad).status_code == 400, bad
+
+
+def test_xrefs_routes_refuse_non_native(studio, tmp_path):
+    case = _case(studio, tmp_path)
+    mid = studio.cases.add_module(case["case_id"], "App.dll", "1" * 64, 10, "pe", "dotnet")
+    c = _client(studio)
+    for tail in ("xrefs", "callgraph"):
+        r = c.get(f"/cases/{case['case_id']}/modules/{mid}/functions/0x401000/{tail}")
+        assert r.status_code == 409 and r.json()["error"]["code"] == "not_native"
+
+
+@pytest.mark.skipif(not _rizin() or not PECLI.is_file(), reason="needs rizin (REBUILD_STUDIO_TOOLS) and the pecli fixture")
+def test_xrefs_and_call_graph_routes_on_pecli_match_the_mcp_tools(studio, tmp_path):
+    import anyio
+    pytest.importorskip("mcp")
+    from mcp import Client
+    from rebuild_controller.ids import sha256_file
+    from rebuild_controller.mcp.server import ServerConfig, build_server
+
+    src = tmp_path / "src"
+    src.mkdir()
+    shutil.copy2(PECLI, src / "pecli.exe")
+    case = _case(studio, tmp_path, src)
+    mid = studio.cases.add_module(case["case_id"], "pecli.exe", sha256_file(src / "pecli.exe"), (src / "pecli.exe").stat().st_size,
+                                  "pe", "native_pe")
+    c = _client(studio)
+    base = f"/cases/{case['case_id']}/modules/{mid}/functions"
+    assert c.get(f"{base}/0x140001190/xrefs").json()["error"]["code"] == "not_analyzed"
+    sid = c.get(base, params={"analyze": "true", "limit": 1}).json()["session_id"]
+
+    async def mcp(tool, args):
+        async with Client(build_server(studio, ServerConfig(toolset="re"))) as cl:
+            res = await cl.call_tool(tool, {"session_id": sid, **args})
+        body = json.loads(res.content[0].text)
+        assert body["ok"], (tool, args, body)
+        return body
+
+    # 0x140001190 is called twice from one function; an address inside it resolves to the same function
+    x = c.get(f"{base}/0x140001190/xrefs")
+    assert x.status_code == 200, x.text
+    x = x.json()
+    assert x["addr"] == "0x140001190" and x["session_id"] == sid and x["untrusted"] is True
+    callers = [r for r in x["to"]["refs"] if r["kind"] == "call"]
+    assert {r["from"] for r in callers} == {"0x1400013f5", "0x140001425"}
+    assert all(r["fcn_addr"] and r["fcn_name"] and int(r["fcn_addr"], 16) <= int(r["from"], 16) for r in callers)
+    kinds = {r["kind"] for r in x["from"]["refs"]}
+    assert "call" in kinds and kinds <= {"call", "jump", "data", "string"}
+    assert x["internal_jumps"] > 0                                     # jumps inside the function are left to the disassembly
+    calls = [r for r in x["from"]["refs"] if r["kind"] == "call"]
+    assert any(r["to_fcn_name"] for r in calls)
+    inner = c.get(f"{base}/0x1400011b4/xrefs").json()
+    assert inner["addr"] == "0x140001190" and inner["to"] == x["to"] and inner["from"] == x["from"]
+
+    for fn in ("0x140001190", "0x140001440", "0x140002b70"):
+        h = c.get(f"{base}/{fn}/xrefs", params={"limit": 1000}).json()
+        for direction, tool in (("to", "xrefs_to"), ("from", "xrefs_from")):
+            m = _unwrap(anyio.run(mcp, tool, {"address": fn, "scope": "function", "limit": 1000})["data"])
+            assert m["refs"] == h[direction]["refs"], (fn, direction)
+            assert m["total"] == h[direction]["total"] and m["addr"] == h["addr"] and m["scope"] == "function", (fn, direction)
+        small = c.get(f"{base}/{fn}/xrefs", params={"limit": 1}).json()
+        assert small["from"]["refs"] == h["from"]["refs"][:1] and small["from"]["more"] == (h["from"]["total"] > 1)
+    # the MCP default (scope=address) is unchanged: references of the one address only
+    one = _unwrap(anyio.run(mcp, "xrefs_from", {"address": "0x140001190"})["data"])
+    assert one["scope"] == "address" and len(one["refs"]) < x["from"]["total"]
+
+    for args in ({}, {"direction": "callers", "depth": 1}, {"direction": "both", "depth": 3, "max_nodes": 40},
+                 {"direction": "callees", "depth": 5, "max_nodes": 5}):
+        fn = "0x140001190"
+        h = c.get(f"{base}/{fn}/callgraph", params=args)
+        assert h.status_code == 200, h.text
+        h = h.json()
+        m = _unwrap(anyio.run(mcp, "call_graph", {"address": fn, **args})["data"])
+        for k in ("root", "direction", "depth", "nodes", "edges", "node_limit_hit"):
+            assert m[k] == h[k], (args, k)
+        addrs = [n["addr"] for n in h["nodes"]]
+        assert len(addrs) == len(set(addrs)) <= h["max_nodes"] and h["root"] == fn == addrs[0]
+        assert all(e["from"] in addrs and e["to"] in addrs for e in h["edges"])
+        assert all(0 <= n["depth"] <= h["depth"] for n in h["nodes"])
+    capped = c.get(f"{base}/0x140001190/callgraph", params={"depth": 5, "max_nodes": 2}).json()
+    assert capped["node_limit_hit"] is True and capped["truncated"] is True and len(capped["nodes"]) == 2
+    # both directions from a callee: its caller appears and the edge back to the root is not duplicated
+    both = c.get(f"{base}/0x140001440/callgraph", params={"direction": "both", "depth": 2}).json()
+    pairs = [(e["from"], e["to"]) for e in both["edges"]]
+    assert len(pairs) == len(set(pairs)) and any(t == "0x140001440" for _, t in pairs)

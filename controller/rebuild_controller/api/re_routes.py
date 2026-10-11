@@ -1,16 +1,20 @@
 """R6 RE workbench in the app.
 
 Piece 1: the Functions list of a project module. Piece 2: the detail pane of one function (header, decompiled code with a
-rizin/ghidra choice, disassembly).
+rizin/ghidra choice, disassembly). Piece 3: cross references of the function (who calls/uses it, what it calls/uses) and a
+bounded call graph.
 
 Every route opens or reuses the module's workbench session and runs the same workbench calls as the MCP tools
 (``list_functions`` -> ``op_functions`` + ``re_workbench.shape_functions``; ``get_function`` -> ``op_function``;
-``decompile`` -> ``ReWorkbench.decompile``; ``disassemble`` of a whole function -> ``op_disasm``), so the app and MCP cannot
-diverge. Mounted from ``api/server.py`` with one line; error shape ``{error:{code,message,next_action}}``.
+``decompile`` -> ``ReWorkbench.decompile``; ``disassemble`` of a whole function -> ``op_disasm``; ``xrefs_to`` /
+``xrefs_from`` with ``scope=function`` -> ``op_xrefs`` + ``re_workbench.shape_xrefs``; ``call_graph`` -> ``op_call_graph``),
+so the app and MCP cannot diverge. Mounted from ``api/server.py`` with one line; error shape ``{error:{code,message,next_action}}``.
 
 Binary-derived text (names, signatures, decompiled code, instructions, comments) is untrusted: responses carry
 ``untrusted: true`` and the app renders it as plain text, never as HTML. Output is size-capped by the backend (decompiled
-text: ``limits.max_subprocess_output_bytes``) and paged here (disassembly: at most ``DISASM_PAGE_MAX`` instructions).
+text: ``limits.max_subprocess_output_bytes``; references: ``XREF_MAX_ROWS`` per direction, string text clipped; call graph:
+depth 1..5 and at most 500 nodes) and paged or capped here (disassembly: at most ``DISASM_PAGE_MAX`` instructions; references:
+at most ``XREF_LIMIT_MAX`` rows per direction).
 """
 from __future__ import annotations
 
@@ -32,8 +36,8 @@ def _addr(value: str) -> str:
 
 
 def mount_re_routes(app: FastAPI, studio: Any) -> None:
-    from ..re_workbench import (DISASM_PAGE_MAX, NATIVE_PROFILES, WorkbenchError, function_header, page_disasm,
-                                shape_functions)
+    from ..re_workbench import (DISASM_PAGE_MAX, NATIVE_PROFILES, XREF_LIMIT_MAX, WorkbenchError, function_header, page_disasm,
+                                shape_functions, shape_xrefs)
 
     r = APIRouter(tags=["re"])
 
@@ -145,6 +149,35 @@ def mount_re_routes(app: FastAPI, studio: Any) -> None:
         res, sid = run(case_id, module_id, lambda s: studio.re.call(s, "disasm", function=target), target)
         page = page_disasm(dict(res.data or {}), offset, limit)
         return {**page, **common(res, sid, case_id, module_id), "untrusted": True, "note": UNTRUSTED_NOTE}
+
+    # ------------------------------------------------------------------ piece 3: references and call graph
+    @r.get("/cases/{case_id}/modules/{module_id}/functions/{addr}/xrefs")
+    def function_xrefs(case_id: str, module_id: str, addr: str = Addr,
+                       limit: int = Query(default=200, ge=1, le=XREF_LIMIT_MAX)):
+        """Called from (references to the function's entry, with the caller) and Calls / uses (every reference made from the
+        function's code, with the target's function, import name or string text): the MCP ``xrefs_to`` / ``xrefs_from``
+        calls with ``scope=function``."""
+        target = _addr(addr)
+        ready(case_id, module_id, False)
+        res, sid = run(case_id, module_id, lambda s: studio.re.call(s, "xrefs", addr=target, scope="function"), target)
+        data = dict(res.data or {})
+        return {"addr": data.get("addr"), "function": data.get("function"), "internal_jumps": int(data.get("internal_jumps") or 0),
+                "to": shape_xrefs(data, "to", limit), "from": shape_xrefs(data, "from", limit), "limit": limit,
+                **common(res, sid, case_id, module_id), "untrusted": True, "note": UNTRUSTED_NOTE}
+
+    @r.get("/cases/{case_id}/modules/{module_id}/functions/{addr}/callgraph")
+    def function_call_graph(case_id: str, module_id: str, addr: str = Addr,
+                            direction: Literal["callees", "callers", "both"] = "callees",
+                            depth: int = Query(default=2, ge=1, le=5), max_nodes: int = Query(default=200, ge=1, le=500)):
+        """Bounded breadth-first call graph (the MCP ``call_graph`` call): nodes with their depth, edges caller -> callee,
+        ``node_limit_hit`` when the node cap cut it. Cycles appear as edges back to an earlier node."""
+        target = _addr(addr)
+        ready(case_id, module_id, False)
+        res, sid = run(case_id, module_id, lambda s: studio.re.call(s, "call_graph", function=target, depth=depth,
+                                                                   direction=direction, max_nodes=max_nodes), target)
+        data = dict(res.data or {})
+        data.pop("cached", None)
+        return {**data, "max_nodes": max_nodes, **common(res, sid, case_id, module_id), "untrusted": True, "note": UNTRUSTED_NOTE}
 
     app.include_router(r)
 

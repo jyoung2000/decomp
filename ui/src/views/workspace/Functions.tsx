@@ -6,7 +6,7 @@ import { ApiError } from '../../lib/api';
 import { isNativeModule, reApi, type FunctionPage, type FunctionRow, type FunctionSort } from '../../lib/re';
 import { useApi, useResource } from '../../lib/store';
 import type { Decompiler } from '../../lib/re';
-import { FunctionPane, type CodeView } from './FunctionDetail';
+import { CODE_VIEWS, FunctionPane, type CodeView } from './FunctionDetail';
 
 const SORTS: { id: FunctionSort; label: string }[] = [
   { id: 'addr', label: 'Address' },
@@ -20,8 +20,9 @@ const n = (v: number) => v.toLocaleString('en-US');
 const bytes = (v: number) => `${n(v)} byte${v === 1 ? '' : 's'}`;
 
 /** R6: the analysed functions of a native module (piece 1) and, for the selected row, a side pane with the function's header,
- * decompiled code and disassembly (piece 2). Backed by the same operations as the MCP list_functions / get_function /
- * decompile / disassemble tools. The selection is in the URL (?module=&fn=&view=&decompiler=), so it can be linked to. */
+ * decompiled code and disassembly (piece 2), references and a bounded call graph whose function links select another function
+ * (piece 3). Backed by the same operations as the MCP list_functions / get_function / decompile / disassemble / xrefs_to /
+ * xrefs_from / call_graph tools. The selection is in the URL (?module=&fn=&view=&decompiler=), so it can be linked to. */
 export function FunctionsTab({ caseId }: { caseId: string }) {
   const api = useApi();
   const modules = useResource(() => api.modules(caseId), [api, caseId]);
@@ -29,7 +30,7 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
   const [params, setParams] = useSearchParams();
   const moduleId = params.get('module') ?? '';
   const fn = /^0x[0-9a-f]{1,16}$/i.test(params.get('fn') ?? '') ? params.get('fn')!.toLowerCase() : null;
-  const view: CodeView = params.get('view') === 'disassembly' ? 'disassembly' : 'decompiled';
+  const view: CodeView = CODE_VIEWS.includes(params.get('view') as CodeView) ? (params.get('view') as CodeView) : 'decompiled';
   const decompiler: Decompiler = params.get('decompiler') === 'ghidra' ? 'ghidra' : 'rizin';
   const layoutRef = useRef<HTMLDivElement>(null);
   const [refocus, setRefocus] = useState<string | null>(null);
@@ -52,6 +53,42 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
     if (fn) setRefocus(fn);
     update({ fn: null });
   }, [fn, update]);
+  // Back/Forward inside the pane: every function opened (from the table, a link, the call graph or a deep link) is pushed;
+  // moving through the history only moves the index
+  const [hist, setHist] = useState<{ stack: string[]; index: number }>({ stack: [], index: -1 });
+  useEffect(() => {
+    if (!fn) return;
+    setHist((h) => {
+      if (h.stack[h.index] === fn) return h;
+      const stack = [...h.stack.slice(0, h.index + 1), fn].slice(-50);
+      return { stack, index: stack.length - 1 };
+    });
+  }, [fn]);
+  const history = {
+    canBack: hist.index > 0,
+    canForward: hist.index >= 0 && hist.index < hist.stack.length - 1,
+    back: () => {
+      if (hist.index <= 0) return;
+      setHist({ ...hist, index: hist.index - 1 });
+      update({ fn: hist.stack[hist.index - 1] });
+    },
+    forward: () => {
+      if (hist.index >= hist.stack.length - 1) return;
+      setHist({ ...hist, index: hist.index + 1 });
+      update({ fn: hist.stack[hist.index + 1] });
+    },
+  };
+  const nav = useMemo(
+    () => ({
+      href: (addr: string) => {
+        const next = new URLSearchParams(params);
+        next.set('fn', addr);
+        return `?${next.toString()}`;
+      },
+      open: (addr: string) => update({ fn: addr }),
+    }),
+    [params, update],
+  );
   useEffect(() => {
     if (!refocus || fn) return;
     layoutRef.current?.querySelector<HTMLElement>(`[data-testid="fn-row-${refocus}"]`)?.focus();
@@ -70,7 +107,10 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
     );
   }
   const module = native.find((m) => m.module_id === moduleId) ?? native[0];
-  const setModuleId = (id: string) => update({ module: id, fn: null });
+  const setModuleId = (id: string) => {
+    setHist({ stack: [], index: -1 });
+    update({ module: id, fn: null });
+  };
   return (
     <section className="stack" aria-labelledby="fn-h" data-testid="functions-tab">
       <div className="row fn-head">
@@ -108,6 +148,8 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
             onView={(v) => update({ view: v === 'decompiled' ? null : v })}
             onDecompiler={(d) => update({ decompiler: d === 'rizin' ? null : d })}
             onClose={closePane}
+            nav={nav}
+            history={history}
           />
         )}
       </div>
