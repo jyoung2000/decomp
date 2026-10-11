@@ -537,6 +537,87 @@
    }
   },
   {
+   "row": "go_apk_arm64",
+   "kind": "native_apk",
+   "origin": "bench",
+   "truth_source": "go tool nm -size -sort address on the unstripped build (identical .text, verified)",
+   "status": "ok",
+   "analysis": {
+    "settings": {
+     "command": "aaa",
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
+    },
+    "possibly_partial": false
+   },
+   "decompiler": "rz-ghidra(pdg)",
+   "rz_ghidra_loaded": true,
+   "functions_found": 2723,
+   "functions_truncated": false,
+   "imports_found": 0,
+   "strings_found": 9977,
+   "functions": {
+    "truth_functions": 2666,
+    "found_functions": 2723,
+    "found_in_code": 2722,
+    "matched": 2647,
+    "recall": 0.9929,
+    "precision": 0.9724,
+    "own_truth": 9,
+    "own_matched": 9,
+    "own_recall": 1.0,
+    "named": 2447,
+    "named_recall": 0.9179,
+    "own_named_recall": 0.2222,
+    "named_precision": 0.9574,
+    "with_name": 2556,
+    "size_exact": 0.2236
+   },
+   "imports": null,
+   "strings": {
+    "truth": 6,
+    "found": 9977,
+    "matched": 6,
+    "recall": 1.0,
+    "missing": []
+   },
+   "decompile": {
+    "own_functions": 9,
+    "attempted": 9,
+    "real": 9,
+    "pseudo_only": 0,
+    "no_function": 0,
+    "errors": 0,
+    "not_attempted_budget": 0,
+    "failures": [],
+    "coverage": 1.0
+   },
+   "seconds": {
+    "packer": 0.083,
+    "analysis": 13.786,
+    "functions": 1.577,
+    "imports": 0.0,
+    "strings": 0.043,
+    "decompile": 0.223
+   },
+   "packed": {
+    "truth": false,
+    "detected": false,
+    "packer": null,
+    "unpacked": false,
+    "unpack_tool": null,
+    "note": "not packed"
+   },
+   "member": "lib/arm64-v8a/libbenchgo.so",
+   "abi": "arm64-v8a",
+   "wall_seconds": 16.975
+  },
+  {
    "row": "go_elf_x64",
    "kind": "native_elf_x64",
    "origin": "bench",
@@ -614,6 +695,332 @@
     "note": "not packed"
    },
    "wall_seconds": 16.278
+  },
+  {
+   "row": "go_macho_arm64",
+   "kind": "native_macho_arm64",
+   "origin": "bench",
+   "truth_source": "go tool nm -size -sort address on the unstripped build (identical .text, verified)",
+   "status": "ok",
+   "analysis": {
+    "settings": {
+     "command": "aaa",
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
+    },
+    "possibly_partial": false
+   },
+   "decompiler": "rz-ghidra(pdg)",
+   "rz_ghidra_loaded": true,
+   "functions_found": 2880,
+   "functions_truncated": false,
+   "imports_found": 58,
+   "strings_found": 11329,
+   "functions": {
+    "truth_functions": 2732,
+    "found_functions": 2880,
+    "found_in_code": 2839,
+    "matched": 2711,
+    "recall": 0.9923,
+    "precision": 0.9549,
+    "own_truth": 9,
+    "own_matched": 9,
+    "own_recall": 1.0,
+    "named": 2500,
+    "named_recall": 0.9151,
+    "own_named_recall": 0.8889,
+    "named_precision": 0.9356,
+    "with_name": 2672,
+    "size_exact": 0.2128
+   },
+   "imports": null,
+   "strings": {
+    "truth": 6,
+    "found": 11329,
+    "matched": 6,
+    "recall": 1.0,
+    "missing": []
+   },
+   "decompile": {
+    "own_functions": 9,
+    "attempted": 9,
+    "real": 9,
+    "pseudo_only": 0,
+    "no_function": 0,
+    "errors": 0,
+    "not_attempted_budget": 0,
+    "failures": [],
+    "coverage": 1.0
+   },
+   "seconds": {
+    "packer": 0.049,
+    "analysis": 11.997,
+    "functions": 0.656,
+    "imports": 0.0,
+    "strings": 0.051,
+    "decompile": 0.217
+   },
+   "packed": {
+    "truth": false,
+    "detected": false,
+    "packer": null,
+    "unpacked": false,
+    "unpack_tool": null,
+    "note": "not packed"
+   },
+   "wall_seconds": 13.17
+  },
+  {
+   "row": "go_macho_fat",
+   "kind": "native_macho_fat",
+   "origin": "bench",
+   "truth_source": "go tool nm -size -sort address on the unstripped build (identical .text, verified); per slice (slices byte-identical to the thin rows)",
+   "status": "ok",
+   "slices": [
+    {
+     "status": "ok",
+     "analysis": {
+      "settings": {
+       "command": "aaa",
+       "analysis.timeout": 300,
+       "passes": [
+        "sigpacks",
+        "pdata",
+        "relocptrs",
+        "thunks"
+       ]
+      },
+      "possibly_partial": false
+     },
+     "decompiler": "rz-ghidra(pdg)",
+     "rz_ghidra_loaded": true,
+     "functions_found": 2850,
+     "functions_truncated": false,
+     "imports_found": 55,
+     "strings_found": 31405,
+     "functions": {
+      "truth_functions": 2770,
+      "found_functions": 2850,
+      "found_in_code": 2829,
+      "matched": 2748,
+      "recall": 0.9921,
+      "precision": 0.9714,
+      "own_truth": 9,
+      "own_matched": 9,
+      "own_recall": 1.0,
+      "named": 2539,
+      "named_recall": 0.9166,
+      "own_named_recall": 0.8889,
+      "named_precision": 0.93,
+      "with_name": 2730,
+      "size_exact": 0.0076
+     },
+     "imports": null,
+     "strings": {
+      "truth": 6,
+      "found": 31405,
+      "matched": 6,
+      "recall": 1.0,
+      "missing": []
+     },
+     "decompile": {
+      "own_functions": 9,
+      "attempted": 9,
+      "real": 9,
+      "pseudo_only": 0,
+      "no_function": 0,
+      "errors": 0,
+      "not_attempted_budget": 0,
+      "failures": [],
+      "coverage": 1.0
+     },
+     "seconds": {
+      "packer": 0.066,
+      "analysis": 6.424,
+      "functions": 0.339,
+      "imports": 0.0,
+      "strings": 0.128,
+      "decompile": 0.335
+     },
+     "packed": {
+      "truth": false,
+      "detected": false,
+      "packer": null,
+      "unpacked": false,
+      "unpack_tool": null,
+      "note": "not packed"
+     },
+     "arch": "x86_64",
+     "member": "slice/x86_64",
+     "base_row": "go_macho_x64",
+     "identical_to_thin_row": true,
+     "wall_seconds": 7.503
+    },
+    {
+     "status": "ok",
+     "analysis": {
+      "settings": {
+       "command": "aaa",
+       "analysis.timeout": 300,
+       "passes": [
+        "sigpacks",
+        "pdata",
+        "relocptrs",
+        "thunks"
+       ]
+      },
+      "possibly_partial": false
+     },
+     "decompiler": "rz-ghidra(pdg)",
+     "rz_ghidra_loaded": true,
+     "functions_found": 2880,
+     "functions_truncated": false,
+     "imports_found": 58,
+     "strings_found": 11329,
+     "functions": {
+      "truth_functions": 2732,
+      "found_functions": 2880,
+      "found_in_code": 2839,
+      "matched": 2711,
+      "recall": 0.9923,
+      "precision": 0.9549,
+      "own_truth": 9,
+      "own_matched": 9,
+      "own_recall": 1.0,
+      "named": 2500,
+      "named_recall": 0.9151,
+      "own_named_recall": 0.8889,
+      "named_precision": 0.9356,
+      "with_name": 2672,
+      "size_exact": 0.2128
+     },
+     "imports": null,
+     "strings": {
+      "truth": 6,
+      "found": 11329,
+      "matched": 6,
+      "recall": 1.0,
+      "missing": []
+     },
+     "decompile": {
+      "own_functions": 9,
+      "attempted": 9,
+      "real": 9,
+      "pseudo_only": 0,
+      "no_function": 0,
+      "errors": 0,
+      "not_attempted_budget": 0,
+      "failures": [],
+      "coverage": 1.0
+     },
+     "seconds": {
+      "packer": 0.083,
+      "analysis": 11.928,
+      "functions": 0.644,
+      "imports": 0.0,
+      "strings": 0.056,
+      "decompile": 0.224
+     },
+     "packed": {
+      "truth": false,
+      "detected": false,
+      "packer": null,
+      "unpacked": false,
+      "unpack_tool": null,
+      "note": "not packed"
+     },
+     "arch": "arm64",
+     "member": "slice/arm64",
+     "base_row": "go_macho_arm64",
+     "identical_to_thin_row": true,
+     "wall_seconds": 13.16
+    }
+   ],
+   "wall_seconds": 22.457
+  },
+  {
+   "row": "go_macho_x64",
+   "kind": "native_macho_x64",
+   "origin": "bench",
+   "truth_source": "go tool nm -size -sort address on the unstripped build (identical .text, verified)",
+   "status": "ok",
+   "analysis": {
+    "settings": {
+     "command": "aaa",
+     "analysis.timeout": 300,
+     "passes": [
+      "sigpacks",
+      "pdata",
+      "relocptrs",
+      "thunks"
+     ]
+    },
+    "possibly_partial": false
+   },
+   "decompiler": "rz-ghidra(pdg)",
+   "rz_ghidra_loaded": true,
+   "functions_found": 2850,
+   "functions_truncated": false,
+   "imports_found": 55,
+   "strings_found": 31405,
+   "functions": {
+    "truth_functions": 2770,
+    "found_functions": 2850,
+    "found_in_code": 2829,
+    "matched": 2748,
+    "recall": 0.9921,
+    "precision": 0.9714,
+    "own_truth": 9,
+    "own_matched": 9,
+    "own_recall": 1.0,
+    "named": 2539,
+    "named_recall": 0.9166,
+    "own_named_recall": 0.8889,
+    "named_precision": 0.93,
+    "with_name": 2730,
+    "size_exact": 0.0076
+   },
+   "imports": null,
+   "strings": {
+    "truth": 6,
+    "found": 31405,
+    "matched": 6,
+    "recall": 1.0,
+    "missing": []
+   },
+   "decompile": {
+    "own_functions": 9,
+    "attempted": 9,
+    "real": 9,
+    "pseudo_only": 0,
+    "no_function": 0,
+    "errors": 0,
+    "not_attempted_budget": 0,
+    "failures": [],
+    "coverage": 1.0
+   },
+   "seconds": {
+    "packer": 0.05,
+    "analysis": 6.359,
+    "functions": 0.338,
+    "imports": 0.0,
+    "strings": 0.133,
+    "decompile": 0.336
+   },
+   "packed": {
+    "truth": false,
+    "detected": false,
+    "packer": null,
+    "unpacked": false,
+    "unpack_tool": null,
+    "note": "not packed"
+   },
+   "wall_seconds": 7.413
   },
   {
    "row": "go_pe_x64",
@@ -1070,5 +1477,11 @@
    "status": "not scored by R0 metrics: web/asar (no native code); parity is measured by its Playwright oracle"
   }
  ],
- "native_rebuild_generated_utc": "2026-10-10T18:28:28Z"
+ "native_rebuild_generated_utc": "2026-10-10T18:28:28Z",
+ "merged_rows": {
+  "go_apk_arm64": "2026-10-11T00:05:16Z",
+  "go_macho_arm64": "2026-10-11T00:05:16Z",
+  "go_macho_fat": "2026-10-11T00:05:16Z",
+  "go_macho_x64": "2026-10-11T00:05:16Z"
+ }
 }

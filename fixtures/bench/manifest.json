@@ -41,12 +41,44 @@
    "truth": "dotnet_renamed/truth/truth.json",
    "toolchain": "dotnet SDK 8.0.424"
   },
+  "go_apk_arm64": {
+   "kind": "native_apk",
+   "binary": "go_apk_arm64/bin/benchapk.apk",
+   "sha256": "37f990801d312319198af574e2b401a872c06b2a968c1cc58331638148ea5b83",
+   "size": 2826775,
+   "truth": "go_apk_arm64/truth/truth.json",
+   "toolchain": "go version go1.27.0 windows/amd64; javac 17.0.20.1; Android build-tools 34.0.0 (aapt2, d8, zipalign), android-34"
+  },
   "go_elf_x64": {
    "kind": "native_elf_x64",
    "binary": "go_elf_x64/bin/benchgo",
    "sha256": "eb6d3c611e39a8531108ecdc3907461d394a16e84ee367e3e392907e2c16a5af",
    "size": 2596988,
    "truth": "go_elf_x64/truth/truth.json",
+   "toolchain": "go version go1.27.0 windows/amd64"
+  },
+  "go_macho_arm64": {
+   "kind": "native_macho_arm64",
+   "binary": "go_macho_arm64/bin/benchgo",
+   "sha256": "b8938d00ba5a39a74ec63eaf8ef7f61c1e1daaf30485246c870f2daffb11a7a3",
+   "size": 2511538,
+   "truth": "go_macho_arm64/truth/truth.json",
+   "toolchain": "go version go1.27.0 windows/amd64"
+  },
+  "go_macho_fat": {
+   "kind": "native_macho_fat",
+   "binary": "go_macho_fat/bin/benchgo_universal",
+   "sha256": "331f295abd9c1b54aac10a6b7fe9c8a87fec10b850cafa7579fae5f5906f305c",
+   "size": 5182130,
+   "truth": "go_macho_fat/truth/truth.json",
+   "toolchain": "go version go1.27.0 windows/amd64; fat header by fixtures/bench/tools/macho_fat.py"
+  },
+  "go_macho_x64": {
+   "kind": "native_macho_x64",
+   "binary": "go_macho_x64/bin/benchgo",
+   "sha256": "421b4b7446c542b46ecadc83063774b34883e43f84564dee05d3249fd988ec1c",
+   "size": 2651664,
+   "truth": "go_macho_x64/truth/truth.json",
    "toolchain": "go version go1.27.0 windows/amd64"
   },
   "go_pe_x64": {
@@ -74,7 +106,7 @@
    "toolchain": "MSVC cl 19.29.30159 (x64), VC tools 14.29.30133, Windows SDK 10.0.19041.0; upx 5.2.1 (sha256 d20ebe0b7b22b6be...)"
   }
  },
- "total_binary_bytes": 5608060,
+ "total_binary_bytes": 18780167,
  "not_built": {
   "c_mingw_x64_o2s": "not run: mingw-w64 (x86_64-w64-mingw32-gcc) is not installed on this host",
   "c_mingw_x86_o2s": "not run: mingw-w64 (i686-w64-mingw32-gcc) is not installed on this host",

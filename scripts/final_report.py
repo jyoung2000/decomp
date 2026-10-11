@@ -207,7 +207,7 @@ def build() -> dict:  # noqa: C901
             "Installer and portable zip are UNSIGNED (no code-signing certificate available); SmartScreen will warn.",
             "No AI provider key was available: the in-app implement/repair loop is verified against a scripted OpenAI-compatible server only; live Anthropic/OpenAI/Gemini/OpenRouter behaviour is UNVERIFIED and zero paid calls were made.",
             "Original-program isolation is damage limitation, not a security sandbox: Low integrity + Job Object limits on Windows; the program can still read most user files and the network is open unless the opt-in AppContainer mode is chosen (docs/ISOLATION.md).",
-            "Java (.jar) recovery is supported (CFR); Android code recovery needs jadx; Unity IL2CPP, GameMaker, Unreal and Mach-O are detected with explicit blockers and no code recovery.",
+            "Java (.jar) recovery is supported (CFR); Android code recovery needs jadx (native lib/<abi>/*.so libraries are analysed by Rizin per ABI); Mach-O is analysed by Rizin (fat files per slice; static only, Mach-O cannot run on Windows); Unity IL2CPP, GameMaker and Unreal are detected with explicit blockers and no code recovery.",
             "Scenario results are limited to the scenarios declared for each case. Passing them is not global parity: features with no scenario, Windows-only behaviour and undiscovered scope are not measured.",
             "Godot → Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because no gameplay scenarios exist.",
             "Scenario authoring in the UI covers command-line programs; web/GUI scenarios are declared through the API or inferred (one automatic start-page check).",

@@ -15,6 +15,10 @@ build. `scripts/benchmark.py` runs the product's own analysis (rizin backend for
 | [`upx_c_msvc_x64`](upx_c_msvc_x64/README.md) | PE x64 packed | `c_msvc_x64_o2` packed with UPX 5.2.1 `--best` |
 | [`dotnet_plain`](dotnet_plain/README.md) | .NET 8 | C# task scheduler, names intact |
 | [`dotnet_renamed`](dotnet_renamed/README.md) | .NET 8 | same assembly, ConfuserEx-style renaming by `tools/dotnet_rename.py` (still runs) |
+| [`go_macho_x64`](go_macho_x64/README.md) | Mach-O x86_64 (R7) | same Go source, darwin/amd64 thin Mach-O, stripped; cross-compiled, never executed here |
+| [`go_macho_arm64`](go_macho_arm64/README.md) | Mach-O arm64 (R7) | same Go source, darwin/arm64 (Apple silicon), stripped, ad-hoc signed by the Go linker |
+| [`go_macho_fat`](go_macho_fat/README.md) | Mach-O fat (R7) | universal file (x86_64 + arm64) written by `tools/macho_fat.py` from the two thin rows (no lipo on Windows); scored per slice |
+| [`go_apk_arm64`](go_apk_arm64/README.md) | APK + ELF arm64 (R7) | unsigned APK (aapt2/d8/zipalign, build-tools 34) with our Go program for android/arm64 as `lib/arm64-v8a/libbenchgo.so`; the library is scored |
 
 Rows not built on the build host are listed in `manifest.json` → `not_built` with the reason (mingw-w64, gcc ELF, Unity IL2CPP,
 GameMaker, ConfuserEx itself). They appear in the scoreboard as "not run: <reason>", never as 0 or as a pass.
@@ -27,12 +31,18 @@ GameMaker, ConfuserEx itself). They appear in the scoreboard as "not run: <reaso
   unpacked PE's import table, `strings`: notable literals from our source (the build checks each is in the binary).
 * .NET: `dotnet.types` and `dotnet.methods` from the unobfuscated assembly's metadata (via the controller's ECMA-335 reader).
 * `packed` / `packer` for the UPX row (its truth is the unpacked build).
+* R7 container rows: `slices` (fat Mach-O; per slice `arch`, `sha256`, `base_row`, `code_ranges`, `functions`, each slice byte-identical to the
+  thin row it names) and `member` (APK; `path`, `sha256`, `size` of the scored native library; `functions`/`code_ranges` are the library's).
+  Mach-O truth comes from `go tool nm` on the unstripped darwin twin with identical `__text`; Mach-O/APK rows carry no import list.
 
 ## Commands
 * `python fixtures/bench/build_bench.py [--rows a,b]` rebuilds rows, re-extracts truth, rewrites `manifest.json` (needs the
   toolchains named in each `build.json`; MSVC is found with vswhere, UPX must match the pin in `docs/dependency-lock.json` → `fixture_build_tools.upx`).
 * `python fixtures/bench/build_bench.py --verify` rebuilds into a temp dir and fails unless every committed binary is reproduced byte for byte
-  (MSVC `/Brepro`, Go `-trimpath -buildid=`, Rust `--remap-path-prefix` + `/Brepro`, .NET `Deterministic`).
-* `python scripts/benchmark.py [--rows ...] [--config cfg.json]` scores the corpus (needs rizin + rz-ghidra via `REBUILD_STUDIO_TOOLS`, ilspycmd).
+  (MSVC `/Brepro`, Go `-trimpath -buildid=`, Rust `--remap-path-prefix` + `/Brepro`, .NET `Deterministic`, APK: stored zip entries with fixed
+  timestamps + `zipalign -p 4`). The APK row needs the Android SDK (build-tools 34.0.0, platforms/android-34; `ANDROID_HOME` or
+  `%LOCALAPPDATA%\Android\Sdk`) and `javac`.
+* `python scripts/benchmark.py [--rows ...] [--config cfg.json]` scores the corpus (needs rizin + rz-ghidra via `REBUILD_STUDIO_TOOLS`, ilspycmd);
+  `--merge --rows a,b` re-measures only those rows and keeps the rest of `reports/benchmark.json`.
 
 Limits kept: every binary < 5 MB, corpus total < 25 MB (checked by the build and by `controller/tests/test_benchmark.py`).

@@ -1,0 +1,19 @@
+{
+ "row": "go_apk_arm64",
+ "what": "unsigned APK (build-tools 34 aapt2/d8/zipalign) whose native library lib/arm64-v8a/libbenchgo.so is benchgo built for android/arm64 (position-independent ELF, stripped); no NDK on the host, so it is a helper executable in the library slot (run by MainActivity), not a JNI library",
+ "toolchain": "go version go1.27.0 windows/amd64; javac 17.0.20.1; Android build-tools 34.0.0 (aapt2, d8, zipalign), android-34",
+ "commands": [
+  "GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o libbenchgo.so .",
+  "(truth build) go build -trimpath -buildvcs=false -ldflags=-buildid= -o sym_libbenchgo.so .",
+  "javac --release 8 -g:none -encoding UTF-8 -cp android.jar java/**/*.java",
+  "d8 --release --min-api 24 --lib android.jar *.class",
+  "aapt2 link --manifest AndroidManifest.xml -I android.jar -o base.apk",
+  "zip (stored, timestamps 2026-01-01): base.apk entries + classes.dex + lib/arm64-v8a/libbenchgo.so",
+  "zipalign -f -p 4 unaligned.apk benchapk.apk"
+ ],
+ "stripped_how": "-ldflags '-s -w' removes the symbol table and DWARF (pclntab remains, as in every Go binary); APK unsigned",
+ "binary_sha256": "37f990801d312319198af574e2b401a872c06b2a968c1cc58331638148ea5b83",
+ "binary_size": 2826775,
+ "source": "go_apk_arm64/src",
+ "reproduce": "python fixtures/bench/build_bench.py --rows go_apk_arm64"
+}

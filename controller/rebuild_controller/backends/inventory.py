@@ -29,6 +29,7 @@ def inventory_root(root: Path, limits: Limits, *, progress: Callable[[dict[str, 
     total_bytes = 0
     truncated = False
     detections: list[tuple[str, Detection]] = []
+    member_modules: list[str] = []
     seen_inodes: set[tuple[int, int]] = set()
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False, onerror=lambda e: skipped.append({"path": str(getattr(e, 'filename', '')), "reason": f"inaccessible: {e.strerror}"})):
         dp = Path(dirpath)
@@ -105,6 +106,11 @@ def inventory_root(root: Path, limits: Limits, *, progress: Callable[[dict[str, 
                     detections.append((rel, Detection("godot_pck", "godot")))
             if det.flags.get("encrypted"):
                 skipped.append({"path": rel, "reason": "encrypted content"})
+            if (det.format == "macho" and det.flags.get("layout") == "fat") or det.format in ("apk", "aab"):
+                mem = _members(full, rel, det, skipped)
+                if mem:
+                    entry["members"] = mem
+                    member_modules.extend(m["path"] for m in mem if m.get("sha256"))
             detections.append((rel, det))
             files.append(entry)
             if progress and len(files) % 500 == 0:
@@ -116,9 +122,28 @@ def inventory_root(root: Path, limits: Limits, *, progress: Callable[[dict[str, 
     return {
         "root": str(root), "files": files, "file_count": len(files), "dir_count": dirs, "total_bytes": total_bytes,
         "modules": [m["path"] for m in modules], "module_count": len(modules), "links": links, "skipped": skipped,
+        "member_modules": member_modules,
         "truncated": truncated, "truncation_limit": limits.max_inventory_files if truncated else None,
         "profile": profile, "unknown_scope": _unknown_scope(files, skipped, links, truncated),
     }
+
+
+def _members(full: Path, rel: str, det: Detection, skipped: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Native code inside a container (fat Mach-O slices, APK/AAB lib/<abi>/*.so), each hashed and detected; bounded."""
+    from . import members as mb
+    out: list[dict[str, Any]] = []
+    for spec in mb.list_members(full, det.to_dict()):
+        path = mb.member_rel_path(rel, spec["member"]) if spec.get("member") else rel
+        if spec.get("skip"):
+            skipped.append({"path": path, "reason": f"container member not analysed: {spec['skip']}"})
+            continue
+        try:
+            d = mb.describe(full, spec)
+        except (OSError, ValueError) as e:
+            skipped.append({"path": path, "reason": f"container member unreadable: {type(e).__name__}: {e}"[:300]})
+            continue
+        out.append({"path": path, "container": rel, "spec": spec, **d})
+    return out
 
 
 def _unknown_scope(files, skipped, links, truncated) -> list[str]:

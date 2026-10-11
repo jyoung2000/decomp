@@ -117,6 +117,15 @@ def sniff(path: Path, head: bytes | None = None) -> Detection:
     return Detection("data", "unknown", confidence=0.3)
 
 
+def sniff_bytes(name: str, data: bytes) -> Detection:
+    """Detection of in-memory content (a fat slice, an APK member) named ``name``; Mach-O load commands are read from ``data``."""
+    head = data[:MAGIC_SNIFF]
+    mk = _support.macho_kind(head)
+    if mk is not None:
+        return _detect_macho(Path(name), head, mk, name.lower(), data=data)
+    return sniff(Path(name), head)
+
+
 def detect_path(path: Path | str) -> dict[str, Any]:
     """Detection plus the full support record (with plain-language statement) for one file."""
     d = sniff(Path(path))
@@ -202,11 +211,11 @@ def _detect_elf(head: bytes, name: str = "") -> Detection:
     return Detection("elf", "native_elf", arch=arch, bits=bits, flags=flags)
 
 
-def _detect_macho(path: Path, head: bytes, kind: str, name: str) -> Detection:
+def _detect_macho(path: Path, head: bytes, kind: str, name: str, data: bytes | None = None) -> Detection:
     flags: dict[str, Any] = {"layout": kind}
     arch, bits = None, None
     try:
-        info = _support.inspect_macho(path)
+        info = _support.inspect_macho(data if data is not None else path)
         flags.update({"slice_count": info["slice_count"], "architectures": info["architectures"], "encrypted": info["encrypted"]})
         first = info["slices"][0] if info["slices"] else {}
         flags["filetype"] = first.get("filetype")

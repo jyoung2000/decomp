@@ -54,6 +54,22 @@ def module_file(cases: Any, case_id: str, module_id: str) -> tuple[dict[str, Any
     if module["case_id"] != case_id:
         raise ValueError(f"module {module_id} does not belong to case {case_id}")
     root = resolve_final(cases.get_case(case_id)["source_root"])
+    cont = (module.get("meta") or {}).get("container")
+    if isinstance(cont, dict) and cont.get("rel_path"):
+        # R7: a fat Mach-O slice or an APK native library. Its bytes are copied once into the case work folder, checked against
+        # the sha256 recorded at inventory, and analysed there; the container itself stays untouched.
+        from . import members
+        cpath = resolve_final(Path(root) / cont["rel_path"])
+        if not is_within(cpath, root):
+            raise ValueError(f"container path escapes the case source root: {cont['rel_path']!r}")
+        if not cpath.is_file():
+            raise ValueError(f"container file missing: {cont['rel_path']!r}")
+        if hasattr(cases, "case_root"):
+            work = Path(cases.case_root(case_id))
+        else:
+            from ..config import get_settings
+            work = Path(get_settings().data_dir) / "cases" / case_id
+        return module, members.materialize(cpath, cont, work / "re" / module_id / "member", sha256=module["sha256"])
     path = resolve_final(Path(root) / module["rel_path"])
     if not is_within(path, root):
         raise ValueError(f"module path escapes the case source root: {module['rel_path']!r}")

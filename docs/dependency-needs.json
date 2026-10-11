@@ -16,7 +16,7 @@
     "unity_mono": {"title": "Unity games (Mono)", "required": ["ilspycmd"]},
     "godot": {"title": "Godot games", "required": ["gdre"]},
     "jvm": {"title": "Java programs (.jar)", "required": ["cfr"]},
-    "android": {"title": "Android apps (.apk)", "required": ["jadx"]},
+    "android": {"title": "Android apps (.apk)", "required": ["jadx"], "optional": ["rizin"]},
     "electron": {"title": "Electron apps", "optional": ["node"]},
     "web": {"title": "Web apps"},
     "unknown": {"title": "Programs of an unknown type", "optional": ["rizin"]}

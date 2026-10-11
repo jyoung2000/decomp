@@ -1,0 +1,14 @@
+{
+ "row": "go_macho_x64",
+ "what": "same Go source, darwin/amd64 thin Mach-O, stripped (-s -w); built by cross-compiling on Windows (never executed here)",
+ "toolchain": "go version go1.27.0 windows/amd64",
+ "commands": [
+  "GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o benchgo .",
+  "(truth build) go build -trimpath -buildvcs=false -ldflags=-buildid= -o sym_benchgo ."
+ ],
+ "stripped_how": "-ldflags '-s -w' removes the symbol table and DWARF (pclntab remains, as in every Go binary)",
+ "binary_sha256": "421b4b7446c542b46ecadc83063774b34883e43f84564dee05d3249fd988ec1c",
+ "binary_size": 2651664,
+ "source": "go_pe_x64/src",
+ "reproduce": "python fixtures/bench/build_bench.py --rows go_macho_x64"
+}

@@ -70,6 +70,20 @@ def test_truth_schema(row):
         assert t["dotnet"]["types"] and t["dotnet"]["methods"]
         assert all({"type", "name", "special_name", "compiler_generated"} <= set(m) for m in t["dotnet"]["methods"])
         return
+    assert t["packed"] == (row.startswith("upx"))
+    if t["kind"] == "native_macho_fat":      # R7: truth per slice; each slice is byte-identical to a thin row
+        assert len(t["slices"]) >= 2 and t["counts"]["slices"] == len(t["slices"])
+        for sl in t["slices"]:
+            thin = bm.load_truth(BENCH / sl["base_row"] / "truth" / "truth.json")
+            assert sl["sha256"] == thin["binary"]["sha256"] and sl["functions"] == thin["functions"], sl["arch"]
+            _check_functions(sl)
+        return
+    if t["kind"] == "native_apk":            # R7: the scored binary is a native library inside the package
+        assert t["member"]["path"].startswith("lib/") and len(t["member"]["sha256"]) == 64
+    _check_functions(t)
+
+
+def _check_functions(t: dict) -> None:
     ranges = [(int(a, 16), int(b, 16)) for a, b in t["code_ranges"]]
     assert ranges and t["functions"]
     starts = [int(f["start"], 16) for f in t["functions"]]
@@ -80,7 +94,6 @@ def test_truth_schema(row):
         assert any(a <= int(f["start"], 16) < b for a, b in ranges)
     assert sum(f["own"] for f in t["functions"]) == t["counts"]["own_functions"] > 0
     assert all({"lib", "name"} <= set(i) for i in t["imports"])
-    assert t["packed"] == (row.startswith("upx"))
 
 
 def test_upx_pin_is_mirrored_byte_identically():

@@ -121,9 +121,10 @@ def test_macho_thin_detection_with_support_statement(tmp_path):
     p.write_bytes(macho_thin(cmds=lc_dylib("/usr/lib/libSystem.B.dylib") + lc_encryption(0), ncmds=2))
     d = sniff(p)
     assert (d.format, d.profile, d.arch, d.bits) == ("macho", "native_macho", "x86_64", 64)
-    assert d.flags["layout"] == "thin" and d.flags["encrypted"] is False and d.support_status == "detected_only"
+    assert d.flags["layout"] == "thin" and d.flags["encrypted"] is False and d.support_status == "supported"   # R7: rizin analysis
     st = d.support["statement"]
-    assert "What can be recovered:" in st and "What cannot:" in st and "What the rebuild will be:" in st and "Blocker:" in st
+    assert "What can be recovered:" in st and "What cannot:" in st and "What the rebuild will be:" in st and "Next:" in st
+    assert "Rizin" in st and "cannot run here" in st
     info = sp.inspect_macho(p)
     assert info["slices"][0]["dylibs"] == ["/usr/lib/libSystem.B.dylib"] and info["architectures"] == ["x86_64"]
 
@@ -392,7 +393,8 @@ def test_detect_path_carries_statement_for_every_tracked_kind(tmp_path):
     for name in samples:
         r = detect_path(tmp_path / name)
         assert r["support"]["statement"] and r["support_status"] in ("detected_only", "partial", "supported"), name
-        assert r["support"]["blocker"] and r["support"]["next_action"], name         # unsupported kinds always say why and what next
+        assert r["support"]["next_action"], name                                       # every kind says what to do next
+        assert r["support"]["blocker"] or r["support_status"] == "supported", name      # and anything not supported says why
     for p in (MINAPP, JAVACLI):
         assert detect_path(p)["support"]["statement"]
 

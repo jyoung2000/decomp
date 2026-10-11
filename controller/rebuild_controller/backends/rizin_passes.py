@@ -77,11 +77,14 @@ def pdata_starts(path: Path) -> dict[str, Any]:
 
 
 def _functions(sess: Any, poll) -> list[dict[str, Any]]:
-    text, _ = sess._exec("aflj", timeout=300, poll=poll)
+    text, truncated = sess._exec("aflj", timeout=300, poll=poll)
     try:
-        data = json.loads(text or "[]")
+        data = json.loads(text or "[]") if not truncated else None
     except ValueError:
-        return []
+        data = None
+    if data is None:     # aflj overflowed the output cap (large binaries): page through the records instead
+        paged = sess._functions_paged(poll) if hasattr(sess, "_functions_paged") else None
+        return paged[0] if paged else []
     return [f for f in data if isinstance(f, dict)]
 
 

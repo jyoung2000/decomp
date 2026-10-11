@@ -17,7 +17,11 @@ Native-language rebuild (R4): for .NET rows and javacli the product pipeline reb
 AI off) in a temp data folder; the column reports whether it builds, the deterministic fixes applied and, where the fixture has a
 scenario oracle, how many scenarios match. Native-code rows have no original-language source to rebuild (they are Rust ports).
 
-usage: python scripts/benchmark.py [--rows a,b] [--config cfg.json] [--out-dir reports] [--no-legacy] [--only-native-rebuild]
+R7 container rows: a fat/universal Mach-O is scored slice by slice and an APK by its native library; the slice / library is taken
+out of the container by the product's own member extraction (backends/members.py), exactly as the pipeline does.
+
+usage: python scripts/benchmark.py [--rows a,b] [--config cfg.json] [--out-dir reports] [--no-legacy] [--only-native-rebuild] [--merge]
+  --merge  re-measure only the selected rows and keep every other row of <out-dir>/benchmark.json as it is
 Config keys (all optional; defaults in DEFAULT_CONFIG):
   {"name": "default", "analysis": {"command": "aaa", "analysis.timeout": 300, "passes": ["sigpacks", "pdata", "relocptrs", "thunks"]},
    "decompile": {"max_functions": 200}, "strings": true, "imports": true, "dotnet": {"enabled": true, "timeout": 600},
@@ -282,6 +286,45 @@ def _run_native(binary: Path, truth: dict | None, cfg: dict, backend, sw: "Stopw
         out["strings"] = score_strings(truth["strings"], found_strings) if cfg.get("strings", True) else None
         out["decompile"] = sw.run("decompile", decompile_own, sess, truth, funcs, int(cfg["decompile"].get("max_functions", 200)))
     out["seconds"] = sw.stages
+    return out
+
+
+def run_container(binary: Path, truth: dict, cfg: dict, backend) -> dict:
+    """R7: score native code inside a container with the product's own member extraction (members.materialize, sha256-checked).
+    Fat Mach-O -> one result per slice (truth["slices"]); APK -> the native library named in truth["member"]."""
+    from rebuild_controller.backends import members
+    out: dict[str, Any] = {"status": "ok"}
+    with tempfile.TemporaryDirectory(prefix="rs-bench-member-", ignore_cleanup_errors=True) as tmp:
+        try:
+            if truth.get("slices"):
+                specs = {sp["arch"]: sp for sp in members.fat_slices(binary)}
+                out["slices"] = []
+                for sl in truth["slices"]:
+                    spec = specs.get(sl["arch"])
+                    if spec is None:
+                        out["slices"].append({"arch": sl["arch"], "status": "error: slice not found by the product's fat parser"})
+                        continue
+                    path = members.materialize(binary, spec, Path(tmp) / sl["arch"], sha256=sl["sha256"])
+                    st_truth = {**truth, **{k: sl[k] for k in ("code_ranges", "imports", "functions", "image_base", "machine")}}
+                    t0 = time.perf_counter()
+                    r = run_native(path, st_truth, cfg, backend)
+                    r.update({"arch": sl["arch"], "member": spec["member"], "base_row": sl["base_row"],
+                              "identical_to_thin_row": (BENCH / sl["base_row"] / "bin" / "benchgo").is_file()
+                              and members._sha(BENCH / sl["base_row"] / "bin" / "benchgo") == sl["sha256"],
+                              "wall_seconds": round(time.perf_counter() - t0, 3)})
+                    out["slices"].append(r)
+            elif truth.get("member"):
+                spec = next((m for m in members.apk_native_libs(binary) if m["member"] == truth["member"]["path"]), None)
+                if spec is None:
+                    return {"status": f"error: {truth['member']['path']} not found by the product's APK member listing"}
+                path = members.materialize(binary, spec, Path(tmp), sha256=truth["member"]["sha256"])
+                out.update(run_native(path, truth, cfg, backend))
+                out["member"] = spec["member"]
+                out["abi"] = spec["abi"]
+            else:
+                return {"status": "error: container row without slices/member truth"}
+        finally:
+            backend.pool.close_all()   # release the extracted copies before the temp folder is removed (Windows file locks)
     return out
 
 
@@ -556,6 +599,8 @@ def run_benchmark(rows: list[dict], cfg: dict) -> dict:
                                             "rz_ghidra_plugin": str(tool.ghidra_plugin) if tool.ghidra_plugin else None}
                     if rz is None:
                         res["status"] = f"not run: {rz_err}"
+                    elif truth and (truth.get("slices") or truth.get("member")):
+                        res.update(run_container(row["binary"], truth, cfg, rz))
                     else:
                         res.update(run_native(row["binary"], truth, cfg, rz))
                 elif row["kind"] == "dotnet":
@@ -616,9 +661,21 @@ def render_markdown(rep: dict) -> str:
           "## Native rows", "",
           "| Row | Truth fns | Found | Boundary recall | Boundary precision | Own-fn recall | Named recall | Name precision | Real-decompiler coverage (own) | Decompile failures | Imports recall | Strings recall | Packed detected | Analysis s | Decompile s | Total s | Native-language rebuild |",
           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    lines: list[tuple[str, dict]] = []
     for r in rep["rows"]:
         if not r["kind"].startswith("native") or r.get("status") != "ok":
             continue
+        if isinstance(r.get("slices"), list):
+            lines += [(f"{r['row']} [{sl['arch']}]", {**sl, "kind": r["kind"]}) for sl in r["slices"]]
+        elif r.get("member"):
+            lines.append((f"{r['row']} [{r['member']}]", r))
+        else:
+            lines.append((r["row"], r))
+    for label, r in lines:
+        if r.get("status") != "ok":
+            L.append(f"| {label} | {r.get('status')} |" + " |" * 15)
+            continue
+        r = {**r, "row": label}
         f = r.get("functions")
         d = r.get("decompile") or {}
         s = r.get("seconds", {})
@@ -689,7 +746,13 @@ def render_markdown(rep: dict) -> str:
           "* Analysis passes (R1, `backends/rizin_passes.py`): `sigpacks` = FLIRT packs built from the MSVC 14.29 runtime libraries and the Rust 1.98.1 std rlibs (`scripts/build_sigpacks.py`, pinned in `rebuild_controller/data/sigpacks/manifest.json`; never built from this corpus); `pdata` = x64 exception-directory function starts (chained entries and EH funclets skipped); `relocptrs` = functions at relocated code pointers no analysed function covers; `thunks` = `jmp [IAT]` thunks named after their import.",
           "* Failures per row are listed in `reports/benchmark.json` (`decompile.failures`, `imports.missing_sample`, `strings.missing`).",
           "* Reproduce: `python fixtures/bench/build_bench.py --verify` (corpus), then `python scripts/benchmark.py` (needs rizin; REBUILD_STUDIO_TOOLS).",
-          "* Native-language rebuild (R4): `python scripts/benchmark.py --only-native-rebuild` re-measures only that column (needs ILSpy + .NET SDK, CFR + JDK) and keeps the other measurements.", ""]
+          "* Native-language rebuild (R4): `python scripts/benchmark.py --only-native-rebuild` re-measures only that column (needs ILSpy + .NET SDK, CFR + JDK) and keeps the other measurements.",
+          "* Container rows (R7): `go_macho_fat [arch]` is one slice of the universal file and `go_apk_arm64 [lib/<abi>/...]` the native library inside the APK, each taken out by the product's own member extraction (`backends/members.py`, sha256-checked) and analysed like a plain file. The Mach-O and APK rows carry no import list in their truth (build_bench.py does not extract Mach-O bind info or ELF dynamic symbols), so Imports recall is n/a.",
+          "* `--merge` re-measures only the selected rows and keeps the rest of the report as it was (see the measured-at list below)."]
+    merged = rep.get("merged_rows") or {}
+    if merged:
+        L += ["", "Rows measured after the main run (`--merge`): " + ", ".join(f"{k} ({v})" for k, v in sorted(merged.items())) + "."]
+    L.append("")
     return "\n".join(L)
 
 
@@ -699,6 +762,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", type=Path, help="JSON file with analyzer knobs (merged over the defaults)")
     ap.add_argument("--out-dir", type=Path, default=REPO / "reports")
     ap.add_argument("--no-legacy", action="store_true", help="skip the original acceptance fixtures")
+    ap.add_argument("--merge", action="store_true", help="re-measure only --rows and keep every other row of <out-dir>/benchmark.json")
     ap.add_argument("--only-native-rebuild", action="store_true",
                     help="keep the other measurements in <out-dir>/benchmark.json and (re)run only the native-language rebuild column")
     a = ap.parse_args(argv)
@@ -714,6 +778,18 @@ def main(argv: list[str] | None = None) -> int:
                 r["native_rebuild"] = _native_rebuild_safe(src, cfg)
         rep.setdefault("config", {})["native_rebuild"] = cfg["native_rebuild"]
         rep["native_rebuild_generated_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    elif a.merge:
+        rep = json.loads((a.out_dir / "benchmark.json").read_text(encoding="utf-8"))
+        new = run_benchmark(rows, cfg)
+        order = [r["row"] for r in discover_rows(None, True)]
+        by = {r["row"]: r for r in rep["rows"]}
+        stamp = new["generated_utc"]
+        for r in new["rows"]:
+            by[r["row"]] = r
+            rep.setdefault("merged_rows", {})[r["row"]] = stamp
+        rep["rows"] = sorted(by.values(), key=lambda r: order.index(r["row"]) if r["row"] in order else len(order))
+        for k, v in new["environment"].items():
+            rep["environment"].setdefault(k, v)
     else:
         rep = run_benchmark(rows, cfg)
     a.out_dir.mkdir(parents=True, exist_ok=True)

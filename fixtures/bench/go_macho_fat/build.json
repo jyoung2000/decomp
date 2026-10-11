@@ -1,0 +1,17 @@
+{
+ "row": "go_macho_fat",
+ "what": "fat/universal Mach-O (x86_64 + arm64) assembled from the two thin rows by tools/macho_fat.py (no lipo on the host); slices are byte-identical to the thin rows",
+ "toolchain": "go version go1.27.0 windows/amd64; fat header by fixtures/bench/tools/macho_fat.py",
+ "commands": [
+  "GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o benchgo .",
+  "(truth build) go build -trimpath -buildvcs=false -ldflags=-buildid= -o sym_benchgo .",
+  "GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o benchgo .",
+  "(truth build) go build -trimpath -buildvcs=false -ldflags=-buildid= -o sym_benchgo .",
+  "python fixtures/bench/tools/macho_fat.py benchgo_universal go_macho_x64/benchgo go_macho_arm64/benchgo"
+ ],
+ "stripped_how": "-ldflags '-s -w' removes the symbol table and DWARF (pclntab remains, as in every Go binary); each slice is the stripped thin build",
+ "binary_sha256": "331f295abd9c1b54aac10a6b7fe9c8a87fec10b850cafa7579fae5f5906f305c",
+ "binary_size": 5182130,
+ "source": "go_pe_x64/src",
+ "reproduce": "python fixtures/bench/build_bench.py --rows go_macho_fat"
+}

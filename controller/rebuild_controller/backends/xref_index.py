@@ -34,6 +34,13 @@ CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 MAX_TEXT = 1000
 
 
+_ADDR_MAX = (1 << 63) - 1      # SQLite INTEGER is signed 64-bit; rizin reports unmapped strings at UT64_MAX (seen on arm64 ELF)
+
+
+def _addr_ok(a: Any) -> bool:
+    return isinstance(a, int) and not isinstance(a, bool) and 0 <= a <= _ADDR_MAX
+
+
 class _Owner:
     def __init__(self, functions: list[dict[str, Any]]):
         spans = []
@@ -72,17 +79,19 @@ def build(db_path: Path, *, functions: list[dict[str, Any]], strings: list[dict[
         own = _Owner(functions)
         con.executemany("INSERT OR IGNORE INTO functions VALUES (?,?,?,?,?,?)",
                         [(f["offset"], str(f.get("name") or ""), f.get("size"), f.get("minbound"), f.get("maxbound"), f.get("nbbs"))
-                         for f in functions if isinstance(f.get("offset"), int)])
+                         for f in functions if _addr_ok(f.get("offset"))])
         con.executemany("INSERT OR IGNORE INTO strings VALUES (?,?,?,?,?)",
                         [(s["vaddr"], str(s.get("string") or "")[:MAX_TEXT], s.get("type"), s.get("section"), s.get("length"))
-                         for s in strings if isinstance(s.get("vaddr"), int)])
+                         for s in strings if _addr_ok(s.get("vaddr"))])
         rows = []
         for x in xrefs:
             src, dst = x.get("from"), x.get("to")
-            if not isinstance(src, int) or not isinstance(dst, int):
+            if not _addr_ok(src) or not _addr_ok(dst):
                 continue
             rows.append((src, dst, str(x.get("type") or ""), own.of(src), dst if dst in own.starts else own.of(dst)))
         for slot, val in pointers or []:
+            if not _addr_ok(slot) or not _addr_ok(val):
+                continue
             if own.of(slot) is None:   # pointers inside code are jump tables etc., not data tables
                 rows.append((slot, val, "PTR", None, val if val in own.starts else own.of(val)))
         con.executemany("INSERT INTO xrefs VALUES (?,?,?,?,?)", rows)

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- R7 bench row go_apk_arm64: an app whose native code is our own Go program (benchgo) shipped as lib/arm64-v8a/libbenchgo.so.
+     extractNativeLibs=true: the package manager extracts the helper into nativeLibraryDir, where MainActivity runs it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.rebuildstudio.benchapk"
+    android:versionCode="1"
+    android:versionName="1.0">
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
+    <application android:label="benchapk" android:extractNativeLibs="true" android:allowBackup="false">
+        <activity android:name="dev.rebuildstudio.benchapk.MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -42,8 +42,8 @@ FUTURE_TOOLS: dict[str, list[dict[str, str]]] = {
         _tool("FModel", "GPL-3.0", "https://github.com/4sval/FModel", "GUI asset browser built on CUE4Parse; interactive, not scriptable enough for the pipeline"),
     ],
     "native_macho": [
-        _tool("Rizin", "LGPL-3.0", "https://github.com/rizinorg/rizin", "already pinned for PE/ELF; Mach-O support exists upstream but has no fixture or regression in this repo"),
-        _tool("LIEF", "Apache-2.0", "https://github.com/lief-project/LIEF", "Mach-O/fat parsing library (already a dependency for PE inspection)"),
+        _tool("swift-demangle (Swift toolchain)", "Apache-2.0", "https://github.com/swiftlang/swift",
+              "Swift symbol demangling (rizin 0.9.1 has none); Mach-O analysis itself is integrated through Rizin since R7"),
     ],
     "android": [
         _tool("Apktool", "Apache-2.0", "https://github.com/iBotPeaches/Apktool", "resources.arsc / res decoding and smali round trip"),
@@ -91,8 +91,9 @@ SUPPORT: dict[str, dict[str, Any]] = {
                            "original C# source, comments and local names", "Unity assets (scenes/prefabs/textures)"],
         "rebuild": "None is produced from code. Any rebuild would be a clean-room re-implementation driven by recorded behavior; the plan marks it unsupported.",
         "verification": "tests/test_support_triage.py (synthetic headers only; no real IL2CPP game)",
-        "blocker": "No IL2CPP dumper/lifter is integrated.",
-        "next_action": "Use the identifier list and run scenario capture on the original; consider adding Il2CppDumper/Cpp2IL (see candidate tools).",
+        "blocker": ("No IL2CPP dumper/lifter is integrated. Il2CppDumper/Cpp2IL need a real GameAssembly + global-metadata.dat pair produced by "
+                    "Unity's IL2CPP build; no Unity editor exists on the build host to make one we own, and third-party games are not used as samples."),
+        "next_action": "Use the identifier list and run scenario capture on the original; Il2CppDumper/Cpp2IL (MIT) can be adopted once an owned IL2CPP build exists (see candidate tools).",
     },
     "gamemaker": {
         "title": "GameMaker", "status": "detected_only", "backend": "triage",
@@ -102,18 +103,21 @@ SUPPORT: dict[str, dict[str, Any]] = {
         "cannot_recover": ["GML scripts, room/object logic and decoded sprites/audio", "native-compiled (YYC) game logic"],
         "rebuild": "None is produced from code. Any rebuild would be a clean-room re-implementation driven by recorded behavior; the plan marks it unsupported.",
         "verification": "tests/test_support_triage.py (synthetic FORM/GEN8 sample; no real GameMaker game)",
-        "blocker": "No data.win decompiler is integrated.",
-        "next_action": "Capture scenarios from the running original; consider UndertaleModTool as an external process (GPL-3.0, see candidate tools).",
+        "blocker": ("No data.win decompiler is integrated. UndertaleModTool needs a complete data.win written by GameMaker; no GameMaker runner exists "
+                    "on the build host to make one we own, and third-party games are not used as samples."),
+        "next_action": "Capture scenarios from the running original; UndertaleModTool can be adopted as an external process (GPL-3.0) once an owned GameMaker build exists.",
     },
     "android": {
         "title": "Android app (APK/AAB)", "status": "partial", "backend": "jvm",
         "can_recover": ["manifest facts: package, version, SDK levels, permissions, components, launcher activity (built-in AXML parser)",
                         "dex inventory: dex count, class and method counts, class names (built-in dex reader)",
-                        "Java-like source for the dex code and decoded resources when jadx is installed (best effort)"],
-        "cannot_recover": ["original Kotlin/Java source, comments and (when obfuscated) real names", "native libraries (lib/*.so) are listed, not decompiled",
-                           "a rebuildable Android project or a signed APK"],
+                        "Java-like source for the dex code and decoded resources when jadx is installed (best effort)",
+                        "native libraries lib/<abi>/*.so: functions, strings and pseudo-C per ABI through Rizin, each library as its own native module"],
+        "cannot_recover": ["original Kotlin/Java source, comments and (when obfuscated) real names", "a rebuildable Android project or a signed APK",
+                           "the JNI glue between Java and native code (each side is analysed separately)"],
         "rebuild": "Reference Java sources only. The rebuild is a re-implementation in the chosen target and is judged by scenarios from the original; the APK itself is not repackaged.",
-        "verification": "tests/test_jvm.py (jadx on a real minimal APK when installed; manifest/dex parsers always)",
+        "verification": ("tests/test_jvm.py (jadx on a real minimal APK when installed; manifest/dex parsers always); native libraries: bench row "
+                         "go_apk_arm64 (tests/test_input_kinds.py)"),
         "blocker": "Code recovery needs jadx plus a Java runtime (both pinned in docs/dependency-lock.json); without them only manifest/dex evidence is produced.",
         "next_action": "Install the jadx and Temurin JRE entries from the dependency lock (Setup-Dependencies.ps1) and re-run recovery.",
     },
@@ -136,18 +140,23 @@ SUPPORT: dict[str, dict[str, Any]] = {
                            "anything inside an encrypted pak without the AES key"],
         "rebuild": "None is produced from code. Any rebuild would be a clean-room re-implementation driven by recorded behavior; the plan marks it unsupported.",
         "verification": "tests/test_support_triage.py (synthetic pak footer; no real Unreal game)",
-        "blocker": "No pak/IoStore extractor or uasset parser is integrated.",
-        "next_action": "Capture scenarios from the running original; consider CUE4Parse as a library behind a new backend (Apache-2.0, see candidate tools).",
+        "blocker": ("No pak/IoStore extractor or uasset parser is integrated. CUE4Parse is a library (no command line), and a meaningful fixture needs "
+                    "paks/assets cooked by Unreal Engine; no engine exists on the build host, and a pak written by our own script would only test that script."),
+        "next_action": "Capture scenarios from the running original; CUE4Parse (Apache-2.0) can be wrapped behind a new backend once an owned cooked build exists.",
     },
     "native_macho": {
-        "title": "macOS/iOS executable (Mach-O)", "status": "detected_only", "backend": "triage",
-        "can_recover": ["architectures (including every slice of a fat/universal binary), file type, platform, linked dylibs",
-                        "encryption flag (FairPlay-encrypted App Store binaries cannot be analysed)"],
-        "cannot_recover": ["functions and pseudo-C: no Mach-O regression exists, so analysis is not offered", "Objective-C/Swift metadata and source"],
-        "rebuild": "None is produced from code. Any rebuild would be a clean-room re-implementation driven by recorded behavior; the plan marks it unsupported.",
-        "verification": "tests/test_support_triage.py (synthetic thin and fat headers)",
-        "blocker": "No Mach-O fixture or verified analysis path; the host also cannot execute Mach-O binaries to capture behavior.",
-        "next_action": "Provide a decrypted binary and a macOS/iOS runtime for scenario capture; Rizin/LIEF are candidates once a fixture exists.",
+        "title": "macOS/iOS executable (Mach-O)", "status": "supported", "backend": "rizin",
+        "can_recover": ["imports/exports, strings, functions and per-function pseudo-C (Rizin + rz-ghidra); a fat/universal binary is analysed "
+                        "slice by slice, each slice as its own module",
+                        "architectures, file type, platform, linked dylibs and the encryption flag (built-in parser)"],
+        "cannot_recover": ["original source, identifiers, comments and types", "Swift names stay mangled (rizin 0.9.1 has no Swift demangler)",
+                           "code of FairPlay-encrypted App Store binaries (reported as encrypted, never decrypted)",
+                           "the original's behaviour on this Windows host: Mach-O programs cannot run here, so scenarios must come from a Mac"],
+        "rebuild": ("A clean-room re-implementation in the chosen target language, guided by the pseudo-C; scenarios have to be recorded on "
+                    "macOS/iOS or supplied as a baseline file."),
+        "verification": ("bench rows go_macho_x64, go_macho_arm64, go_macho_fat (Go-built, truth from the unstripped twin; tests/test_input_kinds.py); "
+                         "no Apple clang/Swift-built fixture (no Apple toolchain on the build host)"),
+        "blocker": "", "next_action": "Record scenarios on a Mac (or supply a baseline file) to compare a rebuild with the original.",
     },
     "godot": {
         "title": "Godot 4 (PCK)", "status": "supported", "backend": "gdre",
@@ -278,47 +287,54 @@ def _macho_thin(f, base: int, size: int) -> dict[str, Any]:
     return out
 
 
-def inspect_macho(path: Path | str) -> dict[str, Any]:
+def inspect_macho(path: Path | str | bytes) -> dict[str, Any]:
+    """Slice table and per-slice facts of a Mach-O file (or of Mach-O bytes, e.g. a slice or an archive member)."""
+    if isinstance(path, (bytes, bytearray)):
+        import io
+        return _inspect_macho(io.BytesIO(path), len(path))
     p = Path(path)
-    size = p.stat().st_size
     with open(p, "rb") as f:
-        head = f.read(4096)
-        kind = macho_kind(head)
-        if kind is None:
-            raise ValueError("not a Mach-O file")
-        slices: list[dict[str, Any]] = []
-        if kind == "thin":
-            if size < 28:
-                raise ValueError("truncated Mach-O header")
-            slices.append(_macho_thin(f, 0, size))
-        else:
-            end, is64 = _MACHO_FAT[head[:4]]
-            n = struct.unpack(end + "I", head[4:8])[0]
-            entry = 32 if is64 else 20
-            for i in range(n):
-                rec = head[8 + i * entry: 8 + (i + 1) * entry]
-                if len(rec) < entry:
-                    break
-                if is64:
-                    cpu, sub, off, sz = struct.unpack(end + "iiQQ", rec[:24])
+        return _inspect_macho(f, p.stat().st_size)
+
+
+def _inspect_macho(f, size: int) -> dict[str, Any]:
+    head = f.read(4096)
+    kind = macho_kind(head)
+    if kind is None:
+        raise ValueError("not a Mach-O file")
+    slices: list[dict[str, Any]] = []
+    if kind == "thin":
+        if size < 28:
+            raise ValueError("truncated Mach-O header")
+        slices.append(_macho_thin(f, 0, size))
+    else:
+        end, is64 = _MACHO_FAT[head[:4]]
+        n = struct.unpack(end + "I", head[4:8])[0]
+        entry = 32 if is64 else 20
+        for i in range(n):
+            rec = head[8 + i * entry: 8 + (i + 1) * entry]
+            if len(rec) < entry:
+                break
+            if is64:
+                cpu, sub, off, sz = struct.unpack(end + "iiQQ", rec[:24])
+            else:
+                cpu, sub, off, sz = struct.unpack(end + "iiII", rec[:16])
+            entry_info: dict[str, Any] = {"declared_arch": _CPU.get(cpu & 0xFFFFFFFF, hex(cpu & 0xFFFFFFFF)), "offset": off, "size": sz}
+            if off + 28 <= size:
+                f.seek(off)
+                if f.read(4) in _MACHO_THIN:
+                    entry_info.update(_macho_thin(f, off, size))
                 else:
-                    cpu, sub, off, sz = struct.unpack(end + "iiII", rec[:16])
-                entry_info: dict[str, Any] = {"declared_arch": _CPU.get(cpu & 0xFFFFFFFF, hex(cpu & 0xFFFFFFFF)), "offset": off, "size": sz}
-                if off + 28 <= size:
-                    f.seek(off)
-                    if f.read(4) in _MACHO_THIN:
-                        entry_info.update(_macho_thin(f, off, size))
-                    else:
-                        entry_info["parse_note"] = "slice header not Mach-O"
-                else:
-                    entry_info["parse_note"] = "slice offset outside file"
-                slices.append(entry_info)
+                    entry_info["parse_note"] = "slice header not Mach-O"
+            else:
+                entry_info["parse_note"] = "slice offset outside file"
+            slices.append(entry_info)
     enc = any(s.get("encrypted") for s in slices)
     return {"format": "macho", "layout": "fat" if kind == "fat" else "thin", "slice_count": len(slices), "slices": slices,
             "architectures": sorted({s.get("arch") or s.get("declared_arch") for s in slices}), "encrypted": enc,
-            "can_still_get": ["architectures and slice table", "linked dylibs", "platform and encryption flag"],
-            "blocker": ("binary is encrypted (LC_ENCRYPTION_INFO cryptid != 0): code is not readable until decrypted" if enc else
-                        "no Mach-O analysis path is verified in this build")}
+            "can_still_get": ["architectures and slice table", "linked dylibs", "platform and encryption flag",
+                              "functions, strings and pseudo-C per slice through the native analysis (rizin)"],
+            "blocker": ("binary is encrypted (LC_ENCRYPTION_INFO cryptid != 0): code is not readable until decrypted" if enc else "")}
 
 
 # =====================================================================================================================

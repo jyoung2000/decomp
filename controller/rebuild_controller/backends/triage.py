@@ -1,4 +1,7 @@
-"""Triage backend for input kinds that are detected but NOT recoverable: Unity IL2CPP, GameMaker, Unreal, Mach-O.
+"""Triage backend for input kinds that are detected but NOT recoverable (Unity IL2CPP, GameMaker, Unreal) plus Mach-O header facts.
+
+Mach-O code is analysed by the rizin backend since R7 (thin files directly, fat files slice by slice); triage still gives the slice
+table, dylibs and encryption flag without any tool.
 
 It is deliberately honest: it never decompiles anything. ``describe`` returns the detection, the plain-language support statement and the
 candidate future tools; ``inspect`` returns what the built-in bounded parsers can still give (Mach-O slice table and flags, GameMaker
@@ -38,7 +41,7 @@ class TriageBackend(BackendAdapter):
         tool = RecoveryToolProbe("builtin-parsers", Availability.INSTALLED, version=PARSER_VERSION, license="project-internal",
                                  detail="pure-Python bounded header parsers; no external tool and no code recovery", integration="library")
         return BackendInfo(
-            backend_id=BACKEND_ID, title="Triage for detected-only kinds (IL2CPP, GameMaker, Unreal, Mach-O)",
+            backend_id=BACKEND_ID, title="Triage for detected-only kinds (IL2CPP, GameMaker, Unreal) and Mach-O headers",
             formats=["il2cpp_metadata", "gamemaker_data", "unreal_pak", "unreal_iostore", "macho"],
             platforms=["windows", "linux", "macos"], profiles=list(PROFILES),
             operations=[

@@ -656,9 +656,48 @@ class RizinSession:
         with self.owned():
             data, trunc = self._run("aflj", poll=poll, needs_analysis=True, timeout=300)
             data = [f for f in data or [] if isinstance(f, dict)]
+            if trunc:
+                # aflj is one JSON document; on large binaries (Go arm64: ~9 MB for 2700 functions) it overflows the output cap and
+                # the tail of the list was silently lost. List the addresses compactly, then read the records in pages.
+                paged = self._functions_paged(poll)
+                if paged is not None:
+                    data, trunc = paged
             if not trunc:
                 self._functions = data
             return data, trunc
+
+    FUNCTION_PAGE = 200
+
+    def _functions_paged(self, poll=None) -> tuple[list[dict[str, Any]], bool] | None:
+        """Every analysed function's afij record, read in pages (analysis must already have run; also used by the analysis passes)."""
+        text, t = self._exec("aflq", timeout=300, poll=poll)
+        if t:
+            return None
+        addrs = []
+        for ln in (text or "").splitlines():
+            tok = ln.split(None, 1)[0] if ln.strip() else ""
+            if tok.startswith("0x"):
+                try:
+                    addrs.append(int(tok, 16))
+                except ValueError:
+                    continue
+        out: list[dict[str, Any]] = []
+        trunc = False
+        for i in range(0, len(addrs), self.FUNCTION_PAGE):
+            page = " ".join(_addr(a) for a in addrs[i:i + self.FUNCTION_PAGE])
+            chunk, t2 = self._exec(f"afij @@= {page}", timeout=300, poll=poll)
+            trunc = trunc or t2
+            for ln in (chunk or "").splitlines():
+                ln = ln.strip()
+                if not ln.startswith("["):
+                    continue
+                try:
+                    recs = json.loads(ln)
+                except ValueError:
+                    trunc = True
+                    continue
+                out.extend(r for r in recs if isinstance(r, dict))
+        return out, trunc or len(out) < len(addrs)
 
     def cached_functions(self, poll=None) -> list[dict[str, Any]]:
         with self.owned():
@@ -1098,7 +1137,7 @@ class RizinBackend(BackendAdapter):
         return BackendInfo(
             backend_id=self.backend_id, title="Rizin (rzpipe) native analysis",
             formats=["pe", "elf", "macho", "raw"], platforms=["linux", "windows", "macos"],
-            profiles=["native_pe", "native_elf", "unity_il2cpp", "unreal", "gamemaker"],
+            profiles=["native_pe", "native_elf", "native_macho", "unity_il2cpp", "unreal", "gamemaker"],
             operations=list(OPERATIONS), tools=[rz],
             # rz-ghidra is optional: listed separately so its absence does not mark the whole backend missing.
             resources={"ram_mb": 512, "disk_mb": 50, "time": "seconds to minutes per module (aaa)",

@@ -14,7 +14,12 @@ Ground truth: our own sources built with symbols (PDB / Go symbol table / unobfu
 | c_msvc_x64_o2 | 95 | 87 | 91.6% | 100.0% | 86.4% | 47.4% | 93.8% | 86.4% (19/22) | 3 | 100.0% | 100.0% | - | 1.3 | 0.3 | 19.6 | n/a (no original-language source; Rust port) |
 | c_msvc_x86_o2 | 95 | 91 | 95.8% | 100.0% | 95.5% | 53.7% | 98.1% | 95.5% (21/22) | 1 | 100.0% | 100.0% | - | 1.3 | 0.2 | 16.6 | n/a (no original-language source; Rust port) |
 | cpp_msvc_x64_o2 | 184 | 155 | 84.2% | 100.0% | 79.0% | 32.1% | 72.0% | 79.0% (30/38) | 8 | 96.9% | 100.0% | - | 1.4 | 0.4 | 23.8 | n/a (no original-language source; Rust port) |
+| go_apk_arm64 [lib/arm64-v8a/libbenchgo.so] | 2666 | 2723 | 99.3% | 97.2% | 100.0% | 91.8% | 95.7% | 100.0% (9/9) | 0 | n/a | 100.0% | - | 13.8 | 0.2 | 17.0 | n/a (no original-language source; Rust port) |
 | go_elf_x64 | 2715 | 2719 | 99.2% | 99.1% | 100.0% | 93.7% | 95.0% | 100.0% (9/9) | 0 | n/a | 100.0% | - | 11.7 | 0.6 | 16.3 | n/a (no original-language source; Rust port) |
+| go_macho_arm64 | 2732 | 2880 | 99.2% | 95.5% | 100.0% | 91.5% | 93.6% | 100.0% (9/9) | 0 | n/a | 100.0% | - | 12.0 | 0.2 | 13.2 | n/a (no original-language source; Rust port) |
+| go_macho_fat [x86_64] | 2770 | 2850 | 99.2% | 97.1% | 100.0% | 91.7% | 93.0% | 100.0% (9/9) | 0 | n/a | 100.0% | - | 6.4 | 0.3 | 7.5 | n/a (no original-language source; Rust port) |
+| go_macho_fat [arm64] | 2732 | 2880 | 99.2% | 95.5% | 100.0% | 91.5% | 93.6% | 100.0% (9/9) | 0 | n/a | 100.0% | - | 11.9 | 0.2 | 13.2 | n/a (no original-language source; Rust port) |
+| go_macho_x64 | 2770 | 2850 | 99.2% | 97.1% | 100.0% | 91.7% | 93.0% | 100.0% (9/9) | 0 | n/a | 100.0% | - | 6.4 | 0.3 | 7.4 | n/a (no original-language source; Rust port) |
 | go_pe_x64 | 2810 | 2822 | 99.4% | 99.0% | 100.0% | 94.5% | 95.9% | 100.0% (9/9) | 0 | 100.0% | 100.0% | - | 15.8 | 0.4 | 17.9 | n/a (no original-language source; Rust port) |
 | rust_msvc_x64 | 386 | 363 | 84.5% | 89.8% | 100.0% | 25.1% | 57.1% | 100.0% (9/9) | 0 | 100.0% | 100.0% | - | 2.1 | 0.4 | 37.3 | n/a (no original-language source; Rust port) |
 | upx_c_msvc_x64 | 95 | 87 | 91.6% | 100.0% | 86.4% | 47.4% | 93.8% | 86.4% (19/22) | 3 | 100.0% | 100.0% | yes (UPX), unpacked with upx 5.2.1 | 1.4 | 0.3 | 24.7 | n/a (no original-language source; Rust port) |
@@ -90,3 +95,7 @@ Deterministic fixes applied:
 * Failures per row are listed in `reports/benchmark.json` (`decompile.failures`, `imports.missing_sample`, `strings.missing`).
 * Reproduce: `python fixtures/bench/build_bench.py --verify` (corpus), then `python scripts/benchmark.py` (needs rizin; REBUILD_STUDIO_TOOLS).
 * Native-language rebuild (R4): `python scripts/benchmark.py --only-native-rebuild` re-measures only that column (needs ILSpy + .NET SDK, CFR + JDK) and keeps the other measurements.
+* Container rows (R7): `go_macho_fat [arch]` is one slice of the universal file and `go_apk_arm64 [lib/<abi>/...]` the native library inside the APK, each taken out by the product's own member extraction (`backends/members.py`, sha256-checked) and analysed like a plain file. The Mach-O and APK rows carry no import list in their truth (build_bench.py does not extract Mach-O bind info or ELF dynamic symbols), so Imports recall is n/a.
+* `--merge` re-measures only the selected rows and keeps the rest of the report as it was (see the measured-at list below).
+
+Rows measured after the main run (`--merge`): go_apk_arm64 (2026-10-11T00:05:16Z), go_macho_arm64 (2026-10-11T00:05:16Z), go_macho_fat (2026-10-11T00:05:16Z), go_macho_x64 (2026-10-11T00:05:16Z).

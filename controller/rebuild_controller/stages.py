@@ -11,13 +11,13 @@ from .jobs import JobState
 from .backends.inventory import build_dependency_graph, inventory_root
 from .jobs.runner import StageContext, StageError, StageRegistry
 
-PROFILE_STAGE = {"native_pe": "analyze_module", "native_elf": "analyze_module", "dotnet": "recover_managed", "unity_mono": "recover_managed",
+PROFILE_STAGE = {"native_pe": "analyze_module", "native_elf": "analyze_module", "native_macho": "analyze_module",
+                 "dotnet": "recover_managed", "unity_mono": "recover_managed",
                  "godot": "recover_engine", "electron": "recover_web", "web": "recover_web", "jvm": "recover_jvm", "android": "recover_jvm"}
 UNSUPPORTED_PROFILES = {
     "unity_il2cpp": "Unity IL2CPP: detected only. Game code is compiled to native code; no IL2CPP dumper is integrated (see the support statement).",
     "gamemaker": "GameMaker: detected only. No data.win decompiler is integrated (see the support statement).",
     "unreal": "Unreal: detected only. No pak/IoStore extractor or uasset parser is integrated (see the support statement).",
-    "native_macho": "Mach-O (macOS/iOS): detected only. No verified analysis path and macOS programs cannot run on this host.",
 }
 
 
@@ -81,6 +81,14 @@ def stage_inventory(ctx: StageContext) -> dict[str, Any]:
         if f["path"] in inv["modules"] and f.get("sha256"):
             mid = st.cases.add_module(case["case_id"], f["path"], f["sha256"], f["size"], d["format"], d["profile"], d.get("arch"), {"flags": d.get("flags", {}), "bits": d.get("bits")})
             modules.append((mid, f["path"], d["profile"]))
+        # R7: native code inside a container (fat Mach-O slices, APK/AAB lib/<abi>/*.so) becomes one module per slice / library,
+        # analysed like any native file (bytes copied to the case work folder when first used, sha256-checked)
+        for m in f.get("members") or []:
+            md = m["detect"]
+            mid = st.cases.add_module(case["case_id"], m["path"], m["sha256"], m["size"], md["format"], md["profile"], md.get("arch"),
+                                      {"flags": md.get("flags", {}), "bits": md.get("bits"), "container": {"rel_path": m["container"], **m["spec"]}})
+            modules.append((mid, m["path"], md["profile"]))
+    containers = {f["path"]: len(f["members"]) for f in inv["files"] if f.get("members")}
     unsupported = []
     dotnet_stems = {r.lower()[:-4]: r for _m, r, p in modules if p in ("dotnet", "unity_mono") and r.lower().endswith(".dll")}
     created = []
@@ -94,6 +102,9 @@ def stage_inventory(ctx: StageContext) -> dict[str, Any]:
             continue
         if stage == "analyze_module" and (st.cases.get_module(mid).get("meta") or {}).get("flags", {}).get("engine_binary") == "unity":
             unsupported.append({"module": rel, "profile": profile, "reason": "Unity engine runtime (UnityPlayer.dll): the engine, not the game's code; not analysed"})
+            continue
+        if stage == "analyze_module" and rel in containers and profile == "native_macho":
+            ctx.log(f"{rel} is a fat/universal Mach-O: analysing each of its {containers[rel]} slice(s) as its own module")
             continue
         if stage is None:
             unsupported.append({"module": rel, "profile": profile, "reason": UNSUPPORTED_PROFILES.get(profile, f"no backend for profile {profile}")})
@@ -114,9 +125,14 @@ def stage_inventory(ctx: StageContext) -> dict[str, Any]:
     for u in unsupported:
         ctx.log(f"Not analysed: {u['module']} — {u['reason']}", "warn")
         st.plan.add_item(case["case_id"], title=f"Unsupported: {u['module']}", outcome=u["reason"], kind="unsupported", reason="detected unsupported profile")
+    for rel, n in containers.items():
+        if not rel.lower().endswith((".apk", ".aab")):
+            continue
+        ctx.log(f"{rel} contains {n} native librar{'y' if n == 1 else 'ies'}: each is analysed as its own native module (per ABI)")
     ctx.progress(files_scanned=inv["file_count"], modules=inv["module_count"], recovery_jobs=len(created), unsupported=len(unsupported))
     ctx.log(f"Planned {len(created)} recovery job(s)" + (f"; {len(unsupported)} module(s) cannot be analysed" if unsupported else ""))
     return {"evidence_id": ev["evidence_id"], "profile": inv["profile"], "modules": len(modules), "recovery_jobs": created, "unsupported": unsupported,
+            "containers": containers,
             "truncated": inv["truncated"], "unknown_scope": inv["unknown_scope"]}
 
 

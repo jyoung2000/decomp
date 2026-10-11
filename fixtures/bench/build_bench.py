@@ -74,6 +74,22 @@ ROWS: dict[str, dict] = {
     "upx_c_msvc_x64": {"kind": "native_pe_x64", "lang": "C", "builder": "upx", "base_row": "c_msvc_x64_o2",
                        "binary": "benchc_upx.exe", "strings": C_STRINGS, "own": {"module": "benchc.obj"},
                        "what": f"c_msvc_x64_o2 packed with UPX {UPX_VERSION} --best (truth = the unpacked build)"},
+    # R7: Mach-O (thin x86_64 + arm64, and a fat/universal file assembled from them) and an Android APK whose native library is ours
+    "go_macho_x64": {"kind": "native_macho_x64", "lang": "Go", "builder": "go", "goos": "darwin", "goarch": "amd64", "src": "go_pe_x64/src",
+                     "binary": "benchgo", "strings": GO_STRINGS, "own": {"name_prefix": ["main."]},
+                     "what": "same Go source, darwin/amd64 thin Mach-O, stripped (-s -w); built by cross-compiling on Windows (never executed here)"},
+    "go_macho_arm64": {"kind": "native_macho_arm64", "lang": "Go", "builder": "go", "goos": "darwin", "goarch": "arm64", "src": "go_pe_x64/src",
+                       "binary": "benchgo", "strings": GO_STRINGS, "own": {"name_prefix": ["main."]},
+                       "what": "same Go source, darwin/arm64 thin Mach-O (Apple silicon), stripped (-s -w); cross-compiled, never executed here"},
+    "go_macho_fat": {"kind": "native_macho_fat", "lang": "Go", "builder": "macho_fat", "base_rows": ["go_macho_x64", "go_macho_arm64"],
+                     "binary": "benchgo_universal", "strings": GO_STRINGS, "own": {"name_prefix": ["main."]},
+                     "what": "fat/universal Mach-O (x86_64 + arm64) assembled from the two thin rows by tools/macho_fat.py (no lipo on the host); "
+                             "slices are byte-identical to the thin rows"},
+    "go_apk_arm64": {"kind": "native_apk", "lang": "Go+Java", "builder": "apk", "src": "go_apk_arm64/src", "go_src": "go_pe_x64/src",
+                     "binary": "benchapk.apk", "member": "lib/arm64-v8a/libbenchgo.so", "strings": GO_STRINGS, "own": {"name_prefix": ["main."]},
+                     "what": "unsigned APK (build-tools 34 aapt2/d8/zipalign) whose native library lib/arm64-v8a/libbenchgo.so is benchgo built for "
+                             "android/arm64 (position-independent ELF, stripped); no NDK on the host, so it is a helper executable in the "
+                             "library slot (run by MainActivity), not a JNI library"},
     "dotnet_plain": {"kind": "dotnet", "lang": "C#", "builder": "dotnet", "src": "dotnet_plain/src", "binary": "benchnet.dll",
                      "strings": NET_STRINGS, "what": ".NET 8 console (Release, Deterministic), names intact"},
     "dotnet_renamed": {"kind": "dotnet", "lang": "C#", "builder": "rename", "base_row": "dotnet_plain", "binary": "benchnet.dll",
@@ -176,12 +192,52 @@ def elf_facts(path: Path) -> dict:
     def nm(o: int) -> str:
         return data[strtab_off + o:data.index(b"\0", strtab_off + o)].decode("latin-1")
     sections = [{"name": nm(h[0]), "start": h[3], "end": h[3] + h[5], "exec": bool(h[2] & 0x4)} for h in hdrs if h[3]]
-    return {"image_base": 0, "sections": sections, "imports": [], "machine": "x86_64"}
+    machine, = struct.unpack_from("<H", data, 0x12)
+    return {"image_base": 0, "sections": sections, "imports": [], "machine": {0x3E: "x86_64", 0xB7: "aarch64"}.get(machine, hex(machine))}
+
+
+MACHO_CPU = {0x01000007: "x86_64", 0x0100000C: "arm64"}
+
+
+def macho_sections(data: bytes) -> tuple[list[dict], int, int]:
+    """(sections, __TEXT vmaddr, cputype) of a thin little-endian 64-bit Mach-O (LC_SEGMENT_64 only; what Go writes)."""
+    if data[:4] != b"\xcf\xfa\xed\xfe":
+        raise ValueError("not a thin little-endian Mach-O 64")
+    cpu, _sub, _ft, ncmds, _sz, _fl = struct.unpack_from("<iiIIII", data, 4)
+    off, sections, text_base = 32, [], 0
+    for _ in range(ncmds):
+        cmd, cmdsize = struct.unpack_from("<II", data, off)
+        if cmd == 0x19:                                       # LC_SEGMENT_64
+            segname = data[off + 8:off + 24].rstrip(b"\0").decode("latin-1")
+            vmaddr, = struct.unpack_from("<Q", data, off + 24)
+            nsects, = struct.unpack_from("<I", data, off + 64)
+            if segname == "__TEXT":
+                text_base = vmaddr
+            for i in range(nsects):
+                so = off + 72 + i * 80
+                sect = data[so:so + 16].rstrip(b"\0").decode("latin-1")
+                addr, size, foff = struct.unpack_from("<QQI", data, so + 32)
+                flags, = struct.unpack_from("<I", data, so + 64)
+                sections.append({"name": sect, "segment": segname, "start": addr, "end": addr + size, "offset": foff, "size": size,
+                                 "exec": bool(flags & 0x80000400)})   # S_ATTR_PURE_INSTRUCTIONS | S_ATTR_SOME_INSTRUCTIONS
+        off += cmdsize
+    return sections, text_base, cpu & 0xFFFFFFFF
+
+
+def macho_facts(path: Path) -> dict:
+    secs, base, cpu = macho_sections(path.read_bytes())
+    return {"image_base": base, "sections": [{k: s[k] for k in ("name", "start", "end", "exec")} for s in secs], "imports": [],
+            "machine": MACHO_CPU.get(cpu, hex(cpu))}
 
 
 def section_bytes(path: Path, name: str) -> bytes:
     """Raw bytes of a named section (used to prove the stripped and unstripped builds share the same code)."""
     data = path.read_bytes()
+    if data[:4] == b"\xcf\xfa\xed\xfe":
+        for sec in macho_sections(data)[0]:
+            if sec["name"] == name:
+                return data[sec["offset"]:sec["offset"] + sec["size"]]
+        raise KeyError(name)
     if data[:4] == b"\x7fELF":
         shoff, = struct.unpack_from("<Q", data, 0x28)
         shentsize, shnum, shstrndx = struct.unpack_from("<HHH", data, 0x3A)
@@ -325,21 +381,23 @@ def build_msvc(name: str, spec: dict, work: Path) -> dict:
 
 def build_go(name: str, spec: dict, work: Path) -> dict:
     src = BENCH / spec["src"]
-    env = {**os.environ, "GOOS": spec["goos"], "GOARCH": "amd64", "CGO_ENABLED": "0", "GOFLAGS": "-mod=mod", "GOTOOLCHAIN": "local",
+    goarch = spec.get("goarch", "amd64")
+    env = {**os.environ, "GOOS": spec["goos"], "GOARCH": goarch, "CGO_ENABLED": "0", "GOFLAGS": "-mod=mod", "GOTOOLCHAIN": "local",
            "GOCACHE": str(work / "gocache")}
     sym = work / ("sym_" + spec["binary"])
     out = work / spec["binary"]
     base = ["go", "build", "-trimpath", "-buildvcs=false"]
     run([*base, "-ldflags=-buildid=", "-o", str(sym), "."], cwd=src, env=env)
     run([*base, "-ldflags=-s -w -buildid=", "-o", str(out), "."], cwd=src, env=env)
-    if section_bytes(sym, ".text") != section_bytes(out, ".text"):
-        raise RuntimeError("stripped and unstripped Go builds differ in .text; truth would not apply")
-    facts = pe_facts(out) if spec["goos"] == "windows" else elf_facts(out)
+    text = "__text" if spec["goos"] == "darwin" else ".text"
+    if section_bytes(sym, text) != section_bytes(out, text):
+        raise RuntimeError(f"stripped and unstripped Go builds differ in {text}; truth would not apply")
+    facts = pe_facts(out) if spec["goos"] == "windows" else macho_facts(out) if spec["goos"] == "darwin" else elf_facts(out)
     funcs = truth_from_go(sym, facts, spec["own"])
     ver = run(["go", "version"]).strip()
     return {"binary": out, "functions": funcs, "facts": facts,
             "truth_source": "go tool nm -size -sort address on the unstripped build (identical .text, verified)",
-            "toolchain": ver, "commands": [f"GOOS={spec['goos']} GOARCH=amd64 CGO_ENABLED=0 {' '.join(base)} -ldflags='-s -w -buildid=' -o {out.name} .",
+            "toolchain": ver, "commands": [f"GOOS={spec['goos']} GOARCH={goarch} CGO_ENABLED=0 {' '.join(base)} -ldflags='-s -w -buildid=' -o {out.name} .",
                                            f"(truth build) {' '.join(base)} -ldflags=-buildid= -o sym_{out.name} ."],
             "stripped_how": "-ldflags '-s -w' removes the symbol table and DWARF (pclntab remains, as in every Go binary)"}
 
@@ -414,7 +472,75 @@ def build_rename(name: str, spec: dict, work: Path) -> dict:
             "stripped_how": f"identifiers renamed in the #Strings heap ({rep['renamed_count']} renamed, {rep['skipped_count']} kept)"}
 
 
-BUILDERS = {"msvc": build_msvc, "go": build_go, "rust": build_rust, "upx": build_upx, "dotnet": build_dotnet, "rename": build_rename}
+def build_macho_fat(name: str, spec: dict, work: Path) -> dict:
+    from macho_fat import build_fat
+    bases = []
+    for r in spec["base_rows"]:
+        (work / r).mkdir(parents=True, exist_ok=True)
+        bases.append(build_go(r, ROWS[r], work / r))
+    out = work / spec["binary"]
+    out.write_bytes(build_fat([b["binary"].read_bytes() for b in bases]))
+    slices = [{"base_row": r, "arch": b["facts"]["machine"], "binary_sha256": sha256(b["binary"]), "size": b["binary"].stat().st_size,
+               "facts": b["facts"], "functions": b["functions"]} for r, b in zip(spec["base_rows"], bases)]
+    return {"binary": out, "slices": slices, "truth_source": bases[0]["truth_source"] + "; per slice (slices byte-identical to the thin rows)",
+            "toolchain": bases[0]["toolchain"] + "; fat header by fixtures/bench/tools/macho_fat.py",
+            "commands": [c for b in bases for c in b["commands"]]
+                        + [f"python fixtures/bench/tools/macho_fat.py {out.name} " + " ".join(f"{r}/benchgo" for r in spec["base_rows"])],
+            "stripped_how": bases[0]["stripped_how"] + "; each slice is the stripped thin build"}
+
+
+def android_sdk() -> tuple[Path, Path]:
+    sdk = Path(os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+               or Path(os.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk")
+    bt, jar = sdk / "build-tools" / "34.0.0", sdk / "platforms" / "android-34" / "android.jar"
+    if not bt.is_dir() or not jar.is_file():
+        raise RuntimeError("not run: Android SDK build-tools 34.0.0 + platforms/android-34 not found (ANDROID_HOME)")
+    return bt, jar
+
+
+def build_apk(name: str, spec: dict, work: Path) -> dict:
+    """APK = aapt2 link (manifest) + d8 (MainActivity) + our Go helper as lib/arm64-v8a/libbenchgo.so, zipped with fixed
+    timestamps and stored entries, then zipalign -p 4 (uncompressed native library page-aligned, build-tools 34)."""
+    import zipfile
+    bt, jar = android_sdk()
+    exe = ".exe" if os.name == "nt" else ""
+    (work / "go").mkdir(parents=True, exist_ok=True)
+    lib = build_go(name, {**spec, "goos": "android", "goarch": "arm64", "src": spec["go_src"], "binary": "libbenchgo.so"}, work / "go")
+    src = BENCH / spec["src"]
+    classes = work / "classes"
+    classes.mkdir(parents=True, exist_ok=True)
+    javas = sorted(str(p) for p in (src / "java").rglob("*.java"))
+    run(["javac", "--release", "8", "-g:none", "-encoding", "UTF-8", "-cp", str(jar), "-d", str(classes), *javas])
+    d8 = bt / ("d8.bat" if os.name == "nt" else "d8")
+    run([str(d8), "--release", "--min-api", "24", "--lib", str(jar), "--output", str(work),
+         *sorted(str(p) for p in classes.rglob("*.class"))])
+    run([str(bt / f"aapt2{exe}"), "link", "--manifest", str(src / "AndroidManifest.xml"), "-I", str(jar), "-o", str(work / "base.apk")])
+    raw = work / "unaligned.apk"
+    with zipfile.ZipFile(work / "base.apk") as zin, zipfile.ZipFile(raw, "w", zipfile.ZIP_STORED) as zout:
+        entries = [(i.filename, zin.read(i)) for i in zin.infolist()]
+        entries.append(("classes.dex", (work / "classes.dex").read_bytes()))
+        entries.append((spec["member"], lib["binary"].read_bytes()))
+        for fn, blob in entries:
+            zi = zipfile.ZipInfo(fn, date_time=(2026, 1, 1, 0, 0, 0))
+            zi.compress_type = zipfile.ZIP_STORED
+            zi.external_attr = 0o644 << 16
+            zout.writestr(zi, blob)
+    out = work / spec["binary"]
+    run([str(bt / f"zipalign{exe}"), "-f", "-p", "4", str(raw), str(out)])
+    jv = subprocess.run(["javac", "-version"], capture_output=True, text=True)
+    return {**lib, "binary": out, "member_binary": lib["binary"], "member": spec["member"],
+            "toolchain": lib["toolchain"] + f"; {(jv.stdout or jv.stderr).strip()}; Android build-tools 34.0.0 (aapt2, d8, zipalign), android-34",
+            "commands": lib["commands"]
+                        + ["javac --release 8 -g:none -encoding UTF-8 -cp android.jar java/**/*.java",
+                           "d8 --release --min-api 24 --lib android.jar *.class",
+                           "aapt2 link --manifest AndroidManifest.xml -I android.jar -o base.apk",
+                           f"zip (stored, timestamps 2026-01-01): base.apk entries + classes.dex + {spec['member']}",
+                           "zipalign -f -p 4 unaligned.apk benchapk.apk"],
+            "stripped_how": lib["stripped_how"] + "; APK unsigned"}
+
+
+BUILDERS = {"msvc": build_msvc, "go": build_go, "rust": build_rust, "upx": build_upx, "dotnet": build_dotnet, "rename": build_rename,
+            "macho_fat": build_macho_fat, "apk": build_apk}
 
 
 def build_row(name: str, work: Path) -> dict:
@@ -447,8 +573,19 @@ def write_row(name: str, res: dict) -> dict:
         truth["dotnet"] = res["dotnet"]
         if "rename_report" in res:
             truth["rename_report"] = res["rename_report"]
+    elif "slices" in res:          # fat Mach-O: truth per slice (each slice is scored on its own)
+        truth["slices"] = [{"arch": sl["arch"], "base_row": sl["base_row"], "sha256": sl["binary_sha256"], "size": sl["size"],
+                            "image_base": hex(sl["facts"]["image_base"]), "machine": sl["facts"]["machine"],
+                            "code_ranges": [[hex(x["start"]), hex(x["end"])] for x in sl["facts"]["sections"] if x["exec"]],
+                            "imports": sl["facts"]["imports"], "functions": sl["functions"],
+                            "counts": {"functions": len(sl["functions"]), "own_functions": sum(1 for x in sl["functions"] if x["own"]),
+                                       "imports": len(sl["facts"]["imports"])}} for sl in res["slices"]]
+        truth["counts"] = {"slices": len(res["slices"]), "functions": sum(x["counts"]["functions"] for x in truth["slices"]),
+                           "own_functions": sum(x["counts"]["own_functions"] for x in truth["slices"])}
     else:
         f = res["facts"]
+        if res.get("member"):        # APK: the scored binary is the native library inside the package
+            truth["member"] = {"path": res["member"], "sha256": sha256(res["member_binary"]), "size": res["member_binary"].stat().st_size}
         truth.update({"image_base": hex(f["image_base"]), "machine": f["machine"],
                       "code_ranges": [[hex(s["start"]), hex(s["end"])] for s in f["sections"] if s["exec"]],
                       "imports": f["imports"], "functions": res["functions"],
@@ -457,7 +594,7 @@ def write_row(name: str, res: dict) -> dict:
     (row_dir / "truth" / "truth.json").write_text(json.dumps(truth, indent=1) + "\n", encoding="utf-8", newline="\n")
     build = {"row": name, "what": spec["what"], "toolchain": res["toolchain"], "commands": res["commands"],
              "stripped_how": res["stripped_how"], "binary_sha256": truth["binary"]["sha256"], "binary_size": size,
-             "source": spec.get("src") or ROWS[spec["base_row"]].get("src"), "reproduce": f"python fixtures/bench/build_bench.py --rows {name}"}
+             "source": spec.get("src") or ROWS[spec.get("base_row") or spec["base_rows"][0]].get("src"), "reproduce": f"python fixtures/bench/build_bench.py --rows {name}"}
     (row_dir / "build.json").write_text(json.dumps(build, indent=1) + "\n", encoding="utf-8", newline="\n")
     return build
 
