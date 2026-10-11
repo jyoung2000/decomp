@@ -230,3 +230,81 @@ All additive; nothing in sections 1-8 was renamed except the task id below (the 
   reason?, spent_usd, at, ...}]}`; `PUT /ai/jev {enabled?, monthly_cap_usd?}`; `PUT /ai/jev/key {key|null}`; `POST /ai/jev/key/import`
   (404 `jev_key_not_found`, 400 `jev_key_invalid`); `POST /ai/jev/test` -> `{ok, reason, message, model?, spent_usd?}`.
   Opt-in live check: `REBUILD_LIVE_JEV=1 pytest -m live tests/test_jev_live.py` (key from `REBUILD_JEV_KEY` or the install file).
+
+## 10. AI-assisted RE quality (R5)
+
+All additive; nothing in sections 1-9 was renamed. The verifier stays the only judge of behaviour.
+
+- **Context fit** (`prompt_fit.py`). `prompt_budget(task)` = the prompt characters that fit the FIRST usable rung of the task's
+  ladder (project override and locality applied): context = model `context_window`, for Ollama connections bounded by
+  `limits.num_ctx_cap` (default 32768); minus an answer reserve `min(max_output_tokens, max(4096, context / 4))` and 512 tokens of
+  margin; at 2 chars/token (the Ollama adapter's conservative estimate, so a fitted prompt is never refused there). Unknown context =
+  no fitting (the router still skips rungs that cannot fit). `fit_packet` trims the evidence packet to that budget and always keeps
+  valid JSON (the old code cut the JSON string): evidence index first, then excerpt bodies clipped (8000 / 3000 / 1200 chars), then
+  whole excerpts dropped lowest priority first (one function briefing / decompiled function per excerpt, so trimming removes whole
+  functions), then scenario output clipped; `packet.fit = {budget_chars, before_chars, after_chars, trimmed, index_dropped,
+  bodies_clipped, excerpts_dropped, scenarios_clipped, fits}`. When the current files would take more than 70% of the budget, the
+  files past that point (path order) are not shown ("NOT SHOWN ... unchanged unless you return them"; a proposal is applied on top of
+  the previous candidate, so unshown files are kept). Activity line: "Evidence trimmed to fit <model>'s context: A -> B chars (n
+  excerpt(s) left out)".
+- **Slim repair prompts** (attempt record `prompt = {mode: "full"|"slices", chars, budget_chars, context_tokens, budget_basis,
+  budget_model, fit?, slices?, errors?}`). When the feedback is a failed build (`build_failed`, also the first native-rebuild repair
+  when the recovered C#/Java does not compile) and the compiler messages map to candidate files (cargo `--> path:line:col`, csc
+  `file(line,col): error CSxxxx`, javac `file:line: error:`), the prompt carries ONLY: the compiler messages (error blocks, at most
+  5000 chars and 25 errors), each failing file's enclosing function around every error line (a file of up to 150 lines whole; no
+  function found = 30 lines either side), numbered, plus the names and sizes of the other files and the attempt history - no evidence
+  packet, no other file content. The model answers `{"edits": [{path, start_line, end_line, text}]}` (1-based inclusive; `""`
+  deletes; `end_line = start_line - 1` inserts; overlapping or out-of-range edits are an unusable answer); on Ollama the answer is
+  grammar-constrained (`output_format: "json_edits"`). Whole-file maps are still accepted. Edits are applied to the previous
+  candidate's files before anything else (identical-answer detection, build, verifier). An unusable or unchanged answer keeps the
+  compile errors as feedback, so the next try is slim again (with "Your last answer was IDENTICAL ..."). Activity line: "Repair prompt
+  carries only the failing code: n slice(s) of m file(s) and k compiler message(s) (N chars)". Scenario mismatches still send the
+  whole (fitted) prompt: a behaviour difference does not point at lines.
+- **Per-function AI naming** (`ai_naming.py`, job stage `ai_naming`, task `naming`). Inputs `{module_id, functions?: [addr|name],
+  limit=8 (max 50), include_named=false}`; default selection = the largest functions that still carry an automatic name (`fcn.*`,
+  `sub_*`, ...). Per function one model call: decompile (R2 `op_decompile`) -> prompt with the function facts and its decompiled code
+  (clipped to the context budget, at most 12000 chars) -> answer `{name, comment, locals, confidence}` (Ollama `json_naming` grammar,
+  at most 600 output tokens) -> every identifier validated with the annotation grammar (automatic-looking names refused) -> written
+  with `op_rename` / `op_add_comment` (`author: "model"`, `provenance: {model, provider, task: "naming", call_id, confidence}`). Each
+  call goes through the router (ladder, budget, cooldowns, policy) like any other; `no_ai` refuses before anything is sent. Result
+  `{module_id, functions, proposed, results:[{function, old_name, status: proposed|unusable_answer|not_applied|decompile_failed,
+  proposed, applied, model, latency_ms, problem?}], stop, budget}` and evidence `ai_naming`. Activity: "<model> proposed the name X for
+  fcn.Y; labelled model-proposed until you accept it".
+- **Model-proposed annotations** (`backends/re_annotations.py`). Every annotation entry may carry `prov = {origin: "model"|"user",
+  status: "proposed"|"accepted"|"confirmed", model, provider, task, call_id, confidence, at, replaced, analysis_name, accepted_at?,
+  confirmed_by?}`. Any change made with `author="model"` (AI naming and every MCP `rename` / `add_comment`, which already act as the
+  model) is `proposed`; a person's own edit is `origin: user`. `replaced` = the entry the FIRST model proposal overwrote (restored
+  exactly on reject); `analysis_name` = the analysis name before it. Labels: decompiled output gets header lines
+  `// [annotation @0x..] [model-proposed] function name X (not yet accepted)`, `... local a -> b ...` and `[model-proposed] <comment>`;
+  disassembly keeps the comment text and adds `comment_status`. `get_annotations` (MCP) and `GET .../annotations` add `proposals:
+  [{kind, key, local, value, status, label: "model-proposed"|"accepted by you"|"confirmed by a test", model, task, replaced,
+  analysis_name, ...}]` and `open_proposals`. Review (`op_review_annotation`): `accept` (a person), `confirm` (a test; `evidence` names
+  it; author `test`), `reject` (removes the entry or restores `replaced`; the module's live rizin process is dropped so the next
+  operation re-analyses and replays the stored annotations). A model can never review (`author` must be `user`, or `test` for
+  confirm). Rollback (`op_rollback_annotations`, a person only): the complete state of an earlier revision is stored as a NEW revision.
+- **Model scoreboard** (`scoreboard.py`, table `model_scores`, created idempotently). Rows `{source: case|benchmark, task, model,
+  provider, connection_id, locality, case_id, row, ok, compiled, verified, truth_match, latency_ms, cost_usd, cost_known, tokens_in,
+  tokens_out, detail}`: every implement / repair attempt (`ok` = usable files, `compiled` = the build passed, `verified` = the
+  verifier's verdict) and every naming call (`ok` = a valid name was written) is recorded automatically; benchmark rows are imported.
+  Summary per model and task: runs, ok, compiled, verified, real-name matches, median latency, cost, `score` (code: 2 x verify rate +
+  compile rate; naming: usable rate + 2 x real-name match rate), `ever_compiled`, `code_runs`. **Presets use it**: per task,
+  measured-and-worked models first (by score), then unmeasured models (size / coder heuristic as before), then models tried for code
+  that never compiled anything; per task `measured: [{model, basis: measured|heuristic, note, score}]` and `recommendation: {model,
+  basis, note}`; warnings "<model> was tried N time(s) for code here and never produced anything that compiles; it is kept but placed
+  after models that did." and "<model> has never compiled anything here yet (no measurement on this PC) ...". `POST /ai/local/use`
+  goes through the same preset.
+- **API**: `GET /ai/scoreboard?limit=` -> `{models, rows, recent}`; `POST /ai/scoreboard/import {rows: [...]}` (at most 5000; each
+  needs `task, model, ok`) -> `{imported, problems}`; `GET /cases/{id}/modules/{mid}/annotations?history=` -> `{revision, annotations,
+  proposals, open_proposals, history, label}`; `POST .../annotations/review {kind: function|global|local|comment, key, local?,
+  decision: accept|reject|confirm, evidence?}`; `POST .../annotations/rollback {revision}`; `POST /cases/{id}/modules/{mid}/ai/naming
+  {functions?, limit, include_named}` -> `{job, route, note}` (409 with the route problem when AI is off or no naming ladder exists).
+- **Benchmark**: `python scripts/benchmark.py --models a,b [--model-tasks naming,repair] [--naming-row c_msvc_x64_o2]
+  [--naming-functions 4] [--repair-models m] [--ollama URL]` scores local models through the product paths above and merges a
+  `model_scoreboard` section into `reports/benchmark.{json,md}` (other rows untouched): naming on the same functions for every model,
+  scored against the corpus truth (`exact`, and `match` = a shared or abbreviated meaningful word); repair = one attempt on
+  dotnetapp's recovered C# with the ILSpy null-case rule off (8/9 before). Opt-in live run: `REBUILD_LIVE_LOCAL=1
+  [REBUILD_LIVE_R5_WRITE=1] pytest -m live tests/test_live_local.py -k r5`.
+- **UI**: Connections -> "Model scoreboard" card (per model and task; "Never compiled" / "Compiled code here"); the preset preview
+  shows per task "First: <model>, measured on this PC (...)" or "chosen by size and coder heuristic (not measured here yet)"; project
+  AI tab -> "AI names and comments" (module, number of functions, "Name functions with AI", proposals with their label and the name
+  they replace, Accept / Reject, history with "Roll back to revision N"); hidden when the project has no native module.

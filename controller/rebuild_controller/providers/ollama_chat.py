@@ -70,6 +70,18 @@ def size_num_ctx(needed: int, model_context: int | None, cap: int) -> tuple[int,
 
 MIN_OUTPUT_TOKENS = 4096        # smallest output reserve worth sending when the context is the binding limit
 
+# R5: grammar-constrained answers for the slim repair (line edits) and the per-function naming task
+OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
+    "json_edits": {"type": "object", "properties": {"edits": {"type": "array", "items": {
+        "type": "object", "properties": {"path": {"type": "string"}, "start_line": {"type": "integer"}, "end_line": {"type": "integer"},
+                                         "text": {"type": "string"}}, "required": ["path", "start_line", "end_line", "text"]}}},
+        "required": ["edits"]},
+    "json_naming": {"type": "object", "properties": {"name": {"type": "string"}, "comment": {"type": "string"},
+                                                     "locals": {"type": "object", "additionalProperties": {"type": "string"}},
+                                                     "confidence": {"type": "number"}},
+                    "required": ["name", "comment"]},
+}
+
 
 class OllamaChatAdapter(ProviderAdapter):
     provider_key = "ollama:chat"
@@ -151,6 +163,8 @@ class OllamaChatAdapter(ProviderAdapter):
         elif (request.metadata or {}).get("output_format") == "json_file_map":
             # Grammar-constrained JSON: a 14B model wrote correct Rust but left one quote unescaped, so the whole answer was unusable.
             body["format"] = {"type": "object", "additionalProperties": {"type": "string"}}
+        elif (request.metadata or {}).get("output_format") in OUTPUT_SCHEMAS:
+            body["format"] = OUTPUT_SCHEMAS[request.metadata["output_format"]]
         if request.reasoning is not None and (request.reasoning.effort or request.reasoning.budget_tokens):
             body["think"] = True
         else:

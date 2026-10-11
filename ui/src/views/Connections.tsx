@@ -4,6 +4,7 @@ import { Empty, Loading } from '../components/Empty';
 import { ErrorCallout } from '../components/ErrorCallout';
 import { JevAdvisorCard } from '../components/ai/JevAdvisorCard';
 import { LadderSection } from '../components/ai/LadderSection';
+import { ModelScoreboard } from '../components/ai/ModelScoreboard';
 import { LocalAiSection } from '../components/ai/LocalAiSection';
 import { StatusChip } from '../components/StatusChip';
 import { useToast } from '../components/Toasts';
@@ -133,6 +134,7 @@ export function ConnectionsView() {
 
       <AddConnection onAdded={conns.reload} />
       <LadderSection connections={conns.data ?? []} version={ladderTick} />
+      <ModelScoreboard version={ladderTick} />
       <JevAdvisorCard />
       <Costs />
       <Hermes />

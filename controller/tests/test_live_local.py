@@ -205,3 +205,29 @@ def _secs(a: str | None, b: str | None) -> float | None:
         return round((dt.datetime.fromisoformat(b.replace("Z", "+00:00")) - dt.datetime.fromisoformat(a.replace("Z", "+00:00"))).total_seconds(), 1)
     except Exception:
         return None
+
+
+# ----------------------------------------------------------------------------------------------- R5 (c): model scoreboard
+def test_live_r5_model_scoreboard_naming_and_one_native_repair(tmp_path):
+    """R5: a few function-naming tasks per local model on a bench row with real names in its truth, and ONE native_rebuild repair
+    (dotnetapp, ILSpy null-case rule off) - through ``scripts/benchmark.py --models`` (the product's own AI paths). Writes the
+    "Model scoreboard (R5)" section into reports/benchmark.{json,md} when REBUILD_LIVE_R5_WRITE=1, else into a temp copy.
+    Env: REBUILD_LIVE_R5_MODELS (default qwen2.5-coder:14b,qwen2.5:14b,deepseek-coder-v2:16b), REBUILD_LIVE_R5_FUNCTIONS (default 4)."""
+    import sys
+    repo = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(repo / "scripts"))
+    import benchmark
+    models = os.environ.get("REBUILD_LIVE_R5_MODELS", "qwen2.5-coder:14b,qwen2.5:14b,deepseek-coder-v2:16b")
+    out = repo / "reports" if os.environ.get("REBUILD_LIVE_R5_WRITE") == "1" else tmp_path
+    if out == tmp_path and (repo / "reports" / "benchmark.json").is_file():
+        shutil.copy(repo / "reports" / "benchmark.json", tmp_path / "benchmark.json")
+    t0 = time.time()
+    assert benchmark.main(["--models", models, "--naming-functions", os.environ.get("REBUILD_LIVE_R5_FUNCTIONS", "4"), "--out-dir", str(out),
+                           "--ollama", OLLAMA]) == 0
+    ms = json.loads((out / "benchmark.json").read_text("utf-8"))["model_scoreboard"]
+    report("r5_model_scoreboard", {"seconds": round(time.time() - t0, 1), "summary": ms["summary"], "rows": ms["rows"]})
+    naming = [r for r in ms["rows"] if r["task"] == "naming" and r.get("status") == "ok"]
+    repair = [r for r in ms["rows"] if r["task"] == "repair"]
+    assert naming and all(r["latency_ms"] for r in naming if r["ok"]) and all(r["cost_usd"] == 0 for r in naming)
+    assert repair and repair[0]["status"] == "ok" and repair[0]["prompt_mode"] in ("full", "slices")
+    assert "## Model scoreboard (R5)" in (out / "benchmark.md").read_text("utf-8")

@@ -71,6 +71,14 @@ function rationaleText(r: string | undefined): string {
   return r;
 }
 
+/** R5: the preset says why its first model is first ("measured: 3 code attempts here, 2 compiled" or "not measured here yet"). */
+function recommendationOf(r: PresetResult, task: string): string | null {
+  const t = (r.tasks ?? {})[task] as { recommendation?: { model: string; basis: string; note: string } | null } | undefined;
+  const rec = t && !Array.isArray(t) ? t.recommendation : null;
+  if (!rec) return null;
+  return rec.basis === 'measured' ? `First: ${rec.model}, measured on this PC (${rec.note})` : `First: ${rec.model}, chosen by size and coder heuristic (${rec.note})`;
+}
+
 function PresetBar({ onApplied }: { onApplied: () => void }) {
   const api = useApi();
   const toast = useToast();
@@ -144,6 +152,11 @@ function PresetBar({ onApplied }: { onApplied: () => void }) {
                     </span>
                   ) : (
                     <span className="muted">no model; work that needs this task is skipped</span>
+                  )}
+                  {recommendationOf(pending.result, t.id) && (
+                    <div className="small muted" data-testid={`preset-rec-${t.id}`}>
+                      {recommendationOf(pending.result, t.id)}
+                    </div>
                   )}
                 </li>
               );

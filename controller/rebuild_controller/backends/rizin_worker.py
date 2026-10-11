@@ -1701,7 +1701,9 @@ class RizinBackend(BackendAdapter):
             cases = native.cases_of(ctx)
             rev, state, ev = annotations.load(cases, case_id, module_id)
             data: dict[str, Any] = {"revision": rev, "annotations": state,
-                                    "label": "annotations are user/model proposals, not analysis facts"}
+                                    "label": "annotations are user/model proposals, not analysis facts",
+                                    "proposals": annotations.proposals(state),
+                                    "open_proposals": len(annotations.proposals(state, only_open=True))}
             if history:
                 data["history"] = annotations.history(cases, case_id, module_id, limit=max(1, min(int(history), 200)))
             return OperationResult(ok=True, data=data, evidence_ids=[ev] if ev else [])
@@ -1709,7 +1711,7 @@ class RizinBackend(BackendAdapter):
             return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
 
     def _mutate(self, ctx: Any, case_id: str, module_id: str, author: str,
-                fn: Callable[..., tuple[dict[str, Any], dict[str, Any]]]) -> OperationResult:
+                fn: Callable[..., tuple[dict[str, Any], dict[str, Any]]], provenance: dict[str, Any] | None = None) -> OperationResult:
         try:
             cases = native.cases_of(ctx)
             poll = native.poll_of(ctx)
@@ -1718,6 +1720,9 @@ class RizinBackend(BackendAdapter):
                 sess.analyze(poll)   # also replays existing annotations onto a fresh process
                 _, state, parent = annotations.load(cases, case_id, module_id)
                 new_state, change = fn(sess, annotations.mutated(state), poll, self.work_dir(cases, case_id, module_id))
+                annotations.mark(new_state, state, change, author=author, provenance=provenance)   # R5: model-proposed until reviewed
+                if author == "model":
+                    change["label"] = "model-proposed"
                 ev = annotations.save(cases, case_id, module_id, new_state, change, parent=parent, author=author)
             return OperationResult(ok=True, data={"change": change, "revision": ev["revision"], "applied_to_analysis": True,
                                                   "note": "Persisted; re-applied automatically after re-analysis and on re-decompile."},
@@ -1730,7 +1735,8 @@ class RizinBackend(BackendAdapter):
             return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
 
     def op_rename(self, ctx: Any, *, case_id: str, module_id: str, kind: str, target: str | int, new_name: str,
-                  function: str | int | None = None, author: str = "user") -> OperationResult:
+                  function: str | int | None = None, author: str = "user",
+                  provenance: dict[str, Any] | None = None) -> OperationResult:
         """Rename a function (target = its address/name), a global (target = address; sets a flag) or a local variable
         (function = its function, target = the variable's current name)."""
         if kind not in ("function", "global", "local"):
@@ -1778,7 +1784,62 @@ class RizinBackend(BackendAdapter):
             orig = annotations.local_key(state, fkey, cur)
             state["locals"].setdefault(fkey, {}).setdefault(orig, {})["name"] = name
             return state, {"action": "rename", "kind": kind, "function": fkey, "old": cur, "new": name, "original": orig}
-        return self._mutate(ctx, case_id, module_id, author, apply)
+        return self._mutate(ctx, case_id, module_id, author, apply, provenance)
+
+    def _reset_scope(self, case_id: str, module_id: str) -> int:
+        """Drop the live rizin process(es) of one case module so the next operation re-analyses and replays the stored
+        annotations (used when an annotation is removed: rizin cannot rename back to an auto name)."""
+        scope = f"{case_id}:{module_id}"
+        with self.pool._lock:
+            victims = [v for k, v in self.pool._sessions.items() if k[2] == scope]
+        for s in victims:
+            with s.lock:
+                s._drop()
+        return len(victims)
+
+    def op_review_annotation(self, ctx: Any, *, case_id: str, module_id: str, kind: str, key: str, decision: str,
+                             local: str | None = None, evidence: str | None = None, author: str = "user") -> OperationResult:
+        """R5: a person accepts or rejects a model-proposed annotation, or a test confirms it (``evidence`` names the test).
+        Reject removes the entry (or restores the one it replaced). A model cannot review (author must be user or test)."""
+        if author not in ("user", "test"):
+            return OperationResult(ok=False, error="refused: only a person (or a test) can review model-proposed annotations")
+        if author == "test" and decision != "confirm":
+            return OperationResult(ok=False, error="refused: a test can only confirm an annotation")
+        try:
+            cases = native.cases_of(ctx)
+            a = parse_address(key) if kind != "local" or str(key).startswith("0x") else None
+            key_n = native.hexaddr(a) if a is not None else str(key)
+            _, state, parent = annotations.load(cases, case_id, module_id)
+            new_state = annotations.mutated(state)
+            change = annotations.review(new_state, kind, key_n, decision, local=local, evidence=evidence)
+            ev = annotations.save(cases, case_id, module_id, new_state, change, parent=parent, author=author)
+            reset = self._reset_scope(case_id, module_id) if decision == "reject" else 0
+            return OperationResult(ok=True, data={"change": change, "revision": ev["revision"], "analysis_reset": bool(reset),
+                                                  "proposals": annotations.proposals(new_state)},
+                                   evidence_ids=[ev["evidence_id"]])
+        except (annotations.AnnotationError, InvalidTarget) as e:
+            return OperationResult(ok=False, error=f"invalid target: {e}")
+        except (KeyError, ValueError, OSError) as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
+
+    def op_rollback_annotations(self, ctx: Any, *, case_id: str, module_id: str, revision: int,
+                                author: str = "user") -> OperationResult:
+        """R5: restore the complete annotation state of an earlier revision (stored as a NEW revision; nothing is deleted)."""
+        if author != "user":
+            return OperationResult(ok=False, error="refused: only a person can roll annotations back")
+        try:
+            cases = native.cases_of(ctx)
+            cur, _, parent = annotations.load(cases, case_id, module_id)
+            old, old_ev = annotations.state_at(cases, case_id, module_id, int(revision))
+            change = {"action": "rollback", "to_revision": int(revision), "to_evidence": old_ev, "from_revision": cur}
+            ev = annotations.save(cases, case_id, module_id, old, change, parent=parent, author=author)
+            self._reset_scope(case_id, module_id)
+            return OperationResult(ok=True, data={"change": change, "revision": ev["revision"], "analysis_reset": True,
+                                                  "proposals": annotations.proposals(old)}, evidence_ids=[ev["evidence_id"]])
+        except annotations.AnnotationError as e:
+            return OperationResult(ok=False, error=f"invalid target: {e}")
+        except (KeyError, ValueError, OSError) as e:
+            return OperationResult(ok=False, error=f"{type(e).__name__}: {e}")
 
     def op_set_type(self, ctx: Any, *, case_id: str, module_id: str, kind: str, target: str | int,
                     prototype: str | None = None, variable: str | None = None, ctype: str | None = None,
@@ -1823,7 +1884,7 @@ class RizinBackend(BackendAdapter):
         return self._mutate(ctx, case_id, module_id, author, apply)
 
     def op_add_comment(self, ctx: Any, *, case_id: str, module_id: str, addr: str | int, text: str,
-                       author: str = "user") -> OperationResult:
+                       author: str = "user", provenance: dict[str, Any] | None = None) -> OperationResult:
         """Attach a comment to an address (empty text removes it). Shown in disassembly and decompiler output."""
         def apply(s: RizinSession, state, poll, work):
             a = parse_address(addr)
@@ -1837,7 +1898,7 @@ class RizinBackend(BackendAdapter):
             else:
                 state["comments"].pop(key, None)
             return state, {"action": "comment", "addr": key, "text": body}
-        return self._mutate(ctx, case_id, module_id, author, apply)
+        return self._mutate(ctx, case_id, module_id, author, apply, provenance)
 
     def op_apply_struct(self, ctx: Any, *, case_id: str, module_id: str, declaration: str, author: str = "user") -> OperationResult:
         """Declare C types (struct/union/enum/typedef) for this module; usable afterwards in set_type."""

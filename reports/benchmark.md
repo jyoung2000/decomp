@@ -87,6 +87,35 @@ Deterministic fixes applied:
 * **pecli**: no symbol map: shipped stripped (mingw -O1 -s) and mingw is not on this host to rebuild an unstripped twin; only functions-found / imports / strings found are reported
 * **dotnetapp**: names are not obfuscated, so the assembly's own metadata is the type/method truth
 
+## Model scoreboard (R5)
+
+Measured 2026-10-11T04:23:22Z with the product's own AI paths against http://127.0.0.1:11434/v1 (RTX 4070 12 GB); local models, $0. Naming row `c_msvc_x64_o2`: the same 4 functions for every model (the largest own functions rizin leaves with an automatic name); `match` = shares a meaningful word with the real name, `exact` = the real name. Repair: one attempt on the recovered C# of dotnetapp with the ILSpy null-case rule switched off (8/9 before the repair); only the verifier's verdict counts.
+
+| Model | Task | Runs | Usable | Matches real name | Exact | Compiled | Verified | Median latency |
+|---|---|---|---|---|---|---|---|---|
+| qwen2.5:14b | naming | 4 | 4 | 3 | 0 | - | - | 2.3 s |
+| deepseek-coder-v2:16b | naming | 4 | 3 | 2 | 0 | - | - | 1.6 s |
+| qwen2.5-coder:14b | naming | 4 | 4 | 2 | 0 | - | - | 2.0 s |
+| qwen2.5-coder:14b | repair | 1 | 1 | - | - | 1 | 0 | 290.1 s |
+
+Naming proposals (function: real name -> proposed, latency):
+
+* qwen2.5-coder:14b 0x140001010: `bench_base64` -> `encode_base64` (match), 10.0 s
+* qwen2.5-coder:14b 0x140001350: `cmd_hist` -> `analyze_text_frequency`, 1.9 s
+* qwen2.5-coder:14b 0x1400017e0: `crc_init` -> `initialize_crc_table` (match), 2.2 s
+* qwen2.5-coder:14b 0x140001be0: `read_file` -> `initialize_resource`, 1.8 s
+* qwen2.5:14b 0x140001010: `bench_base64` -> `base64_encode` (match), 22.8 s
+* qwen2.5:14b 0x140001350: `cmd_hist` -> `process_histogram_data` (match), 2.4 s
+* qwen2.5:14b 0x1400017e0: `crc_init` -> `calculate_crc_table` (match), 2.2 s
+* qwen2.5:14b 0x140001be0: `read_file` -> `initialize_and_check`, 1.9 s
+* deepseek-coder-v2:16b 0x140001010: `bench_base64` -> `encode_base64` (match), 22.8 s
+* deepseek-coder-v2:16b 0x140001350: `cmd_hist` -> `process_data`, 1.5 s
+* deepseek-coder-v2:16b 0x1400017e0: `crc_init` -> `crc32_update` (match), 1.3 s
+* deepseek-coder-v2:16b 0x140001be0: `read_file` -> `process_data`, 1.7 s
+* repair qwen2.5-coder:14b on dotnetapp (IL null-case rule off): answer usable, build built, verifier 8/9 (was 8/9), not verified; prompt full 23150 chars, 8179 tokens in / 1528 out, 290 s
+
+Import into the app's scoreboard: `POST /ai/scoreboard/import` with `{"rows": <model_scoreboard.rows of benchmark.json>}`; the ladder presets then propose the measured-best local model per task.
+
 ## Notes
 
 * `Packed detected`: the product's packer check (`backends/packer.py`: section names, UPX magic, entropy, W+X/virtual-only code sections, entry-point and import anomalies). A UPX row is then unpacked with the pinned `upx -d` into a temp work folder (consent = benchmark config `packer.unpack`) and the unpacked copy is what gets scored; `false positive` marks an unpacked row reported as packed.

@@ -137,6 +137,176 @@ def history(cases: Any, case_id: str, module_id: str, limit: int = 50) -> list[d
     return out
 
 
+def state_at(cases: Any, case_id: str, module_id: str, revision: int) -> tuple[dict[str, Any], str]:
+    """The complete annotation state stored at ``revision`` (for a rollback). Raises AnnotationError when there is none."""
+    for r in cases.list_evidence(case_id, kind=KIND, module_id=module_id):
+        if int(r["revision"]) == int(revision):
+            body = cases.blobs.get_json(r["blob_sha"]) if r.get("blob_sha") else {}
+            st = body.get("state") if isinstance(body, dict) else None
+            out = empty()
+            if isinstance(st, dict):
+                out.update({k: copy.deepcopy(st.get(k, out[k])) for k in out})
+            return out, r["evidence_id"]
+    raise AnnotationError(f"no annotation revision {revision} on this module (see the history)")
+
+
+# ----------------------------------------------------------------------------------------------- provenance (R5)
+# Every annotation entry may carry ``prov``: who proposed it and whether a person accepted it or a test confirmed it.
+# ``origin`` model + ``status`` proposed = "model-proposed": shown labelled as such until accepted / confirmed, and it can be
+# rejected (the entry is removed, or the entry it replaced is restored) or the whole module rolled back to an older revision.
+PROV_STATUSES = ("proposed", "accepted", "confirmed")
+REVIEW_DECISIONS = ("accept", "reject", "confirm")
+_PROV_KEYS = ("model", "provider", "task", "call_id", "evidence_id", "confidence", "rationale")
+
+
+def _clean_prov(p: dict[str, Any] | None) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for k in _PROV_KEYS:
+        v = (p or {}).get(k)
+        if v is None:
+            continue
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            out[k] = v
+        else:
+            out[k] = check_comment(str(v)[:300].replace("\n", " ").replace("\r", " "))
+    return out
+
+
+def entry_for(state: dict[str, Any], kind: str, key: str, local: str | None = None, *, create: bool = False) -> dict[str, Any] | None:
+    """The annotation entry addressed by (kind, key[, local]). kind: function | global | local | comment."""
+    if kind == "function":
+        table = state["functions"]
+    elif kind == "global":
+        table = state["globals"]
+    elif kind == "comment":
+        table = state["comments"]
+    elif kind == "local":
+        if not local:
+            raise AnnotationError("a local needs its original variable name")
+        if create:
+            return state["locals"].setdefault(key, {}).setdefault(local, {})
+        return (state["locals"].get(key) or {}).get(local)
+    else:
+        raise AnnotationError(f"unknown annotation kind {kind!r}; expected function, global, local or comment")
+    if create:
+        return table.setdefault(key, {})
+    return table.get(key)
+
+
+def change_target(change: dict[str, Any]) -> tuple[str, str, str | None] | None:
+    """(kind, key, local) of the entry a stored change touched, or None."""
+    a = change.get("action")
+    if a == "rename":
+        if change.get("kind") == "local":
+            return "local", change["function"], change.get("original") or change.get("old")
+        return change.get("kind"), change.get("addr"), None
+    if a == "set_type":
+        if change.get("kind") == "local":
+            return "local", change["function"], change.get("variable")
+        return "function", change.get("addr"), None
+    if a == "comment":
+        return "comment", change.get("addr"), None
+    return None
+
+
+def mark(state: dict[str, Any], before: dict[str, Any], change: dict[str, Any], *, author: str,
+         provenance: dict[str, Any] | None = None) -> None:
+    """Stamp the entry a change touched with its provenance. ``before`` is the state before the change (to restore on reject)."""
+    tgt = change_target(change)
+    if not tgt or not tgt[1]:
+        return
+    kind, key, local = tgt
+    ent = entry_for(state, kind, key, local)
+    if ent is None:                       # e.g. an emptied comment: nothing left to label
+        return
+    if author == "model":
+        old = entry_for(before, kind, key, local)
+        prev = (old or {}).get("prov") or {}
+        p = {"origin": "model", "status": "proposed", "at": now_iso(), **_clean_prov(provenance)}
+        if prev.get("origin") == "model" and prev.get("status") == "proposed":
+            p["replaced"] = prev.get("replaced")          # keep what the FIRST model proposal replaced
+        else:
+            p["replaced"] = copy.deepcopy(old) if old else None      # restored exactly (with its own provenance) on reject
+        if change.get("old") and kind in ("function", "global", "local") and p.get("replaced") is None:
+            p["analysis_name"] = str(change["old"])[:200]
+        ent["prov"] = p
+    else:
+        ent["prov"] = {"origin": "user", "status": "accepted", "at": now_iso()}
+
+
+def _status_label(p: dict[str, Any] | None) -> str:
+    p = p or {}
+    if p.get("origin") != "model":
+        return "user"
+    return {"proposed": "model-proposed", "accepted": "accepted by you", "confirmed": "confirmed by a test"}.get(p.get("status"), "model-proposed")
+
+
+def proposals(state: dict[str, Any], *, only_open: bool = False) -> list[dict[str, Any]]:
+    """Every model-originated entry (open proposals first), in a shape the app and MCP show directly."""
+    out: list[dict[str, Any]] = []
+
+    def add(kind: str, key: str, ent: dict[str, Any], local: str | None = None) -> None:
+        p = ent.get("prov") or {}
+        if p.get("origin") != "model" or (only_open and p.get("status") != "proposed"):
+            return
+        value = ent.get("text") if kind == "comment" else (ent.get("name") or ent.get("prototype") or ent.get("type"))
+        out.append({"kind": kind, "key": key, "local": local, "value": value, "prototype": ent.get("prototype"),
+                    "type": ent.get("type"), "status": p.get("status"), "label": _status_label(p), "model": p.get("model"),
+                    "task": p.get("task"), "at": p.get("at"), "replaced": p.get("replaced"), "analysis_name": p.get("analysis_name"),
+                    "confirmed_by": p.get("confirmed_by"), "accepted_at": p.get("accepted_at"), "rationale": p.get("rationale")})
+    for k, e in (state.get("functions") or {}).items():
+        add("function", k, e)
+    for k, e in (state.get("globals") or {}).items():
+        add("global", k, e)
+    for f, vars_ in (state.get("locals") or {}).items():
+        for orig, e in vars_.items():
+            add("local", f, e, orig)
+    for k, e in (state.get("comments") or {}).items():
+        add("comment", k, e)
+    out.sort(key=lambda r: (r["status"] != "proposed", r["kind"], r["key"], r["local"] or ""))
+    return out
+
+
+def review(state: dict[str, Any], kind: str, key: str, decision: str, *, local: str | None = None,
+           evidence: str | None = None) -> dict[str, Any]:
+    """accept (a person) | confirm (a test; ``evidence`` names it) | reject (remove / restore what it replaced). Returns the change."""
+    if decision not in REVIEW_DECISIONS:
+        raise AnnotationError(f"unknown decision {decision!r}; expected one of {REVIEW_DECISIONS}")
+    ent = entry_for(state, kind, key, local)
+    p = (ent or {}).get("prov") or {}
+    if ent is None or p.get("origin") != "model":
+        raise AnnotationError(f"no model-proposed {kind} annotation at {key}" + (f" ({local})" if local else ""))
+    change: dict[str, Any] = {"action": "review", "decision": decision, "kind": kind, "key": key, "local": local,
+                              "value": ent.get("text") if kind == "comment" else ent.get("name") or ent.get("prototype") or ent.get("type"),
+                              "model": p.get("model")}
+    if decision == "accept":
+        p.update(status="accepted", accepted_at=now_iso())
+        ent["prov"] = p
+    elif decision == "confirm":
+        if not evidence or not isinstance(evidence, str):
+            raise AnnotationError("confirm needs the test or evidence that confirms the annotation")
+        p.update(status="confirmed", confirmed_by=check_comment(evidence[:300]), confirmed_at=now_iso())
+        ent["prov"] = p
+        change["evidence"] = p["confirmed_by"]
+    else:
+        replaced = p.get("replaced")
+        tables = {"function": state["functions"], "global": state["globals"], "comment": state["comments"]}
+        if kind == "local":
+            vars_ = state["locals"].get(key) or {}
+            if replaced:
+                vars_[local] = copy.deepcopy(replaced)
+            else:
+                vars_.pop(local, None)
+            if not vars_:
+                state["locals"].pop(key, None)
+        elif replaced:
+            tables[kind][key] = copy.deepcopy(replaced)
+        else:
+            tables[kind].pop(key, None)
+        change["restored"] = replaced
+    return change
+
+
 # ----------------------------------------------------------------------------------------------- mutation helpers
 def mutated(state: dict[str, Any]) -> dict[str, Any]:
     return copy.deepcopy(state)
@@ -211,6 +381,11 @@ def apply_all(sess: Any, state: dict[str, Any], work_dir: Path, poll: Callable[[
 
 
 # ----------------------------------------------------------------------------------------------- overlays (comments)
+def _tagged(ent: dict[str, Any], text: str) -> str:
+    p = ent.get("prov") or {}
+    return f"[model-proposed] {text}" if p.get("origin") == "model" and p.get("status") == "proposed" else text
+
+
 def overlay_disasm(ops: list[dict[str, Any]], state: dict[str, Any]) -> int:
     comments = state.get("comments") or {}
     n = 0
@@ -220,16 +395,29 @@ def overlay_disasm(ops: list[dict[str, Any]], state: dict[str, Any]) -> int:
             c = comments.get(f"0x{off:x}")
             if c:
                 op["user_comment"] = c["text"]
+                if (c.get("prov") or {}).get("origin") == "model":      # the label travels next to the text
+                    op["comment_status"] = _status_label(c.get("prov"))
                 n += 1
     return n
 
 
 def comments_in(state: dict[str, Any], lo: int, hi: int) -> list[tuple[int, str]]:
+    """Comments in [lo, hi) plus a note for every model-proposed name in that range (labelled until accepted)."""
     out = []
     for k, c in (state.get("comments") or {}).items():
         a = int(k, 16)
         if lo <= a < hi:
-            out.append((a, c["text"]))
+            out.append((a, _tagged(c, c["text"])))
+    for k, e in (state.get("functions") or {}).items():
+        a = int(k, 16)
+        if lo <= a < hi and e.get("name") and ((e.get("prov") or {}).get("status") == "proposed"):
+            out.append((a, f"[model-proposed] function name {e['name']} (not yet accepted)"))
+    for k, vars_ in (state.get("locals") or {}).items():
+        a = int(k, 16)
+        if lo <= a < hi:
+            for orig, e in vars_.items():
+                if e.get("name") and (e.get("prov") or {}).get("status") == "proposed":
+                    out.append((a, f"[model-proposed] local {orig} -> {e['name']} (not yet accepted)"))
     return sorted(out)
 
 

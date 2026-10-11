@@ -323,6 +323,12 @@ def preset(store: ConnectionStore, name: str, *, apply: bool = False, tasks: Ite
                          "details": (m.get("meta") or {}).get("ollama") or {}})
     warnings: list[str] = []
     proposed: dict[str, list[tuple[str, str]]] = {}
+    from .. import scoreboard
+    try:
+        board = scoreboard.summary(store.db)          # R5: measured results on this PC rank first (docs/AI_LADDER.md section 10)
+    except Exception:  # noqa: BLE001 - a broken scoreboard never blocks a preset
+        board = {"models": []}
+    measured: dict[str, list[dict[str, Any]]] = {}
     has_local = any(p["locality"] == "local" for p in pool)
     has_cloud = any(p["locality"] == "cloud" for p in pool)
     if name in ("local_first", "all_local") and not has_local:
@@ -339,12 +345,26 @@ def preset(store: ConnectionStore, name: str, *, apply: bool = False, tasks: Ite
             cands = known or cands
         loc = [p for p in cands if p["locality"] == "local"]
         cld = [p for p in cands if p["locality"] == "cloud"]
-        key = lambda p: (-_score(task, p["model"], p["caps"], p["details"]), p["conn"]["created_at"], p["conn"]["connection_id"], p["model"])  # noqa: E731
+        key = lambda p: (*scoreboard.rank_key(board, task, p["model"]), -_score(task, p["model"], p["caps"], p["details"]),  # noqa: E731
+                         p["conn"]["created_at"], p["conn"]["connection_id"], p["model"])
         loc.sort(key=key)
         cld.sort(key=key)
         order = {"local_first": loc + cld, "cloud_first": cld + loc, "all_local": loc, "all_cloud": cld}[name]
         chosen = order[:MAX_PRESET_ENTRIES]
         proposed[task] = [(p["conn"]["connection_id"], p["model"]) for p in chosen]
+        measured[task] = []
+        for p in chosen:
+            facts = scoreboard.measured(board, task, p["model"])
+            measured[task].append({"model": p["model"], "connection_id": p["conn"]["connection_id"], "locality": p["locality"],
+                                   "basis": "measured" if facts and facts.get("runs") else "heuristic",
+                                   "note": scoreboard.describe(task, facts), "score": (facts or {}).get("score")})
+            if task in CODE_TASKS:
+                if facts and facts.get("code_runs") and not facts.get("ever_compiled"):
+                    warnings.append(f"{p['model']} was tried {facts['code_runs']} time(s) for code here and never produced anything that "
+                                    f"compiles; it is kept but placed after models that did.")
+                elif not facts or not facts.get("ever_compiled"):
+                    warnings.append(f"{p['model']} has never compiled anything here yet (no measurement on this PC); run the model "
+                                    f"scoreboard or a project to measure it.")
         if not chosen:
             where = {"all_local": "local ", "all_cloud": "cloud "}.get(name, "")
             if task == "visual_review":
@@ -372,6 +392,11 @@ def preset(store: ConnectionStore, name: str, *, apply: bool = False, tasks: Ite
                     store.delete_route(task, bump=False)
             rev = store.bump_revision(f"preset {name} applied", {t: why for t in proposed})
     out_tasks = {t: task_ladder(store, t, pairs, f"preset:{name}") for t, pairs in proposed.items()}
+    for t, ms in measured.items():
+        out_tasks[t]["measured"] = ms
+        best = next((m for m in ms if m["basis"] == "measured" and (m["score"] or 0) > 0), None)
+        out_tasks[t]["recommendation"] = ({"model": best["model"], "basis": "measured", "note": best["note"]} if best and ms and best is ms[0]
+                                          else ({"model": ms[0]["model"], "basis": ms[0]["basis"], "note": ms[0]["note"]} if ms else None))
     return {"preset": name, "applied": bool(apply), "config_revision": rev, "tasks": out_tasks, "warnings": warnings}
 
 

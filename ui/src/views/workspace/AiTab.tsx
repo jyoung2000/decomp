@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LocalityBadge, OriginBadge } from '../../components/ai/Badges';
+import { NamingReview } from '../../components/ai/NamingReview';
 import { AiPolicyEditor, budgetError, formSig, formToPolicy, policyToForm, type PolicyForm } from '../../components/ai/AiPolicyEditor';
 import { Empty } from '../../components/Empty';
 import { ErrorCallout } from '../../components/ErrorCallout';
@@ -22,6 +23,7 @@ export function AiTab({ caseId }: { caseId: string }) {
         <p className="small muted">What AI is allowed to do in this project, and what it has done so far. AI only proposes; builds and the verifier decide.</p>
       </div>
       <AiSettingsPanel caseId={caseId} currentRevision={ladder.data?.config_revision ?? null} />
+      <NamingReview caseId={caseId} />
       <ActivityFeed caseId={caseId} currentRevision={ladder.data?.config_revision ?? null} />
     </div>
   );

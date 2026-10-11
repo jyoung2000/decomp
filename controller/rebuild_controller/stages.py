@@ -54,6 +54,8 @@ def register_stages(reg: StageRegistry) -> None:
     reg.add("recover_jvm", stage_recover_jvm)
     from .native_rebuild import stage_native_rebuild
     reg.add("native_rebuild", stage_native_rebuild)
+    from .ai_naming import stage_ai_naming
+    reg.add("ai_naming", stage_ai_naming)       # R5: per-function AI naming -> model-proposed annotations
     reg.add("deliver", stage_deliver)
     from .pipeline import stage_barrier
     reg.add("barrier", stage_barrier)

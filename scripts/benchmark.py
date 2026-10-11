@@ -44,6 +44,7 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[1]
 BENCH = REPO / "fixtures" / "bench"
 sys.path.insert(0, str(REPO / "controller"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))      # bench_models (R5)
 
 TRUTH_SCHEMA = "rebuild-studio.bench-truth/1"
 REPORT_SCHEMA = "rebuild-studio.benchmark/1"
@@ -740,6 +741,8 @@ def render_markdown(rep: dict) -> str:
     partial = [r for r in rep["rows"] if r.get("partial") and r.get("status") == "ok"]
     if partial:
         L += ["", "## Partial rows", ""] + [f"* **{r['row']}**: {r['partial']}" for r in partial]
+    from bench_models import render as render_models
+    L += render_models(rep.get("model_scoreboard") or {})
     L += ["", "## Notes", "",
           "* `Packed detected`: the product's packer check (`backends/packer.py`: section names, UPX magic, entropy, W+X/virtual-only code sections, entry-point and import anomalies). A UPX row is then unpacked with the pinned `upx -d` into a temp work folder (consent = benchmark config `packer.unpack`) and the unpacked copy is what gets scored; `false positive` marks an unpacked row reported as packed.",
           "* Named recall counts a function as named only when rizin's name at the true start equals a truth name (modulo prefixes, case, punctuation); auto names (`fcn.*`, `entry0`) never count. Name precision = right names / matched functions that carry any non-auto name (a wrong name misleads more than `fcn.*`; rizin's RTTI names such as `method.Foo.virtual_0` count as wrong).",
@@ -756,6 +759,39 @@ def render_markdown(rep: dict) -> str:
     return "\n".join(L)
 
 
+def run_model_scoreboard(a: argparse.Namespace) -> dict:
+    """R5: score local models through the product's AI paths and merge them into the existing report (other rows untouched)."""
+    import bench_models as BM
+    path = a.out_dir / "benchmark.json"
+    rep = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"rows": [], "environment": {}}
+    models = [m for m in a.models.split(",") if m]
+    tasks = {t for t in a.model_tasks.split(",") if t}
+    ms = rep.get("model_scoreboard") or {}
+    keep = [r for r in ms.get("rows") or [] if not (r.get("model") in models and r.get("task") in tasks)]
+    new: list[dict] = []
+    if "naming" in tasks:
+        fns = BM.pick_naming_functions(a.naming_row, a.naming_functions, a.ollama)
+        print(f"[benchmark] R5 naming on {a.naming_row}: {[f['addr'] + ' (' + f['truth'] + ')' for f in fns]}", file=sys.stderr)
+        for m in models:
+            t0 = time.perf_counter()
+            got = BM.run_naming(m, a.naming_row, fns, a.ollama)
+            new += got
+            print(f"[benchmark] R5 naming {m}: {sum(1 for r in got if r.get('ok'))}/{len(got)} usable, "
+                  f"{sum(1 for r in got if r.get('truth_match'))} match the real name, {time.perf_counter() - t0:.0f}s", file=sys.stderr)
+        ms["naming_row"], ms["naming_functions"] = a.naming_row, len(fns)
+    if "repair" in tasks:
+        for m in ([x for x in a.repair_models.split(",") if x] if a.repair_models else models[:1]):
+            r = BM.run_repair(m, a.ollama)
+            new.append(r)
+            print(f"[benchmark] R5 repair {m}: {r.get('status')} build {r.get('build')} verified {r.get('verified')} "
+                  f"{r.get('passed')}/{r.get('scenarios')} in {r.get('seconds')}s", file=sys.stderr)
+    ms.update(rows=keep + new, endpoint=a.ollama, generated_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+              gpu=os.environ.get("REBUILD_BENCH_GPU"))
+    ms["summary"] = BM.summarize(ms["rows"])
+    rep["model_scoreboard"] = ms
+    return rep
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="R0 benchmark scoreboard")
     ap.add_argument("--rows", help="comma-separated row names (default: all)")
@@ -765,11 +801,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--merge", action="store_true", help="re-measure only --rows and keep every other row of <out-dir>/benchmark.json")
     ap.add_argument("--only-native-rebuild", action="store_true",
                     help="keep the other measurements in <out-dir>/benchmark.json and (re)run only the native-language rebuild column")
+    ap.add_argument("--models", help="R5: comma-separated local model ids to score (keeps every other measurement of benchmark.json)")
+    ap.add_argument("--model-tasks", default="naming,repair", help="R5: naming and/or repair (default both)")
+    ap.add_argument("--naming-row", default="c_msvc_x64_o2", help="R5: bench row with real function names in its truth")
+    ap.add_argument("--naming-functions", type=int, default=4, help="R5: functions named per model")
+    ap.add_argument("--repair-models", help="R5: models for the repair task (default: the first of --models)")
+    ap.add_argument("--ollama", default="http://127.0.0.1:11434/v1", help="R5: the local Ollama endpoint")
     a = ap.parse_args(argv)
     override = json.loads(a.config.read_text(encoding="utf-8")) if a.config else None
     cfg = merge_config(DEFAULT_CONFIG, override)
     rows = discover_rows([r for r in a.rows.split(",") if r] if a.rows else None, not a.no_legacy)
-    if a.only_native_rebuild:
+    if a.models:
+        rep = run_model_scoreboard(a)
+    elif a.only_native_rebuild:
         rep = json.loads((a.out_dir / "benchmark.json").read_text(encoding="utf-8"))
         by = {r["row"]: r for r in rows}
         for r in rep["rows"]:

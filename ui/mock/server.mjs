@@ -334,6 +334,49 @@ function jevStatus() {
     breaker: { state: 'closed', failures: j.failures, open_until: null }, offline_reason: offline, min_confidence: 0.6,
     jev_install: { key_file_found: true, path: `${WIN_HOME}\\.jev\\secrets\\typesafe.key` }, last_decisions: j.decisions.slice(0, 20) };
 }
+// ---- R5: model scoreboard + model-proposed annotations (AI naming)
+function mockScoreboard() {
+  return { rows: 9, models: [
+    { model: 'qwen2.5-coder:14b', provider: 'local', locality: 'local', ever_compiled: true, code_runs: 7, tasks: {
+      repair: { runs: 7, ok: 7, compiled: 1, verified: 1, median_latency_ms: 412000, sources: ['case'] },
+      naming: { runs: 4, ok: 4, compiled: 0, verified: 0, truth_checked: 4, truth_match: 3, median_latency_ms: 9100, sources: ['benchmark'] } } },
+    { model: 'deepseek-coder-v2:16b', provider: 'local', locality: 'local', ever_compiled: false, code_runs: 3, tasks: {
+      implementation: { runs: 3, ok: 3, compiled: 0, verified: 0, median_latency_ms: 221000, sources: ['case'] } } },
+  ], recent: [] };
+}
+function mockAnnotations(cid, parts, m, body) {
+  const mid = parts[1];
+  S.annotations ??= new Map();
+  const a = S.annotations.get(mid) ?? { revision: 0, proposals: [], history: [] };
+  S.annotations.set(mid, a);
+  const bump = (change) => { a.revision += 1; a.history.push({ evidence_id: id('ev'), revision: a.revision, change: { ...change, at: now() } }); };
+  const view = () => ({ revision: a.revision, proposals: a.proposals, open_proposals: a.proposals.filter((p) => p.status === 'proposed').length, history: a.history.slice(-20), label: 'annotations are user/model proposals, not analysis facts' });
+  if (parts[2] === 'ai' && parts[3] === 'naming' && m === 'POST') {
+    const mk = (kind, key, value, analysis) => ({ kind, key, local: null, value, status: 'proposed', label: 'model-proposed', model: 'qwen2.5-coder:14b', task: 'naming', at: now(), analysis_name: analysis, replaced: null });
+    for (const p of [mk('function', '0x140001190', 'parse_command_line', 'fcn.140001190'), mk('comment', '0x140001190', 'Splits argv into a command and its options.', null), mk('function', '0x140001a20', 'write_store_file', 'fcn.140001a20')]) {
+      if (!a.proposals.some((q) => q.kind === p.kind && q.key === p.key)) { a.proposals.push(p); bump({ action: p.kind === 'comment' ? 'comment' : 'rename', kind: p.kind, new: p.value, label: 'model-proposed', author: 'model' }); }
+    }
+    return [200, { job: { job_id: id('job'), state: 'queued' }, route: [{ model: 'qwen2.5-coder:14b', label: 'Ollama (this PC)', locality: 'local' }], note: 'Every name and comment is written as model-proposed; accept or reject each one under Annotations.' }];
+  }
+  if (parts[2] !== 'annotations') return null;
+  if (parts.length === 3 && m === 'GET') return [200, view()];
+  if (parts[3] === 'review' && m === 'POST') {
+    const p = a.proposals.find((q) => q.kind === body.kind && q.key === body.key && (q.local ?? null) === (body.local ?? null));
+    if (!p) return [400, { error: { code: 'annotation', message: `invalid target: no model-proposed ${body.kind} annotation at ${body.key}`, next_action: 'check the address / name in the list of proposals' } }];
+    if (body.decision === 'accept') Object.assign(p, { status: 'accepted', label: 'accepted by you' });
+    else if (body.decision === 'reject') a.proposals = a.proposals.filter((q) => q !== p);
+    else return [400, { error: { code: 'annotation', message: 'invalid target: confirm needs the test or evidence that confirms the annotation' } }];
+    bump({ action: 'review', decision: body.decision, kind: p.kind, author: 'user' });
+    return [200, { change: { action: 'review', decision: body.decision }, revision: a.revision, proposals: a.proposals, analysis_reset: body.decision === 'reject' }];
+  }
+  if (parts[3] === 'rollback' && m === 'POST') {
+    if (!(body.revision >= 1 && body.revision <= a.revision)) return [400, { error: { code: 'annotation', message: `invalid target: no annotation revision ${body.revision} on this module (see the history)` } }];
+    a.proposals = [];
+    bump({ action: 'rollback', to_revision: body.revision, author: 'user' });
+    return [200, { change: { action: 'rollback', to_revision: body.revision }, revision: a.revision, proposals: a.proposals, analysis_reset: true }];
+  }
+  return null;
+}
 function mockAiControl(seg, m, body) {
   const key = `${m} /${seg.join('/')}`;
   const j = r9().jev;
@@ -1008,6 +1051,10 @@ async function handle(req, res) {
     }
     if (sub === 'jobs') return send(res, 200, [...S.jobs.values()].filter((j) => j.case_id === cid));
     if (sub === 'modules') return send(res, 200, [...S.modules.values()].filter((x) => x.case_id === cid));
+    if (sub.startsWith('modules/') && (sub.endsWith('/annotations') || sub.includes('/annotations/') || sub.endsWith('/ai/naming'))) {
+      const r = mockAnnotations(cid, sub.split('/'), m, body);
+      if (r) return send(res, r[0], r[1]);
+    }
     if (sub === 'evidence') return send(res, 200, [...S.evidence.values()].filter((x) => x.case_id === cid && (!url.searchParams.get('kind') || x.kind === url.searchParams.get('kind'))).map(({ body: _b, ...e }) => e));
     if (sub === 'evidence/search') {
       const q = (url.searchParams.get('q') ?? '').toLowerCase();
@@ -1181,6 +1228,11 @@ async function handle(req, res) {
   if (seg[0] === 'ai' && ['jev', 'rules', 'cooldowns', 'route'].includes(seg[1])) {
     const r = mockAiControl(seg, m, body);
     if (r) return send(res, r[0], r[1]);
+  }
+  if (seg[0] === 'ai' && seg[1] === 'scoreboard') {
+    // R5 model scoreboard (docs/AI_LADDER.md section 10)
+    if (m === 'GET' && seg.length === 2) return send(res, 200, mockScoreboard());
+    if (m === 'POST' && seg[2] === 'import') return send(res, 200, { imported: (body.rows ?? []).length, problems: [] });
   }
   if (p === '/ai/ladder' && m === 'GET') return send(res, 200, currentLadder());
   if (seg[0] === 'ai' && seg[1] === 'ladder' && seg[2] === 'preset' && m === 'POST') {

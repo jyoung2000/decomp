@@ -243,7 +243,8 @@ def test_full_benchmark_run_writes_reports(tmp_path):
         assert r["status"] == "ok" or r["status"].startswith("not run"), (name, r["status"])
         assert f"| {name} |" in md or f"| {name} " in md
         if row["kind"].startswith("native") and r["status"] == "ok":
-            assert r["functions"]["recall"] is not None and "analysis" in r["seconds"]
+            for part in (r.get("slices") or [r]):          # a fat/universal Mach-O row is scored per slice (R7)
+                assert part["functions"]["recall"] is not None and "analysis" in part["seconds"], (name, part.get("arch"))
     if by["upx_c_msvc_x64"]["status"] == "ok" and by["c_msvc_x64_o2"]["status"] == "ok":
         upx, plain = by["upx_c_msvc_x64"], by["c_msvc_x64_o2"]
         assert upx["packed"]["truth"] and upx["packed"]["detected"] and upx["packed"]["packer"] == "UPX"   # reported as packed

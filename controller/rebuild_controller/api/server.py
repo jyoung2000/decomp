@@ -746,6 +746,7 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     from .local_ai_routes import mount_local_ai_routes; mount_local_ai_routes(app, studio)  # local AI detection + model downloads
     from .ai_control_routes import mount_ai_control_routes; mount_ai_control_routes(app, studio)  # R9: JeV, cooldowns, rules, dry run
     from .health_routes import mount_health_routes; mount_health_routes(app, studio)  # R10 dependency health + install queue
+    from .ai_quality_routes import mount_ai_quality_routes; mount_ai_quality_routes(app, studio)  # R5 scoreboard, AI naming, annotation review
     return app
 
 
