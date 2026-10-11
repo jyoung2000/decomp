@@ -127,3 +127,18 @@ target C#, **AI off**. Preflight: ready (machine .NET SDK 8.0.424 counted as ext
   original `dotnetapp.dll`.
 
 Compare runs 1–7: the Rust port with local models (deepseek-coder-v2:16b, qwen2.5:14b, gemma4:12b, qwen2.5-coder:14b) never compiled.
+
+## Run 10 — project-database corruption, recovery and the R11 drill (2026-10-10/11)
+
+- Incident: updating to the R5 build (controller 60569e17…) found `%LOCALAPPDATA%\RebuildStudio\studio.sqlite3` malformed
+  (b-tree pages pointing past the file, no `-wal`); the controller crash-looped with only Try again / Quit. The damage happened
+  during the session started 14:01 local, while the app was running; a migration marker written at 03:41Z by a process with R9+ code
+  saw 0 projects although the real store held two. Root cause not proven (no OS crash/power events; AppData redirection for processes
+  launched from the Claude desktop package is the leading theory). Damaged file renamed aside (`studio.sqlite3.corrupt-20261010-2342`),
+  copy + logs in `D:\rs-db-rescue`; `.dump` salvage was partial (events/jobs/plans only). The C# project was recreated: 7/7 again.
+- R11 build installed (controller d3b3a980… = commit 3bd8ecd): first verified backup taken at start
+  (`studio-20261011T074918Z-start.sqlite3`, integrity ok, 1 project).
+- Drill on the installed app with `REBUILD_STUDIO_DATA=D:\rs-drill-data` (the real folder untouched): seeded with that backup and a copy of
+  the store with 4 garbled b-tree pages → controller exited 70 with `store-recovery.json` listing the backup → dialog "Rebuild Studio:
+  the project list needs your decision" (Restore the last good backup / Start with an empty project list / More options...) → Restore →
+  damaged file moved to `damaged/`, `recovery-log.jsonl` records the restore, controller healthy, project "Notes app (.NET) as C#" back.
