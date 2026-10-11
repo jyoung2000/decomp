@@ -1122,31 +1122,22 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
             rx = rt._wb_guard(lambda: rt.workbench(s).compile_regex(regex)) if regex else None
 
             def shape(d: dict[str, Any]) -> dict[str, Any]:
-                rows = [x for x in d.get("strings") or [] if isinstance(x, dict) and (x.get("length") or 0) >= min_length]
-                if section:
-                    rows = [x for x in rows if str(x.get("section") or "") == section]
-                rows = _filter(rows, contains, ("string",))
-                if rx is not None:
-                    rows = [x for x in rows if rx.search(str(x.get("string") or ""))]
-                for x in rows:
-                    if isinstance(x.get("vaddr"), int):
-                        x["addr"] = "0x%x" % x["vaddr"]
-                out = _paged(d, "strings", offset, limit, rows)
-                out["scanned"] = d.get("seen")
-                out["_truncated"] = out["_truncated"] or bool(d.get("count_truncated"))
-                return out
+                # one helper with the app's Strings view (GET /cases/{c}/modules/{m}/strings)
+                from ..re_workbench import shape_strings
+                p = shape_strings(d, contains=contains, regex=rx, min_length=min_length, section=section, offset=offset, limit=limit)
+                return {"strings": p["strings"], "total": p["total"], "offset": p["offset"], "returned": p["returned"],
+                        "evidence_ids": d.get("evidence_ids", []), "scanned": p["scanned"],
+                        "_truncated": p["more"] or p["count_truncated"]}
             return rt.t_re(session_id, "strings", shape, limit=MAX_STRINGS)(s)
         return await run("strings", body)
 
     def _table(op: str, key: str, session_id: str, contains: Optional[str], offset: int, limit: int):
         def shape(d: dict[str, Any]) -> dict[str, Any]:
-            rows = _filter(list(d.get(key) or []), contains, ("name", "realname", "flagname", "libname"))
-            for x in rows:
-                if isinstance(x, dict):
-                    for k in ("vaddr", "plt"):
-                        if isinstance(x.get(k), int) and x[k]:
-                            x.setdefault("addr", "0x%x" % x[k])
-            return _paged(d, key, offset, limit, rows)
+            # one helper with the app's Imports / Exports views (GET /cases/{c}/modules/{m}/imports|exports)
+            from ..re_workbench import shape_table
+            p = shape_table(d, key, contains, offset, limit)
+            return {key: p[key], "total": p["total"], "offset": p["offset"], "returned": p["returned"],
+                    "evidence_ids": d.get("evidence_ids", []), "_truncated": p["more"]}
         return rt.t_re(session_id, op, shape)
 
     @spec("imports", "Imported functions/symbols (library, name, PLT/IAT address); name filter; paged.", read_only=True)
@@ -1166,15 +1157,8 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
 
     @spec("sections", "Sections and segments (name, virtual/physical address and size, permissions).", read_only=True)
     async def sections(session_id: SID) -> CallToolResult:
-        def shape(d: dict[str, Any]) -> dict[str, Any]:
-            for grp in ("sections", "segments"):
-                for x in d.get(grp) or []:
-                    if isinstance(x, dict):
-                        for k in ("vaddr", "paddr"):
-                            if isinstance(x.get(k), int):
-                                x[k] = "0x%x" % x[k]
-            return d
-        return await run("sections", rt.t_re(session_id, "sections", shape))
+        from ..re_workbench import shape_sections   # one helper with the app's Sections view
+        return await run("sections", rt.t_re(session_id, "sections", shape_sections))
 
     @spec("entry_points", "Program entry points (address, type).", read_only=True)
     async def entry_points(session_id: SID) -> CallToolResult:

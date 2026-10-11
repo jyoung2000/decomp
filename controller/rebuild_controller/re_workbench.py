@@ -361,3 +361,107 @@ def shape_xrefs(data: dict[str, Any], direction: str, limit: int) -> dict[str, A
     rows = hexify_refs(list(data.get(direction) or []))
     total = max(len(rows), int(data.get(f"{direction}_total") or 0))
     return {"addr": data.get("addr"), "direction": direction, "refs": rows[:limit], "total": total, "more": total > limit}
+
+
+# ---------------------------------------------------------------------- module-level lists (shared by MCP strings / imports / exports /
+# symbols / sections and the app's Strings, Imports, Exports and Sections views; R6 piece 4)
+STRINGS_PAGE_MAX = 500
+TABLE_PAGE_MAX = 1000
+TABLE_FILTER_KEYS = ("name", "realname", "flagname", "libname")
+SECTION_NAME = r"^[A-Za-z0-9_.$\-]{1,64}$"
+
+
+def _filter_rows(rows: list[Any], contains: Optional[str], keys: tuple[str, ...]) -> list[Any]:
+    if not contains:
+        return rows
+    n = contains.lower()
+    return [r for r in rows if isinstance(r, dict) and any(n in str(r.get(k) or "").lower() for k in keys)]
+
+
+def _page_rows(key: str, rows: list[Any], offset: int, limit: int) -> dict[str, Any]:
+    page = rows[offset:offset + limit]
+    return {key: page, "total": len(rows), "offset": offset, "returned": len(page), "more": offset + limit < len(rows)}
+
+
+def shape_strings(data: dict[str, Any], *, contains: Optional[str] = None, regex: Optional[re.Pattern[str]] = None,
+                  min_length: int = 4, section: Optional[str] = None, offset: int = 0, limit: int = 100) -> dict[str, Any]:
+    """Filter (minimum length, exact section, case-insensitive substring, bounded regex from ``ReWorkbench.compile_regex``) and
+    page the rows of ``op_strings``; each row gets ``addr`` (0x-hex of ``vaddr``). Returns ``{strings, total, offset, returned,
+    more, scanned, count_truncated}``. Rows keep the backend's fields: vaddr, paddr, length, section, type (encoding), string
+    (clipped by the backend)."""
+    rows = [x for x in data.get("strings") or [] if isinstance(x, dict) and (x.get("length") or 0) >= min_length]
+    if section:
+        rows = [x for x in rows if str(x.get("section") or "") == section]
+    rows = _filter_rows(rows, contains, ("string",))
+    if regex is not None:
+        rows = [x for x in rows if regex.search(str(x.get("string") or ""))]
+    rows = [dict(x) for x in rows]
+    for x in rows:
+        if isinstance(x.get("vaddr"), int):
+            x["addr"] = "0x%x" % x["vaddr"]
+    out = _page_rows("strings", rows, offset, limit)
+    out["scanned"] = data.get("seen")
+    out["count_truncated"] = bool(data.get("count_truncated"))
+    return out
+
+
+def string_sections(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Sections that hold strings, with how many (for the app's section filter)."""
+    counts: dict[str, int] = {}
+    for x in data.get("strings") or []:
+        if isinstance(x, dict):
+            k = str(x.get("section") or "")
+            counts[k] = counts.get(k, 0) + 1
+    return [{"section": k, "count": v} for k, v in sorted(counts.items())]
+
+
+def shape_table(data: dict[str, Any], key: str, contains: Optional[str], offset: int, limit: int) -> dict[str, Any]:
+    """Imports / exports / symbols of ``op_imports`` / ``op_exports`` / ``op_symbols``: name filter (name, realname, flagname,
+    libname), ``addr`` = 0x-hex of ``vaddr`` (or ``plt`` for imports), paged: ``{<key>, total, offset, returned, more}``."""
+    rows = [dict(x) if isinstance(x, dict) else x for x in _filter_rows(list(data.get(key) or []), contains, TABLE_FILTER_KEYS)]
+    for x in rows:
+        if isinstance(x, dict):
+            for k in ("vaddr", "plt"):
+                if isinstance(x.get(k), int) and x[k]:
+                    x.setdefault("addr", "0x%x" % x[k])
+    return _page_rows(key, rows, offset, limit)
+
+
+def shape_sections(data: dict[str, Any]) -> dict[str, Any]:
+    """``op_sections`` with vaddr/paddr as 0x-hex strings (sections and segments)."""
+    out = dict(data)
+    for grp in ("sections", "segments"):
+        rows = []
+        for x in data.get(grp) or []:
+            if isinstance(x, dict):
+                x = dict(x)
+                for k in ("vaddr", "paddr"):
+                    if isinstance(x.get(k), int):
+                        x[k] = "0x%x" % x[k]
+            rows.append(x)
+        out[grp] = rows
+    return out
+
+
+def add_section_entropy(sections: list[dict[str, Any]], report: Optional[dict[str, Any]]) -> bool:
+    """Copy per-section entropy (and the packer report's high-entropy threshold flag) from a packer report onto rizin's
+    sections, matched by name and order (the report has RVAs, rizin absolute addresses). Returns True when any matched."""
+    rep_secs = [s for s in (report or {}).get("sections") or [] if isinstance(s, dict)]
+    if not rep_secs:
+        return False
+    from .backends.packer import HIGH_ENTROPY
+    by_name: dict[str, list[dict[str, Any]]] = {}
+    for s in rep_secs:
+        by_name.setdefault(str(s.get("name") or ""), []).append(s)
+    used: dict[str, int] = {}
+    hit = False
+    for s in sections:
+        name = str(s.get("name") or "")
+        i = used.get(name, 0)
+        cand = by_name.get(name) or []
+        if i < len(cand) and isinstance(cand[i].get("entropy"), (int, float)):
+            s["entropy"] = float(cand[i]["entropy"])
+            s["high_entropy"] = s["entropy"] >= HIGH_ENTROPY
+            hit = True
+        used[name] = i + 1
+    return hit

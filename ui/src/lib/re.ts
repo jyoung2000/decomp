@@ -284,3 +284,163 @@ export function buildCallTree(g: CallGraph): CallTreeNode {
   root.children.forEach(mark);
   return root;
 }
+
+// ---- piece 4: module-level lists (strings, imports, exports, sections + entry points) and "used by" of one string or import.
+// Same workbench calls and shaping as the MCP strings / imports / exports / sections / entry_points tools (re_workbench.shape_*),
+// and "used by" = MCP xrefs_to with scope=address. All text is untrusted program data: rendered as plain text only.
+export type ModuleList = 'functions' | 'strings' | 'imports' | 'exports' | 'sections';
+export const MODULE_LISTS: { id: ModuleList; label: string }[] = [
+  { id: 'functions', label: 'Functions' },
+  { id: 'strings', label: 'Strings' },
+  { id: 'imports', label: 'Imports' },
+  { id: 'exports', label: 'Exports' },
+  { id: 'sections', label: 'Sections' },
+];
+
+export interface StringRow {
+  addr: string;
+  vaddr?: number;
+  paddr?: number;
+  /** characters */
+  length: number;
+  section?: string;
+  /** encoding as reported by rizin: ascii, utf8, utf16le, utf32le, … */
+  type?: string;
+  /** the text, clipped by the controller (1,000 characters) */
+  string: string;
+}
+
+export interface StringPage {
+  strings: StringRow[];
+  total: number;
+  offset: number;
+  returned: number;
+  more: boolean;
+  scanned?: number;
+  count_truncated?: boolean;
+  sections: { section: string; count: number }[];
+  truncated?: boolean;
+  untrusted: true;
+}
+
+export interface StringQuery {
+  contains?: string;
+  regex?: string;
+  minLength?: number;
+  section?: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface ImportRow {
+  addr?: string;
+  name: string;
+  libname?: string;
+  type?: string;
+  ordinal?: number;
+  bind?: string;
+  plt?: number;
+}
+
+export interface ExportRow {
+  addr?: string;
+  name: string;
+  realname?: string;
+  flagname?: string;
+  type?: string;
+  vaddr?: number;
+  size?: number;
+}
+
+interface TablePageBase {
+  total: number;
+  offset: number;
+  returned: number;
+  more: boolean;
+  truncated?: boolean;
+  untrusted: true;
+}
+export interface ImportPage extends TablePageBase {
+  imports: ImportRow[];
+}
+export interface ExportPage extends TablePageBase {
+  exports: ExportRow[];
+}
+
+export interface SectionRow {
+  name: string;
+  vaddr?: string;
+  paddr?: string;
+  /** bytes in the file */
+  size?: number;
+  /** bytes in memory */
+  vsize?: number;
+  /** rizin permission string, e.g. -r-x */
+  perm?: string;
+  flags?: string[];
+  /** Shannon entropy 0..8 from the packer report, when it has this section */
+  entropy?: number;
+  high_entropy?: boolean;
+}
+
+export interface EntryPoint {
+  addr: string;
+  type?: string;
+  vaddr?: number;
+}
+
+export interface SectionsInfo {
+  sections: SectionRow[];
+  segments: SectionRow[];
+  entrypoints: EntryPoint[];
+  entropy_source?: string | null;
+  untrusted: true;
+}
+
+export interface UsedBy {
+  addr: string;
+  refs: XrefRow[];
+  total: number;
+  more: boolean;
+  limit: number;
+  /** the distinct containing functions of the references shown */
+  functions: { addr: string; name?: string | null }[];
+  untrusted: true;
+}
+
+export const STRING_PAGE_SIZES = [50, 100, 200, 500];
+export const TABLE_PAGE_SIZES = [50, 100, 200];
+export const STRING_MIN_LENGTHS = [1, 4, 6, 8, 12, 20];
+
+export const reListApi = (api: Api) => {
+  const base = (c: string, m: string) => `/cases/${enc(c)}/modules/${enc(m)}`;
+  return {
+    strings: (caseId: string, moduleId: string, q: StringQuery = {}) => {
+      const p = new URLSearchParams();
+      if (q.contains) p.set('contains', q.contains);
+      if (q.regex) p.set('regex', q.regex);
+      p.set('min_length', String(q.minLength ?? 4));
+      if (q.section) p.set('section', q.section);
+      p.set('offset', String(q.offset ?? 0));
+      p.set('limit', String(q.limit ?? 100));
+      return api.get<StringPage>(`${base(caseId, moduleId)}/strings?${p.toString()}`);
+    },
+    table: <T extends 'imports' | 'exports'>(kind: T, caseId: string, moduleId: string, q: { contains?: string; offset?: number; limit?: number } = {}) => {
+      const p = new URLSearchParams();
+      if (q.contains) p.set('contains', q.contains);
+      p.set('offset', String(q.offset ?? 0));
+      p.set('limit', String(q.limit ?? 100));
+      return api.get<T extends 'imports' ? ImportPage : ExportPage>(`${base(caseId, moduleId)}/${kind}?${p.toString()}`);
+    },
+    sections: (caseId: string, moduleId: string) => api.get<SectionsInfo>(`${base(caseId, moduleId)}/sections`),
+    usedBy: (caseId: string, moduleId: string, addr: string, limit = XREF_LIMIT, analyze = false) =>
+      api.get<UsedBy>(`${base(caseId, moduleId)}/used-by/${enc(addr)}?limit=${limit}${analyze ? '&analyze=true' : ''}`),
+  };
+};
+
+/** rizin's permission string (-r-x, -rw-) as words. */
+export function permWords(perm?: string): string {
+  if (!perm) return 'unknown';
+  const w = [perm.includes('r') && 'read', perm.includes('w') && 'write', perm.includes('x') && 'execute'].filter(Boolean);
+  return w.length ? w.join(', ') : 'none';
+}

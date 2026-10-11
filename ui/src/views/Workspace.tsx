@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { ConfirmDialog } from '../components/Dialog';
-import { Empty } from '../components/Empty';
+import { Empty, Loading } from '../components/Empty';
 import { ErrorCallout } from '../components/ErrorCallout';
 import { CaseStatusChip, useOutcome } from '../components/Outcome';
 import { RouteTabs } from '../components/Tabs';
@@ -13,14 +13,17 @@ import { useApi, useCaseState, useResource, useStore } from '../lib/store';
 import { OverviewTab } from './workspace/Overview';
 import { PlanTab } from './workspace/Plan';
 import { PreviewTab } from './workspace/Preview';
-import { FeedbackTab } from './workspace/Feedback';
-import { ComparisonsTab } from './workspace/Comparisons';
 import { AdvancedTab } from './workspace/Advanced';
 import { AiTab } from './workspace/AiTab';
 import { LiveLogTab } from './workspace/LiveLog';
 import { ScenariosTab } from './workspace/Scenarios';
-import { FunctionsTab } from './workspace/Functions';
 import { isNativeModule } from '../lib/re';
+
+// Loaded on demand to keep the main bundle under Vite's chunk warning: the R6 RE workbench (functions, code, references,
+// strings, imports, sections) and the less-visited Feedback and Comparisons tabs
+const FeedbackTab = lazy(() => import('./workspace/Feedback').then((m) => ({ default: m.FeedbackTab })));
+const ComparisonsTab = lazy(() => import('./workspace/Comparisons').then((m) => ({ default: m.ComparisonsTab })));
+const FunctionsTab = lazy(() => import('./workspace/Functions').then((m) => ({ default: m.FunctionsTab })));
 import { ConsentCard, PERMISSION_RE } from '../components/ConsentCard';
 import { PreflightCard, usePreflight } from '../components/Preflight';
 
@@ -161,10 +164,10 @@ export function WorkspaceView() {
           <Route path="overview" element={<OverviewTab caseId={caseId} />} />
           <Route path="plan" element={<PlanTab caseId={caseId} />} />
           <Route path="preview" element={<PreviewTab caseId={caseId} />} />
-          <Route path="feedback" element={<FeedbackTab caseId={caseId} />} />
+          <Route path="feedback" element={<Suspense fallback={<Loading what="feedback" />}><FeedbackTab caseId={caseId} /></Suspense>} />
           <Route path="scenarios" element={<ScenariosTab caseId={caseId} />} />
-          <Route path="comparisons" element={<ComparisonsTab caseId={caseId} />} />
-          <Route path="functions" element={<FunctionsTab caseId={caseId} />} />
+          <Route path="comparisons" element={<Suspense fallback={<Loading what="comparisons" />}><ComparisonsTab caseId={caseId} /></Suspense>} />
+          <Route path="functions" element={<Suspense fallback={<Loading what="the functions view" />}><FunctionsTab caseId={caseId} /></Suspense>} />
           <Route path="live-log" element={<LiveLogTab caseId={caseId} />} />
           <Route path="ai" element={<AiTab caseId={caseId} />} />
           <Route path="advanced" element={<AdvancedTab caseId={caseId} />} />

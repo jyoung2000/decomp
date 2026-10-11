@@ -536,3 +536,212 @@ def test_xrefs_and_call_graph_routes_on_pecli_match_the_mcp_tools(studio, tmp_pa
     both = c.get(f"{base}/0x140001440/callgraph", params={"direction": "both", "depth": 2}).json()
     pairs = [(e["from"], e["to"]) for e in both["edges"]]
     assert len(pairs) == len(set(pairs)) and any(t == "0x140001440" for _, t in pairs)
+
+
+# =============================================================================================== piece 4: strings, imports, exports, sections, used by
+STRS = {"untrusted": True, "seen": 5, "count_truncated": False,
+        "strings": [{"vaddr": 0x406000, "paddr": 0x5000, "length": 12, "section": ".rdata", "type": "ascii", "string": "<b>hello</b>"},
+                    {"vaddr": 0x406010, "paddr": 0x5010, "length": 3, "section": ".rdata", "type": "ascii", "string": "abc"},
+                    {"vaddr": 0x406020, "paddr": 0x5020, "length": 9, "section": ".data", "type": "utf16le", "string": "Hello%d\n!"},
+                    {"vaddr": 0x406030, "paddr": 0x5030, "length": 1500, "section": ".rdata", "type": "ascii", "string": "x" * 1000},
+                    "junk"]}
+IMPS = {"imports": [{"ordinal": 1, "type": "FUNC", "name": "ExitProcess", "libname": "KERNEL32.dll", "plt": 0x407000},
+                    {"ordinal": 2, "type": "FUNC", "name": "printf", "libname": "msvcrt.dll", "plt": 0x407008},
+                    {"ordinal": 3, "type": "FUNC", "name": "GetLastError", "libname": "KERNEL32.dll", "plt": 0x407010}], "count": 3}
+EXPS = {"exports": [{"name": "Open", "realname": "ItemStore_Open", "vaddr": 0x401000, "type": "FUNC"}], "count": 1}
+SECS = {"sections": [{"name": ".text", "size": 512, "vsize": 4096, "perm": "-r-x", "paddr": 0x400, "vaddr": 0x401000},
+                     {"name": ".rsrc", "size": 8192, "vsize": 8192, "perm": "-r--", "paddr": 0x600, "vaddr": 0x408000}],
+        "segments": []}
+USED = {"addr": "0x406000", "scope": "address", "to_total": 3, "from_total": 0, "from": [],
+        "to": [{"from": 0x401010, "to": 0x406000, "type": "DATA", "kind": "data", "fcn_addr": 0x401000, "fcn_name": "entry0"},
+               {"from": 0x401020, "to": 0x406000, "type": "DATA", "kind": "data", "fcn_addr": 0x401000, "fcn_name": "entry0"},
+               {"from": 0x409000, "to": 0x406000, "type": "DATA", "kind": "data", "fcn_addr": None, "fcn_name": None}]}
+
+
+class ListBackend(FakeBackend):
+    def __init__(self):
+        super().__init__()
+        self.ops: list[tuple] = []
+
+    def _r(self, body):
+        return OperationResult(ok=True, data={**json.loads(json.dumps(body)), "cached": False}, evidence_ids=["ev_l"])
+
+    def op_strings(self, ctx, *, case_id, module_id, limit=2000):
+        self.ops.append(("strings", limit))
+        return self._r(STRS)
+
+    def op_imports(self, ctx, *, case_id, module_id):
+        self.ops.append(("imports",))
+        return self._r(IMPS)
+
+    def op_exports(self, ctx, *, case_id, module_id):
+        self.ops.append(("exports",))
+        return self._r(EXPS)
+
+    def op_sections(self, ctx, *, case_id, module_id):
+        return self._r(SECS)
+
+    def op_entrypoints(self, ctx, *, case_id, module_id):
+        return self._r({"entrypoints": [{"vaddr": 0x401000, "type": "program", "addr": "0x401000"}]})
+
+    def op_packer_report(self, ctx, *, case_id, module_id):
+        return self._r({"report": {"sections": [{"name": ".text", "entropy": 6.1}, {"name": ".rsrc", "entropy": 7.9}]}})
+
+    def op_xrefs(self, ctx, *, case_id, module_id, addr, scope="address"):
+        self.ops.append(("xrefs", addr, scope))
+        return self._r({**USED, "addr": addr})
+
+
+def test_shared_list_shapers():
+    from rebuild_controller.re_workbench import (ReWorkbench, add_section_entropy, shape_sections, shape_strings, shape_table,
+                                                 string_sections)
+    d = json.loads(json.dumps(STRS))
+    p = shape_strings(d, min_length=4)
+    assert [x["addr"] for x in p["strings"]] == ["0x406000", "0x406020", "0x406030"] and p["total"] == 3 and p["scanned"] == 5
+    assert d["strings"][0].get("addr") is None                                   # the cached evidence is not mutated
+    assert [x["string"] for x in shape_strings(d, contains="HELLO")["strings"]] == ["<b>hello</b>", "Hello%d\n!"]
+    assert [x["section"] for x in shape_strings(d, section=".data")["strings"]] == [".data"]
+    rx = ReWorkbench.compile_regex(r"^H\w+%d")
+    assert [x["addr"] for x in shape_strings(d, regex=rx)["strings"]] == ["0x406020"]
+    assert shape_strings(d, min_length=1, offset=1, limit=2)["more"] is True
+    for bad in ("(a+)+", r"(\w)\1", "x" * 201, "("):
+        with pytest.raises(WorkbenchError):
+            ReWorkbench.compile_regex(bad)
+    assert string_sections(d) == [{"section": ".data", "count": 1}, {"section": ".rdata", "count": 3}]
+    t = shape_table(json.loads(json.dumps(IMPS)), "imports", "kernel32", 0, 1)
+    assert t["imports"][0]["addr"] == "0x407000" and t["total"] == 2 and t["more"] is True
+    secs = shape_sections(json.loads(json.dumps(SECS)))["sections"]
+    assert secs[0]["vaddr"] == "0x401000" and secs[0]["paddr"] == "0x400"
+    assert add_section_entropy(secs, {"sections": [{"name": ".text", "entropy": 6.0}, {"name": ".rsrc", "entropy": 7.5}]})
+    assert (secs[0]["high_entropy"], secs[1]["high_entropy"]) == (False, True)
+    assert add_section_entropy(secs, None) is False
+
+
+def test_module_list_routes_and_used_by(studio, tmp_path, monkeypatch):
+    case = _case(studio, tmp_path)
+    mid = studio.cases.add_module(case["case_id"], "a.exe", "0" * 64, 66, "pe", "native_pe")
+    fake = ListBackend()
+    monkeypatch.setattr(studio.re, "backend", lambda: fake)
+    c = _client(studio)
+    base = f"/cases/{case['case_id']}/modules/{mid}"
+
+    # lists need no analysis
+    r = c.get(f"{base}/strings", params={"min_length": 4, "limit": 2})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["total"] == 3 and d["returned"] == 2 and d["more"] is True and d["untrusted"] is True and d["note"]
+    assert d["strings"][0]["string"] == "<b>hello</b>" and d["strings"][0]["type"] == "ascii"   # verbatim; the app renders text
+    assert {s["section"] for s in d["sections"]} == {".rdata", ".data"}
+    from rebuild_controller.backends.rizin_worker import MAX_STRINGS
+    assert fake.ops[-1] == ("strings", MAX_STRINGS)                     # the same (cached) call as the MCP strings tool
+    assert c.get(f"{base}/strings", params={"regex": "hel+o", "section": ".rdata"}).json()["total"] == 1
+    e = c.get(f"{base}/strings", params={"regex": "(a+)+"})
+    assert e.status_code == 400 and e.json()["error"]["code"] == "invalid_regex" and e.json()["error"]["next_action"]
+    assert c.get(f"{base}/strings", params={"regex": "("}).json()["error"]["code"] == "invalid_regex"
+    assert c.get(f"{base}/strings", params={"contains": "a\x01"}).json()["error"]["code"] == "validation"
+    for bad in ({"section": "a b"}, {"limit": 501}, {"min_length": 0}, {"regex": "x" * 201}):
+        assert c.get(f"{base}/strings", params=bad).status_code == 400, bad
+
+    i = c.get(f"{base}/imports", params={"contains": "KERNEL32", "limit": 1}).json()
+    assert i["imports"][0]["name"] == "ExitProcess" and i["imports"][0]["addr"] == "0x407000" and i["total"] == 2 and i["more"]
+    assert c.get(f"{base}/imports", params={"limit": 1001}).status_code == 400
+    x = c.get(f"{base}/exports").json()
+    assert x["exports"][0]["addr"] == "0x401000" and x["total"] == 1 and x["untrusted"] is True
+    s = c.get(f"{base}/sections").json()
+    assert [(z["name"], z["vaddr"], z["entropy"], z["high_entropy"]) for z in s["sections"]] == [
+        (".text", "0x401000", 6.1, False), (".rsrc", "0x408000", 7.9, True)]
+    assert s["entrypoints"][0]["addr"] == "0x401000" and s["entropy_source"] == "packer report"
+
+    # used by: references need the analysis, which runs only when asked
+    u = c.get(f"{base}/used-by/0x406000")
+    assert u.status_code == 409 and u.json()["error"]["code"] == "not_analyzed" and not any(o[0] == "xrefs" for o in fake.ops)
+    u = c.get(f"{base}/used-by/406000", params={"analyze": "true", "limit": 2})
+    assert u.status_code == 200, u.text
+    u = u.json()
+    assert fake.ops[-1] == ("xrefs", "0x406000", "address") and fake.calls == 1      # op_functions recorded the analysis
+    assert [r["from"] for r in u["refs"]] == ["0x401010", "0x401020"] and u["total"] == 3 and u["more"] is True
+    assert u["functions"] == [{"addr": "0x401000", "name": "entry0"}] and u["untrusted"] is True
+    studio.cases.add_evidence(case["case_id"], "native.functions", "functions", body={"functions": []}, module_id=mid)
+    assert c.get(f"{base}/used-by/0x406000").status_code == 200                       # analysed: no prompt again
+    assert c.get(f"{base}/used-by/zz").status_code == 400
+    assert c.get(f"{base}/used-by/0x406000", params={"limit": 1001}).status_code == 400
+
+    monkeypatch.setattr(studio.re, "backend", lambda: FakeBackend(tool=None))
+    m = c.get(f"{base}/strings").json()["error"]
+    assert m["code"] == "engine_missing" and "strings" in m["message"] and "Tools" in m["next_action"]
+
+
+def test_module_list_routes_refuse_non_native(studio, tmp_path):
+    case = _case(studio, tmp_path)
+    mid = studio.cases.add_module(case["case_id"], "App.dll", "1" * 64, 10, "pe", "dotnet")
+    c = _client(studio)
+    for tail in ("strings", "imports", "exports", "sections", "used-by/0x401000"):
+        r = c.get(f"/cases/{case['case_id']}/modules/{mid}/{tail}")
+        assert r.status_code == 409 and r.json()["error"]["code"] == "not_native", tail
+    assert c.get(f"/cases/{case['case_id']}/modules/mod_nope/strings").status_code == 404
+
+
+@pytest.mark.skipif(not _rizin() or not PECLI.is_file(), reason="needs rizin (REBUILD_STUDIO_TOOLS) and the pecli fixture")
+def test_module_lists_on_pecli_match_the_mcp_tools(studio, tmp_path):
+    import anyio
+    pytest.importorskip("mcp")
+    from mcp import Client
+    from rebuild_controller.ids import sha256_file
+    from rebuild_controller.mcp.server import ServerConfig, build_server
+
+    src = tmp_path / "src"
+    src.mkdir()
+    shutil.copy2(PECLI, src / "pecli.exe")
+    case = _case(studio, tmp_path, src)
+    mid = studio.cases.add_module(case["case_id"], "pecli.exe", sha256_file(src / "pecli.exe"), (src / "pecli.exe").stat().st_size,
+                                  "pe", "native_pe")
+    c = _client(studio)
+    base = f"/cases/{case['case_id']}/modules/{mid}"
+    first = c.get(f"{base}/strings", params={"limit": 5})               # strings need no analysis
+    assert first.status_code == 200, first.text
+    sid = first.json()["session_id"]
+
+    async def mcp(tool, args):
+        async with Client(build_server(studio, ServerConfig(toolset="re"))) as cl:
+            res = await cl.call_tool(tool, {"session_id": sid, **args})
+        body = json.loads(res.content[0].text)
+        assert body["ok"], (tool, args, body)
+        return body
+
+    for args in ({}, {"contains": "error", "limit": 10}, {"regex": r"^error: \w+", "min_length": 6},
+                 {"section": ".rdata", "offset": 20, "limit": 15}, {"min_length": 20, "limit": 500}):
+        h = c.get(f"{base}/strings", params=args).json()
+        m = _unwrap(anyio.run(mcp, "strings", args)["data"])
+        assert m["strings"] == h["strings"], args
+        assert (m["total"], m["offset"], m["returned"], m["scanned"]) == (h["total"], h["offset"], h["returned"], h["scanned"]), args
+        assert h["total"] > 0, args
+    assert all(x["section"] == ".rdata" for x in c.get(f"{base}/strings", params={"section": ".rdata"}).json()["strings"])
+    for tool in ("imports", "exports"):
+        for args in ({}, {"contains": "kernel32", "offset": 2, "limit": 5}):
+            h = c.get(f"{base}/{tool}", params=args).json()
+            m = _unwrap(anyio.run(mcp, tool, args)["data"])
+            assert m[tool] == h[tool] and m["total"] == h["total"], (tool, args)
+    imps = c.get(f"{base}/imports", params={"limit": 1000}).json()
+    assert {i["libname"] for i in imps["imports"]} >= {"KERNEL32.dll"} and imps["total"] == 55
+    s = c.get(f"{base}/sections").json()
+    ms = _unwrap(anyio.run(mcp, "sections", {})["data"])
+    strip = lambda rows: [{k: v for k, v in r.items() if k not in ("entropy", "high_entropy")} for r in rows]  # noqa: E731
+    assert strip(s["sections"]) == ms["sections"] and s["segments"] == ms["segments"]
+    assert s["entropy_source"] == "packer report" and isinstance(s["sections"][0]["entropy"], float)
+    assert s["entrypoints"] == _unwrap(anyio.run(mcp, "entry_points", {})["data"])["entrypoints"]
+    assert s["entrypoints"][0]["addr"] == "0x140001410"
+
+    # used by: a string used twice from one function, and an import called from three functions
+    assert c.get(f"{base}/used-by/0x14000a378").json()["error"]["code"] == "not_analyzed"
+    u = c.get(f"{base}/used-by/0x14000a378", params={"analyze": "true"})
+    assert u.status_code == 200, u.text
+    u = u.json()
+    assert {(r["from"], r["fcn_name"]) for r in u["refs"]} == {("0x140002078", "fcn.140001d63"), ("0x140002143", "fcn.140001d63")}
+    assert u["functions"] == [{"addr": "0x140001d63", "name": "fcn.140001d63"}]
+    imp = next(i for i in imps["imports"] if i["name"] == "EnterCriticalSection")
+    v = c.get(f"{base}/used-by/{imp['addr']}").json()
+    assert ("0x140002d5b", "fcn.140002d40") in {(r["from"], r["fcn_name"]) for r in v["refs"]} and len(v["functions"]) >= 3
+    for addr in ("0x14000a378", imp["addr"]):
+        h = c.get(f"{base}/used-by/{addr}", params={"limit": 1000}).json()
+        m = _unwrap(anyio.run(mcp, "xrefs_to", {"address": addr, "limit": 1000})["data"])
+        assert m["refs"] == h["refs"] and m["total"] == h["total"] and m["addr"] == h["addr"], addr

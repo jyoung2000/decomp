@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Empty, Loading } from '../../components/Empty';
 import { ErrorCallout } from '../../components/ErrorCallout';
 import { ApiError } from '../../lib/api';
-import { isNativeModule, reApi, type FunctionPage, type FunctionRow, type FunctionSort } from '../../lib/re';
+import { MODULE_LISTS, isNativeModule, reApi, type FunctionPage, type FunctionRow, type FunctionSort, type ModuleList } from '../../lib/re';
 import { useApi, useResource } from '../../lib/store';
 import type { Decompiler } from '../../lib/re';
 import { CODE_VIEWS, FunctionPane, type CodeView } from './FunctionDetail';
+
+// piece 4: Strings / Imports / Exports / Sections load on demand (keeps the main bundle under Vite's chunk warning)
+const ModuleLists = lazy(() => import('./ModuleLists'));
+const HEX = /^0x[0-9a-f]{1,16}$/i;
 
 const SORTS: { id: FunctionSort; label: string }[] = [
   { id: 'addr', label: 'Address' },
@@ -22,14 +26,19 @@ const bytes = (v: number) => `${n(v)} byte${v === 1 ? '' : 's'}`;
 /** R6: the analysed functions of a native module (piece 1) and, for the selected row, a side pane with the function's header,
  * decompiled code and disassembly (piece 2), references and a bounded call graph whose function links select another function
  * (piece 3). Backed by the same operations as the MCP list_functions / get_function / decompile / disassemble / xrefs_to /
- * xrefs_from / call_graph tools. The selection is in the URL (?module=&fn=&view=&decompiler=), so it can be linked to. */
+ * xrefs_from / call_graph tools. Piece 4 adds the module's Strings, Imports, Exports and Sections beside the list (?list=), with a
+ * "Used by" pane for a selected string or import (?item=) whose functions open here. The selection is in the URL
+ * (?module=&list=&item=&fn=&view=&decompiler=), so it can be linked to. */
 export function FunctionsTab({ caseId }: { caseId: string }) {
   const api = useApi();
   const modules = useResource(() => api.modules(caseId), [api, caseId]);
   const native = useMemo(() => (modules.data ?? []).filter(isNativeModule), [modules.data]);
   const [params, setParams] = useSearchParams();
   const moduleId = params.get('module') ?? '';
-  const fn = /^0x[0-9a-f]{1,16}$/i.test(params.get('fn') ?? '') ? params.get('fn')!.toLowerCase() : null;
+  const fn = HEX.test(params.get('fn') ?? '') ? params.get('fn')!.toLowerCase() : null;
+  const list: ModuleList = MODULE_LISTS.some((l) => l.id === params.get('list')) ? (params.get('list') as ModuleList) : 'functions';
+  const item = HEX.test(params.get('item') ?? '') ? params.get('item')!.toLowerCase() : null;
+  const [focusPane, setFocusPane] = useState(false);
   const view: CodeView = CODE_VIEWS.includes(params.get('view') as CodeView) ? (params.get('view') as CodeView) : 'decompiled';
   const decompiler: Decompiler = params.get('decompiler') === 'ghidra' ? 'ghidra' : 'rizin';
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -83,12 +92,22 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
       href: (addr: string) => {
         const next = new URLSearchParams(params);
         next.set('fn', addr);
+        next.delete('list');
+        next.delete('item');
         return `?${next.toString()}`;
       },
-      open: (addr: string) => update({ fn: addr }),
+      open: (addr: string) => {
+        if (list !== 'functions') setFocusPane(true);   // the link that was clicked goes away: focus the opened function
+        update({ fn: addr, list: null, item: null });
+      },
     }),
-    [params, update],
+    [params, update, list],
   );
+  useEffect(() => {
+    if (!focusPane || list !== 'functions') return;
+    document.getElementById('fn-pane-h')?.focus();
+    setFocusPane(false);
+  }, [focusPane, list, fn]);
   useEffect(() => {
     if (!refocus || fn) return;
     layoutRef.current?.querySelector<HTMLElement>(`[data-testid="fn-row-${refocus}"]`)?.focus();
@@ -109,13 +128,27 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
   const module = native.find((m) => m.module_id === moduleId) ?? native[0];
   const setModuleId = (id: string) => {
     setHist({ stack: [], index: -1 });
-    update({ module: id, fn: null });
+    update({ module: id, fn: null, item: null });
   };
+  const setList = (l: ModuleList) => update({ list: l === 'functions' ? null : l, item: null });
+  const onListKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const i = MODULE_LISTS.findIndex((l) => l.id === list);
+    let k = i;
+    if (e.key === 'ArrowRight') k = (i + 1) % MODULE_LISTS.length;
+    else if (e.key === 'ArrowLeft') k = (i - 1 + MODULE_LISTS.length) % MODULE_LISTS.length;
+    else if (e.key === 'Home') k = 0;
+    else if (e.key === 'End') k = MODULE_LISTS.length - 1;
+    else return;
+    e.preventDefault();
+    setList(MODULE_LISTS[k].id);
+    e.currentTarget.querySelectorAll<HTMLButtonElement>('[role=tab]')[k]?.focus();
+  };
+  const listLabel = MODULE_LISTS.find((l) => l.id === list)!.label;
   return (
     <section className="stack" aria-labelledby="fn-h" data-testid="functions-tab">
       <div className="row fn-head">
         <h2 id="fn-h" className="section-title">
-          Functions
+          {listLabel}
         </h2>
         {native.length > 1 ? (
           <label className="small">
@@ -134,23 +167,38 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
           </span>
         )}
       </div>
-      <div ref={layoutRef} className={`fn-layout${fn ? ' with-pane' : ''}`}>
-        <div className="fn-list-col stack">
-          <FunctionList key={module.module_id} caseId={caseId} moduleId={module.module_id} moduleName={module.rel_path} selected={fn} onSelect={(addr) => update({ module: module.module_id, fn: addr })} onClose={closePane} />
-        </div>
-        {fn && (
-          <FunctionPane
-            caseId={caseId}
-            moduleId={module.module_id}
-            addr={fn}
-            view={view}
-            decompiler={decompiler}
-            onView={(v) => update({ view: v === 'decompiled' ? null : v })}
-            onDecompiler={(d) => update({ decompiler: d === 'rizin' ? null : d })}
-            onClose={closePane}
-            nav={nav}
-            history={history}
-          />
+      <div className="tabs ml-tabs" role="tablist" aria-label={`Views of ${module.rel_path}`} onKeyDown={onListKey} data-testid="ml-tabs">
+        {MODULE_LISTS.map((l) => (
+          <button key={l.id} type="button" role="tab" id={`ml-tab-${l.id}`} aria-controls="ml-panel" aria-selected={list === l.id} tabIndex={list === l.id ? 0 : -1} className="tab" onClick={() => setList(l.id)} data-testid={`ml-tab-${l.id}`}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id="ml-panel" aria-labelledby={`ml-tab-${list}`}>
+        {list !== 'functions' ? (
+          <Suspense fallback={<Loading what={listLabel.toLowerCase()} />}>
+            <ModuleLists kind={list} caseId={caseId} moduleId={module.module_id} moduleName={module.rel_path} item={list === 'strings' || list === 'imports' ? item : null} onItem={(a) => update({ item: a })} nav={nav} />
+          </Suspense>
+        ) : (
+          <div ref={layoutRef} className={`fn-layout${fn ? ' with-pane' : ''}`}>
+            <div className="fn-list-col stack">
+              <FunctionList key={module.module_id} caseId={caseId} moduleId={module.module_id} moduleName={module.rel_path} selected={fn} onSelect={(addr) => update({ module: module.module_id, fn: addr })} onClose={closePane} />
+            </div>
+            {fn && (
+              <FunctionPane
+                caseId={caseId}
+                moduleId={module.module_id}
+                addr={fn}
+                view={view}
+                decompiler={decompiler}
+                onView={(v) => update({ view: v === 'decompiled' ? null : v })}
+                onDecompiler={(d) => update({ decompiler: d === 'rizin' ? null : d })}
+                onClose={closePane}
+                nav={nav}
+                history={history}
+              />
+            )}
+          </div>
         )}
       </div>
     </section>

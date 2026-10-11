@@ -2,12 +2,16 @@
 
 Piece 1: the Functions list of a project module. Piece 2: the detail pane of one function (header, decompiled code with a
 rizin/ghidra choice, disassembly). Piece 3: cross references of the function (who calls/uses it, what it calls/uses) and a
-bounded call graph.
+bounded call graph. Piece 4: module-level Strings, Imports, Exports, Sections (+ entry points) and a "used by" lookup of one
+string or import (the referencing addresses and their containing functions).
 
 Every route opens or reuses the module's workbench session and runs the same workbench calls as the MCP tools
 (``list_functions`` -> ``op_functions`` + ``re_workbench.shape_functions``; ``get_function`` -> ``op_function``;
 ``decompile`` -> ``ReWorkbench.decompile``; ``disassemble`` of a whole function -> ``op_disasm``; ``xrefs_to`` /
-``xrefs_from`` with ``scope=function`` -> ``op_xrefs`` + ``re_workbench.shape_xrefs``; ``call_graph`` -> ``op_call_graph``),
+``xrefs_from`` with ``scope=function`` -> ``op_xrefs`` + ``re_workbench.shape_xrefs``; ``call_graph`` -> ``op_call_graph``; ``strings`` -> ``op_strings`` + ``re_workbench.shape_strings`` (regex through
+``ReWorkbench.compile_regex``); ``imports`` / ``exports`` -> ``op_imports`` / ``op_exports`` + ``re_workbench.shape_table``;
+``sections`` -> ``op_sections`` + ``re_workbench.shape_sections``; ``entry_points`` -> ``op_entrypoints``; "used by" ->
+``xrefs_to`` with ``scope=address`` = ``op_xrefs`` + ``re_workbench.shape_xrefs``),
 so the app and MCP cannot diverge. Mounted from ``api/server.py`` with one line; error shape ``{error:{code,message,next_action}}``.
 
 Binary-derived text (names, signatures, decompiled code, instructions, comments) is untrusted: responses carry
@@ -36,8 +40,9 @@ def _addr(value: str) -> str:
 
 
 def mount_re_routes(app: FastAPI, studio: Any) -> None:
-    from ..re_workbench import (DISASM_PAGE_MAX, NATIVE_PROFILES, XREF_LIMIT_MAX, WorkbenchError, function_header, page_disasm,
-                                shape_functions, shape_xrefs)
+    from ..re_workbench import (DISASM_PAGE_MAX, NATIVE_PROFILES, SECTION_NAME, STRINGS_PAGE_MAX, TABLE_PAGE_MAX, XREF_LIMIT_MAX,
+                                WorkbenchError, add_section_entropy, function_header, page_disasm, shape_functions, shape_sections,
+                                shape_strings, shape_table, shape_xrefs, string_sections)
 
     r = APIRouter(tags=["re"])
 
@@ -56,15 +61,17 @@ def mount_re_routes(app: FastAPI, studio: Any) -> None:
     def analysed(case_id: str, module_id: str) -> bool:
         return any(studio.cases.list_evidence(case_id, kind=k, module_id=module_id) for k in ("native.functions", "native.analyze"))
 
-    def ready(case_id: str, module_id: str, analyze: bool) -> dict[str, Any]:
-        """Common gate: native module, engine installed, analysed (or the user asked to analyse now)."""
+    def ready(case_id: str, module_id: str, analyze: bool, *, need_analysis: bool = True,
+              what: str = "functions cannot be listed") -> dict[str, Any]:
+        """Common gate: native module, engine installed, analysed (or the user asked to analyse now). Reading strings, imports,
+        exports and sections needs no analysis (``need_analysis=False``); references do."""
         m = native_module(case_id, module_id)
         b = studio.re.backend()
         tool = b.tool() if hasattr(b, "tool") else None
         if tool is None or not getattr(tool, "version", None):
-            raise _err("engine_missing", "The analysis engine (rizin) is not installed, so functions cannot be listed.", 503,
+            raise _err("engine_missing", f"The analysis engine (rizin) is not installed, so {what}.", 503,
                        "Install rizin on the Tools page, then come back to this tab.")
-        if not analyze and not analysed(case_id, module_id):
+        if need_analysis and not analyze and not analysed(case_id, module_id):
             raise _err("not_analyzed", f"{m.get('rel_path')} has not been analysed yet.", 409,
                        "Choose 'Analyse now' (about a minute for a small program, longer for large ones), or start the "
                        "project's analysis from Overview.")
@@ -178,6 +185,98 @@ def mount_re_routes(app: FastAPI, studio: Any) -> None:
         data = dict(res.data or {})
         data.pop("cached", None)
         return {**data, "max_nodes": max_nodes, **common(res, sid, case_id, module_id), "untrusted": True, "note": UNTRUSTED_NOTE}
+
+    # ------------------------------------------------------------------ piece 4: strings, imports, exports, sections, used by
+    def plain_text(value: str | None, what: str) -> None:
+        if value is not None and any(ord(c) < 32 for c in value):
+            raise _err("validation", f"the {what} contains control characters", 400, "type plain text and retry")
+
+    @r.get("/cases/{case_id}/modules/{module_id}/strings")
+    def strings(case_id: str, module_id: str, contains: str | None = Query(default=None, max_length=120),
+                regex: str | None = Query(default=None, max_length=200), min_length: int = Query(default=4, ge=1, le=1000),
+                section: str | None = Query(default=None, pattern=SECTION_NAME), offset: int = Query(default=0, ge=0, le=10_000_000),
+                limit: int = Query(default=100, ge=1, le=STRINGS_PAGE_MAX)):
+        """Strings of the module (the MCP ``strings`` call): substring or bounded regex (no nested quantifiers or
+        backreferences, at most 200 characters), minimum length, exact section, paged. ``sections`` lists the sections that
+        hold strings (with counts) for the app's filter."""
+        from ..backends.rizin_worker import MAX_STRINGS
+        native_module(case_id, module_id)
+        plain_text(contains, "search text")
+        plain_text(regex, "pattern")
+        rx = None
+        if regex:
+            try:
+                rx = studio.re.compile_regex(regex)
+            except WorkbenchError as e:
+                raise _err("invalid_regex", f"The pattern cannot be used: {e.message}", 400,
+                           e.next_action or "Fix the pattern, or turn off 'Regular expression' to search for plain text.") from None
+        ready(case_id, module_id, False, need_analysis=False, what="strings cannot be read")
+        res, sid = run(case_id, module_id, lambda s: studio.re.call(s, "strings", limit=MAX_STRINGS))
+        data = dict(res.data or {})
+        page = shape_strings(data, contains=contains, regex=rx, min_length=min_length, section=section, offset=offset, limit=limit)
+        return {**page, "sections": string_sections(data), "contains": contains or "", "regex": regex or "",
+                "min_length": min_length, "section": section or "", **common(res, sid, case_id, module_id),
+                "untrusted": True, "note": UNTRUSTED_NOTE}
+
+    def table(key: str, case_id: str, module_id: str, contains: str | None, offset: int, limit: int) -> dict[str, Any]:
+        native_module(case_id, module_id)
+        plain_text(contains, "search text")
+        ready(case_id, module_id, False, need_analysis=False, what=f"{key} cannot be read")
+        res, sid = run(case_id, module_id, lambda s: studio.re.call(s, key))
+        page = shape_table(dict(res.data or {}), key, contains, offset, limit)
+        return {**page, "contains": contains or "", **common(res, sid, case_id, module_id), "untrusted": True, "note": UNTRUSTED_NOTE}
+
+    @r.get("/cases/{case_id}/modules/{module_id}/imports")
+    def imports(case_id: str, module_id: str, contains: str | None = Query(default=None, max_length=120),
+                offset: int = Query(default=0, ge=0, le=10_000_000), limit: int = Query(default=200, ge=1, le=TABLE_PAGE_MAX)):
+        """Imported functions (library, name, IAT/PLT address as ``addr``): the MCP ``imports`` call."""
+        return table("imports", case_id, module_id, contains, offset, limit)
+
+    @r.get("/cases/{case_id}/modules/{module_id}/exports")
+    def exports(case_id: str, module_id: str, contains: str | None = Query(default=None, max_length=120),
+                offset: int = Query(default=0, ge=0, le=10_000_000), limit: int = Query(default=200, ge=1, le=TABLE_PAGE_MAX)):
+        """Exported symbols (name, address, type): the MCP ``exports`` call."""
+        return table("exports", case_id, module_id, contains, offset, limit)
+
+    @r.get("/cases/{case_id}/modules/{module_id}/sections")
+    def sections(case_id: str, module_id: str):
+        """Sections and segments (the MCP ``sections`` call) plus entry points (the MCP ``entry_points`` call). Each section
+        gets ``entropy`` / ``high_entropy`` from the module's packer report when it has one for that section."""
+        native_module(case_id, module_id)
+        ready(case_id, module_id, False, need_analysis=False, what="sections cannot be read")
+        res, sid = run(case_id, module_id, lambda s: studio.re.call(s, "sections"))
+        data = shape_sections(dict(res.data or {}))
+        eps, _ = run(case_id, module_id, lambda s: studio.re.call(s, "entrypoints"))
+        entry = [e for e in (eps.data or {}).get("entrypoints") or [] if isinstance(e, dict)]
+        entropy_from = None
+        b = studio.re.backend()
+        if hasattr(b, "op_packer_report"):       # static and cached; a failure only loses the entropy column
+            try:
+                pk = b.op_packer_report(studio, case_id=case_id, module_id=module_id)
+                if pk.ok and add_section_entropy(data["sections"], (pk.data or {}).get("report")):
+                    entropy_from = "packer report"
+            except Exception:
+                pass
+        return {"sections": data["sections"], "segments": data.get("segments") or [], "entrypoints": entry,
+                "entropy_source": entropy_from, **common(res, sid, case_id, module_id), "untrusted": True, "note": UNTRUSTED_NOTE}
+
+    @r.get("/cases/{case_id}/modules/{module_id}/used-by/{addr}")
+    def used_by(case_id: str, module_id: str, addr: str = Addr, limit: int = Query(default=200, ge=1, le=XREF_LIMIT_MAX),
+                analyze: bool = False):
+        """Who uses one string or import: the references to its address (the MCP ``xrefs_to`` call with the default
+        ``scope=address``), each with the referencing address (``from``), its kind and its containing function
+        (``fcn_addr`` / ``fcn_name``, null when the code is not inside an analysed function)."""
+        target = _addr(addr)
+        ready(case_id, module_id, analyze, what="references cannot be listed")
+        if analyze and not analysed(case_id, module_id):   # record the analysis like the Functions list does
+            run(case_id, module_id, lambda s: studio.re.call(s, "functions"))
+        res, sid = run(case_id, module_id, lambda s: studio.re.call(s, "xrefs", addr=target, scope="address"))
+        data = dict(res.data or {})
+        shaped = shape_xrefs(data, "to", limit)
+        fns = sorted({(x["fcn_addr"], x.get("fcn_name")) for x in shaped["refs"] if x.get("fcn_addr")}, key=lambda t: int(t[0], 16))
+        return {"addr": data.get("addr"), "refs": shaped["refs"], "total": shaped["total"], "more": shaped["more"], "limit": limit,
+                "functions": [{"addr": a, "name": nm} for a, nm in fns], **common(res, sid, case_id, module_id),
+                "untrusted": True, "note": UNTRUSTED_NOTE}
 
     app.include_router(r)
 

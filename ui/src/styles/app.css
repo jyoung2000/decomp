@@ -438,6 +438,18 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 .fn-tree-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--s-2); padding: 1px 2px; min-width: 0; }
 .fn-tree-toggle { width: 1.2em; flex: none; border: 0; background: none; padding: 0; color: var(--fg-3); cursor: pointer; text-align: center; }
 .fn-tree-rel { flex: none; }
+/* R6 piece 4: module lists (strings, imports, exports, sections) and the "Used by" pane */
+.ml-tabs { margin-top: calc(-1 * var(--s-1)); }
+.ml-string { display: inline; }
+.ml-string-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.btn-link { border: 0; background: none; padding: 0 0 0 var(--s-1); color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+.btn-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ml-table .ml-inline { display: none; }
+.filters .field.field-check { flex: 0 0 auto; min-width: 0; flex-direction: row; align-items: center; gap: var(--s-1); align-self: center; }
+.ml-entry { padding: var(--s-2) var(--s-3); }
+.ml-entry-list { margin: var(--s-1) 0 0; padding-left: var(--s-4); }
+.ub-item { min-width: 0; overflow-wrap: anywhere; }
+.ml-high { margin-left: var(--s-1); }
 @media (max-width: 1100px) {
   .fn-layout.with-pane { grid-template-columns: minmax(0, 1fr); }
   .fn-pane { position: static; max-height: none; }
@@ -450,4 +462,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
   .fn-refs-table .col-at { display: none; }
   .fn-pane-head { flex-wrap: wrap; }
   .fn-tree ul { padding-left: var(--s-2); }
+  .ml-tabs { flex-wrap: wrap; }
+  .ml-table .col-opt { display: none; }
+  .ml-table .ml-inline { display: block; }
 }
