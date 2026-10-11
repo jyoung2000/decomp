@@ -195,17 +195,48 @@ def hermes_gates() -> list[str]:
     return [l.strip() for l in h.read_text().splitlines() if re.match(r"^\s*[-*]?\s*\*{0,2}G\d", l)][:12] if h.exists() else []
 
 
+def benchmark() -> dict:
+    """Scoreboard rows from reports/benchmark.json (R0/R1/R7); rows that were not run keep their stated reason."""
+    d = _jload(ROOT / "reports" / "benchmark.json", {}) or {}
+    rows = []
+    for x in d.get("rows", []):
+        f, dc, pk = x.get("functions") or {}, x.get("decompile") or {}, x.get("packed") or {}
+        rows.append({"row": x.get("row"), "status": x.get("status"), "recall": f.get("recall"), "precision": f.get("precision"),
+                     "named_recall": f.get("named_recall"), "decompile_coverage": dc.get("coverage"),
+                     "packed": pk.get("note") if pk.get("truth") else None, "seconds": x.get("wall_seconds")})
+    return {"generated_utc": d.get("generated_utc"), "config": d.get("config"), "rows": rows}
+
+
+def r_series() -> list[dict]:
+    """Status cell of every R-series milestone row in PLAN.md (first sentence only)."""
+    out = []
+    for ln in (ROOT / "PLAN.md").read_text("utf-8").splitlines():
+        m = re.match(r"^\| (R\d+) \| \*\*(.+?)\*\*", ln)
+        if m:
+            # descriptions contain '|' characters, so read the last three cells from the right: depends | status | acceptance
+            cells = ln.rstrip().rstrip("|").rsplit(" | ", 3)
+            out.append({"id": m.group(1), "title": m.group(2).rstrip("."), "status": cells[-2].strip()[:400] if len(cells) >= 3 else "?"})
+    return out
+
+
+def installed_app_runs() -> list[str]:
+    """Headings of the genuine-install evidence log runs (what ran through the installed app, by run)."""
+    log = ROOT / "evidence" / "windows" / "20261006-jalon" / "GATE-LOG.md"
+    return [ln[3:].strip() for ln in log.read_text("utf-8").splitlines() if ln.startswith("## Run")] if log.exists() else []
+
+
 def build() -> dict:  # noqa: C901
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(), "host": {"os": platform.platform(), "certifies_windows": False, "note": "report generated on the build host; see the Windows sections for what ran where"},
         "commits": sh(["git", "log", "--oneline", "-30"]).splitlines(), "branch": sh(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
         "pins": pins(), "backends": doctor(), "test_runs": test_runs(), "fixtures": {k: {"kind": v.get("kind"), "oracle": v.get("oracle"), "features": len(v.get("features", []))} for k, v in fixtures().get("fixtures", {}).items()},
         "demos": demos(), "windows_gates": gates(), "hermes_gates": hermes_gates(),
+        "benchmark": benchmark(), "r_series": r_series(), "installed_app_runs": installed_app_runs(),
         "windows": _jload(ROOT / "reports" / "windows-validation.json"),
         "limits": [
             "Not certified: the interactive Windows host was the owner's developer machine (dev tools installed, admin-capable account), not a clean standard-user VM. Clean-machine and standard-user gates remain open.",
             "Installer and portable zip are UNSIGNED (no code-signing certificate available); SmartScreen will warn.",
-            "No AI provider key was available: the in-app implement/repair loop is verified against a scripted OpenAI-compatible server only; live Anthropic/OpenAI/Gemini/OpenRouter behaviour is UNVERIFIED and zero paid calls were made.",
+            "No cloud AI provider key was available: live Anthropic/OpenAI/Gemini/OpenRouter behaviour is UNVERIFIED and zero paid calls were made (R3 waits for the owner's key). Local AI (Ollama) is verified end to end; on an RTX 4070 12 GB, no local model produced a compiling Rust port of the .NET fixture (runs 1-7), while the C# target rebuilt it with no AI (run 9).",
             "Original-program isolation is damage limitation, not a security sandbox: Low integrity + Job Object limits on Windows; the program can still read most user files and the network is open unless the opt-in AppContainer mode is chosen (docs/ISOLATION.md).",
             "Java (.jar) recovery is supported (CFR); Android code recovery needs jadx (native lib/<abi>/*.so libraries are analysed by Rizin per ABI); Mach-O is analysed by Rizin (fat files per slice; static only, Mach-O cannot run on Windows); Unity IL2CPP, GameMaker and Unreal are detected with explicit blockers and no code recovery.",
             "Scenario results are limited to the scenarios declared for each case. Passing them is not global parity: features with no scenario, Windows-only behaviour and undiscovered scope are not measured.",
@@ -283,6 +314,16 @@ def render(r: dict) -> str:
             L.append(f"| {d['example']} | `{x['candidate_id']}` | {'yes' if x['final'] else 'no'} | {x['authored_by']} | {x['basis']} | {x['stored_author_field']} | {x['app_routed_ai_calls']} |")
     L += ["", "Recommended follow-up (not done here): record a `source` (`mcp` or `controller`) in candidate metadata so provenance does not depend on logs.",
           ""] + _windows_sections(r.get("windows"))
+    b = r.get("benchmark") or {}
+    pct = lambda v: "n/a" if v is None else f"{v * 100:.1f} %"
+    L += ["", "## Analysis quality without AI (benchmark, reports/benchmark.md)", "",
+          f"Generated {b.get('generated_utc')}. Function recall/precision are against ground truth from our own builds; rows not run keep their reason.", "",
+          "| Row | Status | Function recall | Precision | Named recall | Real-decompiler coverage | Packed |", "|---|---|---|---|---|---|---|"]
+    L += [f"| {x['row']} | {x['status'] if x['status'] == 'ok' else x['status'][:90]} | {pct(x['recall'])} | {pct(x['precision'])} | {pct(x['named_recall'])} "
+          f"| {pct(x['decompile_coverage'])} | {x['packed'] or ''} |" for x in b.get("rows", [])]
+    L += ["", "## Platform milestones (PLAN.md R-series)", "", "| ID | Milestone | Status |", "|---|---|---|"]
+    L += [f"| {m['id']} | {m['title']} | {m['status'].replace(chr(10), ' ')} |" for m in r.get("r_series", [])]
+    L += ["", "## Runs through the installed app (evidence/windows/20261006-jalon/GATE-LOG.md)", ""] + [f"- {h}" for h in r.get("installed_app_runs", [])]
     L += ["", "## Windows release gates (not certified here)", ""] + [f"- {g}" for g in r["windows_gates"]]
     L += ["", "## Hermes gates", ""] + [f"- {g}" for g in r["hermes_gates"]]
     L += ["", "## Limits and remaining user-dependent actions", ""] + [f"- {l}" for l in r["limits"]]

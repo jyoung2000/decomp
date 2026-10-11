@@ -1,41 +1,41 @@
 {
- "generated_at": "2026-10-07T16:04:48.630688+00:00",
+ "generated_at": "2026-10-11T03:42:59.017882+00:00",
  "host": {
   "os": "Windows-11-10.0.26200-SP0",
   "certifies_windows": false,
   "note": "report generated on the build host; see the Windows sections for what ran where"
  },
  "commits": [
+  "afcb716 MCP list_functions: sort and report by code bytes (realsz), keep the address span separately",
+  "739caa8 R2 evidence: recorded Claude Code session driving the RE MCP tools on pecli (open, list, decompile, rename, comment, re-decompile, xrefs)",
+  "2dfe346 R7: Mach-O supported (static), Android native libraries analysed per ABI; owned fixtures",
+  "ca2ff8a Windows CI: /health without a token is liveness only; PDB tests accept another MSVC toolset",
+  "7d27d48 Evidence: .NET Notes app rebuilt as C# in the genuine install, 7/7 verified, no AI",
+  "c3c80ba R4: rebuild in the original language first (.NET \u00e2\u2020\u2019 C#, JVM \u00e2\u2020\u2019 Java)",
+  "73c0b78 Lock: UPX 5.2.1, Temurin JDK 21 and Ghidra 12.1.4 are verified pins (verify_required false)",
+  "2db52f4 Build gate: check the doctor's dependency 'error' property without tripping StrictMode",
+  "991ca6a R1: no-AI native analysis depth, measured against the R0 benchmark",
+  "28a7773 Repair loop: detect an unchanged answer, skip the rebuild, vary, then switch rung (R5f)",
+  "0daa689 R9 + R10: per-task AI control with failure rules and JeV; dependency health, one-click install, preflight",
+  "9139c3a Evidence: .NET rebuild run 7 with qwen2.5-coder:14b (0/7; repairs 2-5 byte-identical)",
+  "fd12aa7 R2: MCP reverse-engineering toolset, HTTP transport and copy-config UI",
+  "c169b25 R0: benchmark corpus with ground truth and a scoreboard",
+  "78219c9 PLAN: R-series roadmap for the reverse-engineering platform",
+  "84aca40 Evidence: .NET rebuild with local AI through the genuine install (runs 1-6, all honestly scaffolded)",
+  "219dcef Ollama: shrink the output reserve to fit the context instead of refusing the request",
+  "e7287e9 Ollama: grammar-constrained JSON for file-map answers; thinking off unless requested",
+  "7d13b1e Implement loop: drop Rust built-in crates (std/core/alloc) from a model's Cargo.toml dependencies",
+  "6fd6f5e Recovery stages start from an empty output folder so a project can be started again",
+  "12cdab4 Ollama: always stream so slow local generation is bounded per token, not by a fixed total timeout",
+  "b3de2f7 Reuse scenarios recorded in the Scenarios tab as the rebuild's baseline; forecast counts them as verifiable",
+  "53c1b57 Local AI: auto-detect local servers/models, search + download GGUF models, no silent context truncation",
+  "2a2ef16 Ladder focus effect keyed on entries (hosted CI: focus moved on the wrong render); genuine-install gate run 7; plan r5; report",
   "fc6abf6 A project whose last job failed or got blocked no longer stays 'running' with Resume disabled",
   "954a8d3 Fix delivery to an output folder on another drive (WinError 17), found on a genuine Windows install",
   "ef0968a UI test: 20 s budget for the keyboard ladder test (its 5 s focus wait hit the 5 s default test timeout on Linux CI)",
   "cd02b1f Live rebuild log: plain-English job.log lines from every main stage, /cases/{id}/log, Live log tab + 'Now doing' strip",
   "fb7f5ba Correct the Windows evidence: runs 1-4 were MSIX-virtualized installs; record the genuine Explorer install (run 5); regenerate final report",
-  "a8a0747 UI test: allow 5 s for the async focus move on slow CI runners",
-  "a341d70 Found on a genuine (non-virtualized) install: .NET apphost no longer blocks recovery; blocker text points at Tools",
-  "da31c6c Rust tool: test and plain-language text match its optional status",
-  "2444694 CI fixes: ladder keyboard-focus test waits for the async focus move; Rust toolchain marked optional (only Rust remakes need it); recorder counts vitest tests, not files",
-  "903a0f0 AI UI verified against the real controller and a local model; contract fixes; actionable integrity-label error",
-  "ab6494c AI ladder controller: credits/model-unavailable/context failures, ladder+preset+model APIs with config revisions, project AI policy (no_ai never touches the network), plan AI ownership, activity feed; live Ollama proof",
-  "1d619ca UI: editable AI model ladder (numbered rungs, local/cloud, availability, capabilities, price), searchable picker with manual IDs, presets with preview, project AI policy incl. No AI, plan AI chips + origin badges, AI activity tab",
-  "0e7704a AI ladder contract (failure taxonomy, ladder/preset/model APIs, project policy, plan AI ownership, activity feed); plan P13",
-  "c1f28c3 Guided setup installs a private Rust toolchain (rustup-init 1.29.1 pinned, GNU host 1.97.0, no admin/Visual Studio)",
-  "f3b0988 Final report: Windows sections from recorded validation (interactive desktop vs hosted CI), live doctor, current limits; plan r4",
-  "c42355b Windows gate log run 3: installed-app fixtures, guided tools, uninstall/data-keep, crash/relaunch/close drills",
-  "80ff419 Tests: isolate the per-user tools dir in the jsweb no-node probe test",
-  "d94b546 Web capture: automatic start-page check waits for a registering service worker and skips the racy pre-load snapshot",
-  "34800f6 Found via the installed controller: web projects infer how to start the original; --wait returns blockers instead of hanging",
-  "1077820 Browser comparisons in the installed app: Tools-page Node + playwright-core, Edge as the browser; short isolated home",
-  "44cd4fb Windows native decompilation: pin Cutter v2.5.0's rizin (same commit as rizin 0.9.1) which carries rz-ghidra",
-  "40e99a8 Tests: hosted Windows runner portability (gcc writes app.exe; process-limit test uses the base interpreter)",
-  "7db84c1 Scenario authoring and consent in the UI: declare CLI scenarios, record the original (with permission) into a new baseline revision",
-  "5fc16f2 In-app implement/build/compare/repair loop with case budget, retries and resumable attempts; JVM pipeline routing; POSIX file-size cap off by default",
-  "689e5b4 Support matrix: Java/Android recovery (CFR, jadx, pinned JRE); precise detection + honest blockers for IL2CPP, GameMaker, Unreal, Mach-O",
-  "38f6daa Plan r3: state at usage-limit stop",
-  "ef09bcd Plan r2 statuses; non-developer install guide (NSIS .exe, shortcuts, pinning, tools, uninstall data choice)",
-  "357e9d0 Tests: portable PE sample (committed fixture, no mingw); diagnostics for Linux sandbox failures seen in CI",
-  "c008034 Build: bundle every controller module explicitly; fail the build if any backend cannot load when frozen",
-  "a0df280 Guided tool setup from the app: hash-verified downloads with progress, retry, cancel, offline install-from-file"
+  "a8a0747 UI test: allow 5 s for the async focus move on slow CI runners"
  ],
  "branch": "ccr-4dbe9b92-nyzsa8",
  "pins": {
@@ -196,6 +196,40 @@
      },
      "install_dir": "dotnet"
     },
+    "dotnet-sdk": {
+     "version": "8.0.425",
+     "role": "Optional: .NET 8 SDK (dotnet build) for rebuilding .NET programs in C# (R4 'native-language rebuild'): the C# recovered by ILSpy is compiled with it and checked against the scenarios before any AI is involved. Official Microsoft zip for SDK 8.0.425 (runtime 8.0.31, the same release as the dotnet-runtime pin), installed side by side under tools\\dotnet-sdk; no machine-wide install, no PATH change. Builds run in the sandbox with DOTNET_ROOT/DOTNET_CLI_HOME/NUGET_PACKAGES inside the case folder. Without it the app falls back to a .NET 8+ SDK already on PATH.",
+     "license": "MIT (.NET SDK); bundled components carry their own licenses (ThirdPartyNotices.txt in the archive)",
+     "optional": true,
+     "source": {
+      "docs": "https://dotnet.microsoft.com/download/dotnet/8.0",
+      "release_metadata": "https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json",
+      "release": "8.0.31",
+      "sdk": "8.0.425"
+     },
+     "artifact": {
+      "name": "dotnet-sdk-8.0.425-win-x64.zip",
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.425/dotnet-sdk-8.0.425-win-x64.zip",
+      "size_bytes": 285157731,
+      "sha256": "cd6eb1df826dd168108e2c427673f9d627b7e0631963eeedf0fa7aef0913c53f",
+      "verify_required": false,
+      "hash_provenance": "2026-10-10 on Windows 11 (R4): downloaded from builds.dotnet.microsoft.com; SHA-512 matched the official value in https://builds.dotnet.microsoft.com/dotnet/release-metadata/8.0/releases.json (release 8.0.31, sdk 8.0.425, file dotnet-sdk-win-x64.zip); sha256 computed locally from the same verified bytes.",
+      "sha512_official": "f0b6f15bf6f1a0507205c0cb102ab99e1dee875c4682c8ed94665be1d580186a06b21455e83b3a01a0ff7f4cd887b67420f2e2fe09ed985534a4cea488ae1af9"
+     },
+     "footprint": {
+      "disk_bytes": 748618050,
+      "note": "285 MB download, about 750 MB unpacked (SDK, shared runtimes and the win-x64 apphost pack, so builds need no NuGet download)."
+     },
+     "layout": {
+      "archive_root": "",
+      "entry": "dotnet.exe",
+      "entry_sha256": "111da7b604cd196b49167cfeecdaef4034b58cc7de71a91cbf9e162c9e8b0931",
+      "version_args": [
+       "--list-sdks"
+      ]
+     },
+     "install_dir": "dotnet-sdk"
+    },
     "temurin-jre": {
      "version": "17.0.20.1+1",
      "role": "Optional: Java runtime for CFR and jadx (Java/Android code recovery). Eclipse Temurin 17 JRE, installed side by side under tools\\jre like the .NET runtime; no machine-wide install. Without it the app falls back to a JDK/JRE 8+ already on PATH/JAVA_HOME.",
@@ -294,6 +328,94 @@
       }
      },
      "install_dir": "jadx"
+    },
+    "upx": {
+     "version": "5.2.1",
+     "role": "Optional: unpacks UPX-packed programs before native analysis (`upx -d`, separate process). Runs only with the user's consent, on a copy inside the case work folder (never in place); the original's sha256 is checked before and after. Also packs the upx_c_msvc_x64 benchmark row (fixture_build_tools.upx is the same pin).",
+     "license": "GPL-2.0-or-later with the UPX exception (see COPYING/LICENSE in the archive)",
+     "optional": true,
+     "source": {
+      "repo": "https://github.com/upx/upx",
+      "tag": "v5.2.1"
+     },
+     "artifact": {
+      "name": "upx-5.2.1-win64.zip",
+      "url": "https://github.com/upx/upx/releases/download/v5.2.1/upx-5.2.1-win64.zip",
+      "size_bytes": 680290,
+      "sha256": "eabc6792a347d45e945be7748423e7868fd01b0d2bcaa2f4b1031fd71ff69bda",
+      "verify_required": false,
+      "hash_provenance": "2026-10-10 on Windows 11: downloaded from the official GitHub release (published 2026-08-27); sha256 computed locally equals the GitHub release asset digest (sha256:eabc6792...)."
+     },
+     "layout": {
+      "archive_root": "upx-5.2.1-win64",
+      "entry": "upx.exe",
+      "entry_sha256": "d20ebe0b7b22b6be968c8c34be61f94ddea12cb11462e2cec27f548ef9574df8",
+      "version_args": [
+       "--version"
+      ]
+     },
+     "install_dir": "upx"
+    },
+    "temurin-jdk21": {
+     "version": "21.0.12.1+1",
+     "role": "Optional: Java 21 JDK. (1) javac for rebuilding Java programs in Java (R4 'native-language rebuild': the CFR-recovered sources are compiled with --release matching the original class files, then checked against the scenarios before any AI is involved); (2) the runtime for the optional Ghidra headless decompiler (Ghidra 12 needs JDK 21+; the Temurin 17 JRE above is too old). Eclipse Temurin 21 JDK, installed side by side under tools\\jdk21; no machine-wide install, no PATH change (Rebuild Studio sets JAVA_HOME only for the processes it starts). Without it Java rebuilds fall back to a javac on JAVA_HOME/PATH.",
+     "license": "GPL-2.0-with-classpath-exception",
+     "optional": true,
+     "source": {
+      "docs": "https://adoptium.net/temurin/releases/?version=21",
+      "repo": "https://github.com/adoptium/temurin21-binaries",
+      "tag": "jdk-21.0.12.1+1",
+      "api": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=windows&vendor=eclipse"
+     },
+     "artifact": {
+      "name": "OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip",
+      "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip",
+      "size_bytes": 205073461,
+      "sha256": "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e",
+      "verify_required": false,
+      "hash_provenance": "2026-10-10 on Windows 11 (R1): downloaded from the Adoptium GitHub release; sha256 computed locally equals the 'checksum' field of the Adoptium v3 assets API response for this package.",
+      "sha256_official": "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e"
+     },
+     "layout": {
+      "archive_root": "jdk-21.0.12.1+1",
+      "entry": "bin/java.exe",
+      "entry_sha256": "82051fdab26319d77d20cc0065045d05ec00b3e3d05f44935d7c06b96b621d55",
+      "version_args": [
+       "-version"
+      ]
+     },
+     "install_dir": "jdk21"
+    },
+    "ghidra": {
+     "version": "12.1.4",
+     "role": "Optional: full Ghidra headless (analyzeHeadless) as a second decompiler next to rz-ghidra: per-function and whole-program decompilation in a separate Java process. Needs the Temurin JDK 21 entry (or any JDK 21+).",
+     "license": "Apache-2.0",
+     "optional": true,
+     "source": {
+      "repo": "https://github.com/NationalSecurityAgency/ghidra",
+      "tag": "Ghidra_12.1.4_build"
+     },
+     "artifact": {
+      "name": "ghidra_12.1.4_PUBLIC_20260921.zip",
+      "url": "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip",
+      "size_bytes": 569649598,
+      "sha256": "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db",
+      "verify_required": false,
+      "hash_provenance": "2026-10-10 on Windows 11 (R1): downloaded from the official GitHub release (published 2026-09-21); sha256 computed locally equals both the GitHub release asset digest and the SHA-256 printed in the release notes.",
+      "sha256_official": "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db"
+     },
+     "layout": {
+      "archive_root": "ghidra_12.1.4_PUBLIC",
+      "entry": "support/analyzeHeadless.bat",
+      "entry_sha256": "dd7b9d17d32ed70a71df82a43a21cdaed6c4ce67064e30f8642c149f81c2ae07",
+      "extra_files": {
+       "Ghidra/application.properties": "e84c26b08545eee63d24a1a8a4dd7905e4209538e2e7192093877c435c64eb67"
+      },
+      "requires": [
+       "temurin-jdk21"
+      ]
+     },
+     "install_dir": "ghidra"
     },
     "rust": {
      "version": "1.97.0",
@@ -439,6 +561,35 @@
      "minimum_version": "14.38.0.0"
     }
    },
+   "fixture_build_tools": {
+    "$comment": "Tools used to build test/benchmark fixtures (fixtures/bench/build_bench.py). upx is also in 'tools' (same version and sha256) since R1, where the Tools page installs it for the consented 'upx -d' step.",
+    "upx": {
+     "version": "5.2.1",
+     "role": "Packs the upx_c_msvc_x64 benchmark row (upx --best). Fixture build only.",
+     "license": "GPL-2.0-or-later with the UPX exception (see COPYING/LICENSE in the archive)",
+     "source": {
+      "repo": "https://github.com/upx/upx",
+      "tag": "v5.2.1"
+     },
+     "artifact": {
+      "name": "upx-5.2.1-win64.zip",
+      "url": "https://github.com/upx/upx/releases/download/v5.2.1/upx-5.2.1-win64.zip",
+      "size_bytes": 680290,
+      "sha256": "eabc6792a347d45e945be7748423e7868fd01b0d2bcaa2f4b1031fd71ff69bda",
+      "verify_required": true,
+      "hash_provenance": "2026-10-10 on Windows 11: downloaded from the official GitHub release (published 2026-08-27); sha256 computed locally equals the GitHub release asset digest (sha256:eabc6792...)."
+     },
+     "layout": {
+      "archive_root": "upx-5.2.1-win64",
+      "entry": "upx.exe",
+      "entry_sha256": "d20ebe0b7b22b6be968c8c34be61f94ddea12cb11462e2cec27f548ef9574df8",
+      "version_args": [
+       "--version"
+      ]
+     },
+     "install_dir": "upx"
+    }
+   },
    "build_toolchain": {
     "rust": {
      "toolchain": "1.97.0",
@@ -555,10 +706,10 @@
     "tools": [
      {
       "name": "gdre_tools",
-      "availability": "missing",
-      "path": null,
-      "version": null,
-      "detail": "gdre_tools not found in tools dir or PATH",
+      "availability": "verified",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\gdre\\gdre_tools.exe",
+      "version": "2.7.0",
+      "detail": "no release archive found next to the tools to verify",
       "prerequisites": [],
       "license": "MIT",
       "source": "https://github.com/GDRETools/gdsdecomp",
@@ -566,18 +717,26 @@
       "integrity": "",
       "integration": "cli",
       "optional": false,
-      "next_action": "Download GDRE tools 2.7.0 from https://github.com/GDRETools/gdsdecomp/releases/tag/v2.7.0, verify the zip sha256 abb4c197fe517d6a46b67faf41fc76d9890c882661a55ca2d49ba605955dfacc, and unpack it to <tools_dir>/gdre/",
+      "next_action": "",
       "extra": {}
      }
     ],
     "resources": {
      "typical_seconds": "4-600",
      "ram_mb": 500,
-     "next_action": "Download GDRE tools 2.7.0 from https://github.com/GDRETools/gdsdecomp/releases/tag/v2.7.0, verify the zip sha256 abb4c197fe517d6a46b67faf41fc76d9890c882661a55ca2d49ba605955dfacc, and unpack it to <tools_dir>/gdre/"
+     "next_action": ""
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "missing"
+    "availability": "verified",
+    "verification": {
+     "when": "2026-10-10T18:01:56.755Z",
+     "command": "D:\\decomp\\.venv\\Scripts\\python.exe -m pytest -q -p no:cacheprovider tests/test_gdre.py",
+     "host": "windows",
+     "versions": {
+      "gdre_tools": "2.7.0"
+     }
+    }
    },
    {
     "backend_id": "ghidra",
@@ -609,18 +768,31 @@
        "decompiled": "object"
       },
       "dangerous": false
+     },
+     {
+      "name": "decompile_all",
+      "description": "Whole-program Ghidra headless run: decompile up to N functions, largest first",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "max_functions": "int"
+      },
+      "outputs": {
+       "functions": "list"
+      },
+      "dangerous": false
      }
     ],
     "tools": [
      {
       "name": "ghidra",
-      "availability": "missing",
-      "path": null,
-      "version": null,
-      "detail": "GHIDRA_INSTALL_DIR is not set; full Ghidra headless is optional (rizin covers native analysis)",
+      "availability": "installed",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\ghidra\\support\\analyzeHeadless.bat",
+      "version": "12.1.4",
+      "detail": "java C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\jdk21\\bin\\java.exe",
       "prerequisites": [
-       "GHIDRA_INSTALL_DIR",
-       "JDK 21+"
+       "GHIDRA_INSTALL_DIR or Tools page: Ghidra",
+       "JDK 21+ (Tools page: Temurin JDK 21)"
       ],
       "license": "Apache-2.0",
       "source": "https://github.com/NationalSecurityAgency/ghidra",
@@ -637,7 +809,7 @@
     },
     "tested_support": [],
     "experimental": true,
-    "availability": "missing"
+    "availability": "installed"
    },
    {
     "backend_id": "ilspy",
@@ -694,32 +866,40 @@
     "tools": [
      {
       "name": "ilspycmd",
-      "availability": "missing",
-      "path": null,
-      "version": null,
-      "detail": "ilspycmd not found in tools dir, PATH or ~/.dotnet/tools",
+      "availability": "verified",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\ilspycmd\\ilspycmd.dll",
+      "version": "9.1.0.7988",
+      "detail": "",
       "prerequisites": [
        ".NET 8 runtime"
       ],
       "license": "MIT",
       "source": "https://github.com/icsharpcode/ILSpy",
       "pinned": "9.1.0.7988",
-      "integrity": "",
+      "integrity": "58ef1a86bea09f2e5a114720b607dd0bdaaf91cfe498c6b7a3412bd960d0f57d",
       "integration": "cli",
       "optional": false,
-      "next_action": "dotnet tool install ilspycmd --version 9.1.0.7988 --tool-path ~/.dotnet/tools   (requires the .NET 8 SDK/runtime)",
+      "next_action": "",
       "extra": {}
      }
     ],
     "resources": {
      "typical_seconds_per_assembly": "1-30",
      "ram_mb": 300,
-     "next_action": "dotnet tool install ilspycmd --version 9.1.0.7988 --tool-path ~/.dotnet/tools   (requires the .NET 8 SDK/runtime)",
+     "next_action": "",
      "il2cpp": "unsupported (reported, never faked)"
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "missing"
+    "availability": "verified",
+    "verification": {
+     "when": "2026-10-10T18:02:10.002Z",
+     "command": "D:\\decomp\\.venv\\Scripts\\python.exe -m pytest -q -p no:cacheprovider tests/test_ilspy.py",
+     "host": "windows",
+     "versions": {
+      "ilspycmd": "9.1.0.7988"
+     }
+    }
    },
    {
     "backend_id": "jsweb",
@@ -783,8 +963,8 @@
      {
       "name": "node",
       "availability": "installed",
-      "path": "C:\\Users\\jalon\\AppData\\Local\\hermes\\node\\node.EXE",
-      "version": "22.23.2",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\node\\node.exe",
+      "version": "22.22.0",
       "detail": "",
       "prerequisites": [],
       "license": "MIT",
@@ -798,20 +978,18 @@
      },
      {
       "name": "asar",
-      "availability": "missing",
-      "path": null,
-      "version": null,
-      "detail": "optional; not found",
-      "prerequisites": [
-       "Node.js"
-      ],
+      "availability": "installed",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\asar\\node_modules\\.bin\\asar.cmd",
+      "version": "4.3.1",
+      "detail": "",
+      "prerequisites": [],
       "license": "MIT",
       "source": "https://github.com/electron/asar",
       "pinned": "4.3.1",
-      "integrity": "",
+      "integrity": "sha512-6pI64z/tMSBkUTZLQFYhs2YiB7fS9sKA6gy7/2nH1Ju7GGwT32UPsj4Mxsws5NMmtR6C0zYdXVxEU/rGqJRCJA==",
       "integration": "cli",
       "optional": true,
-      "next_action": "npm install --save-exact @electron/asar@4.3.1 --prefix <tools_dir>/asar   (optional: only for cross-checks; inspection is native)",
+      "next_action": "",
       "extra": {}
      }
     ],
@@ -881,15 +1059,15 @@
     "tools": [
      {
       "name": "java",
-      "availability": "installed",
-      "path": "C:\\Program Files\\Microsoft\\jdk-17.0.20.101-hotspot\\bin\\java.EXE",
+      "availability": "verified",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\jre\\bin\\java.exe",
       "version": "17.0.20.1",
       "detail": "",
       "prerequisites": [],
       "license": "GPL-2.0-with-classpath-exception",
       "source": "https://adoptium.net/temurin/",
       "pinned": "17.0.20.1+1",
-      "integrity": "6db7759259dc79800c5c6014f0ec68961a1fe69c36bb9b2a15a42c3b0c413f6a",
+      "integrity": "1977f302375adbb920d41dac65c7e22eb9c2ed8e1e8d6258964154ff16f14406",
       "integration": "cli",
       "optional": false,
       "next_action": "",
@@ -897,38 +1075,38 @@
      },
      {
       "name": "cfr",
-      "availability": "missing",
-      "path": null,
-      "version": null,
-      "detail": "cfr jar not found in the tools dir",
+      "availability": "verified",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\cfr\\cfr-0.152.jar",
+      "version": "0.152",
+      "detail": "",
       "prerequisites": [
        "Java runtime"
       ],
       "license": "MIT",
       "source": "https://github.com/leibnitz27/cfr",
       "pinned": "0.152",
-      "integrity": "",
+      "integrity": "f686e8f3ded377d7bc87d216a90e9e9512df4156e75b06c655a16648ae8765b2",
       "integration": "cli",
       "optional": false,
-      "next_action": "Install the optional tools from docs/dependency-lock.json (Setup-Dependencies.ps1 -Tool temurin-jre,cfr,jadx, or the Tools page in the app); or put cfr-0.152.jar in <tools>/cfr/ and any Java 8+ runtime on PATH",
+      "next_action": "",
       "extra": {}
      },
      {
       "name": "jadx",
-      "availability": "missing",
-      "path": null,
-      "version": null,
-      "detail": "jadx jar not found in the tools dir",
+      "availability": "installed",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\jadx\\lib\\jadx-1.5.6-all.jar",
+      "version": "1.5.6",
+      "detail": "",
       "prerequisites": [
        "Java runtime"
       ],
       "license": "Apache-2.0",
       "source": "https://github.com/skylot/jadx",
       "pinned": "1.5.6",
-      "integrity": "",
+      "integrity": "fe3e12c45acf75f92369685fd02d1d7a7323385dc725680a9b98a0dac0ea554b",
       "integration": "cli",
       "optional": true,
-      "next_action": "Optional (Android code recovery only): Setup-Dependencies.ps1 -Tool jadx",
+      "next_action": "",
       "extra": {}
      }
     ],
@@ -936,11 +1114,20 @@
      "typical_seconds_per_jar": "1-120",
      "ram_mb": 512,
      "android": "code recovery needs jadx (optional tool); inspect always works",
-     "next_action": "Install the optional tools from docs/dependency-lock.json (Setup-Dependencies.ps1 -Tool temurin-jre,cfr,jadx, or the Tools page in the app); or put cfr-0.152.jar in <tools>/cfr/ and any Java 8+ runtime on PATH"
+     "next_action": ""
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "missing"
+    "availability": "verified",
+    "verification": {
+     "when": "2026-10-10T18:15:37.896Z",
+     "command": "D:\\decomp\\.venv\\Scripts\\python.exe -m pytest -q -p no:cacheprovider tests/test_jvm.py",
+     "host": "windows",
+     "versions": {
+      "java": "17.0.20.1",
+      "cfr": "0.152"
+     }
+    }
    },
    {
     "backend_id": "rizin",
@@ -959,6 +1146,7 @@
     "profiles": [
      "native_pe",
      "native_elf",
+     "native_macho",
      "unity_il2cpp",
      "unreal",
      "gamemaker"
@@ -1131,6 +1319,234 @@
       "dangerous": false
      },
      {
+      "name": "symbols",
+      "description": "Symbol table (isj); untrusted",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "symbols": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "function",
+      "description": "One function: signature, cc, blocks (afbj), variables (afvlj), annotations",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "function": "str"
+      },
+      "outputs": {
+       "function": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "disassemble",
+      "description": "Linear disassembly: count instructions or length bytes at an address",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "addr": "str",
+       "count": "int",
+       "length": "int"
+      },
+      "outputs": {
+       "ops": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "call_graph",
+      "description": "Bounded BFS call graph (callees/callers/both, depth 1..5)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "function": "str",
+       "depth": "int",
+       "direction": "str"
+      },
+      "outputs": {
+       "nodes": "list",
+       "edges": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "search_bytes",
+      "description": "Hex byte pattern search with ?? wildcards over the module file",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "pattern": "str"
+      },
+      "outputs": {
+       "matches": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "annotations",
+      "description": "Current persisted annotations (+ history)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "annotations": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "rename",
+      "description": "Rename function/global/local; persisted annotation",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "kind": "str",
+       "target": "str",
+       "new_name": "str"
+      },
+      "outputs": {
+       "change": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "set_type",
+      "description": "Function prototype or local variable type; persisted annotation",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "kind": "str",
+       "target": "str"
+      },
+      "outputs": {
+       "change": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "add_comment",
+      "description": "Comment at an address; persisted annotation",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "addr": "str",
+       "text": "str"
+      },
+      "outputs": {
+       "change": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "apply_struct",
+      "description": "Declare C struct/union/enum/typedef; persisted annotation",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "declaration": "str"
+      },
+      "outputs": {
+       "change": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "patch_bytes",
+      "description": "Patch bytes in a COPY inside the work folder (never the original); needs confirm",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "addr": "str",
+       "data_hex": "str",
+       "confirm": "bool"
+      },
+      "outputs": {
+       "copy_path": "str"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "relocations",
+      "description": "Relocations (irj)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "relocations": "list"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "packer_report",
+      "description": "Packer/entropy/overlay/section-anomaly report (static, no rizin)",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "report": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "unpack",
+      "description": "Unpack a UPX-packed module with the pinned upx -d into the case work folder (never in place); needs confirm",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "confirm": "bool"
+      },
+      "outputs": {
+       "unpacked": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "fetch_pdb",
+      "description": "Opt-in: download the module's PDB from a symbol server into the work folder; kept only if GUID+age match",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "confirm": "bool"
+      },
+      "outputs": {
+       "path": "str"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "xref_index",
+      "description": "Build the SQLite cross-index functions<->strings<->xrefs (+ call edges) in the work folder",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str"
+      },
+      "outputs": {
+       "counts": "object"
+      },
+      "dangerous": false
+     },
+     {
+      "name": "search_index",
+      "description": "Search the cross-index: strings (with referencing functions) and function names",
+      "inputs": {
+       "case_id": "str",
+       "module_id": "str",
+       "query": "str"
+      },
+      "outputs": {
+       "strings": "list",
+       "functions": "list"
+      },
+      "dangerous": false
+     },
+     {
       "name": "admin_raw",
       "description": "Run a raw rizin command (admin/debug only)",
       "inputs": {
@@ -1147,8 +1563,8 @@
     "tools": [
      {
       "name": "rizin",
-      "availability": "installed",
-      "path": "D:\\rs-test-tools\\rizin\\rizin.exe",
+      "availability": "verified",
+      "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\rizin\\rizin.exe",
       "version": "0.9.1",
       "detail": "commit c3a90e9226d977f58f4e9c75f78fa6b07afe13c7; shared source build",
       "prerequisites": [],
@@ -1168,9 +1584,9 @@
       {
        "name": "rz-ghidra",
        "availability": "installed",
-       "path": "D:\\rs-test-tools\\rizin\\lib\\rizin\\plugins\\core_ghidra.dll",
+       "path": "C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\rizin\\lib\\rizin\\plugins\\core_ghidra.dll",
        "version": null,
-       "detail": "plugin for rizin 0.9.1 at D:\\rs-test-tools\\rizin\\rizin.exe; build provenance unknown (no build manifest)",
+       "detail": "plugin for rizin 0.9.1 at C:\\Users\\jalon\\AppData\\Local\\RebuildStudio\\tools\\rizin\\rizin.exe; build provenance unknown (no build manifest)",
        "prerequisites": [
         "rizin shared build with headers (not the static release)",
         "cmake",
@@ -1188,11 +1604,19 @@
     },
     "tested_support": [],
     "experimental": false,
-    "availability": "installed"
+    "availability": "verified",
+    "verification": {
+     "when": "2026-10-10T18:03:13.953Z",
+     "command": "D:\\decomp\\.venv\\Scripts\\python.exe -m pytest -q -p no:cacheprovider tests/test_rizin.py tests/test_fixture_oracle.py::test_pecli_oracle_rejects_wrong_remake_and_accepts_original",
+     "host": "windows",
+     "versions": {
+      "rizin": "0.9.1"
+     }
+    }
    },
    {
     "backend_id": "triage",
-    "title": "Triage for detected-only kinds (IL2CPP, GameMaker, Unreal, Mach-O)",
+    "title": "Triage for detected-only kinds (IL2CPP, GameMaker, Unreal) and Mach-O headers",
     "formats": [
      "il2cpp_metadata",
      "gamemaker_data",
@@ -1238,7 +1662,7 @@
     "tools": [
      {
       "name": "builtin-parsers",
-      "availability": "installed",
+      "availability": "verified",
       "path": null,
       "version": "1",
       "detail": "pure-Python bounded header parsers; no external tool and no code recovery",
@@ -1260,15 +1684,55 @@
     },
     "tested_support": [],
     "experimental": true,
-    "availability": "installed"
+    "availability": "verified",
+    "verification": {
+     "when": "2026-10-10T18:03:15.165Z",
+     "command": "D:\\decomp\\.venv\\Scripts\\python.exe -m pytest -q -p no:cacheprovider tests/test_support_triage.py",
+     "host": "windows",
+     "versions": {
+      "builtin-parsers": "1"
+     }
+    }
    }
   ],
   "summary": {
-   "missing": 4,
+   "missing": 0,
    "detected": 0,
-   "installed": 3,
+   "installed": 2,
    "usable": 0,
-   "verified": 0
+   "verified": 5
+  },
+  "dependencies": {
+   "overall": "ok",
+   "sentence": "Everything your projects need is installed and working.",
+   "missing_required": [],
+   "missing_recommended": [],
+   "tools": {
+    "rizin": "installed",
+    "gdre": "installed",
+    "ilspycmd": "installed",
+    "dotnet-runtime": "installed",
+    "dotnet-sdk": "external",
+    "temurin-jre": "installed",
+    "cfr": "installed",
+    "jadx": "installed",
+    "upx": "installed",
+    "temurin-jdk21": "installed",
+    "ghidra": "installed",
+    "rust": "installed",
+    "node": "installed",
+    "playwright-core": "installed"
+   },
+   "services": {
+    "rizin_worker": "ok"
+   },
+   "host": {
+    "webview2": "ok",
+    "disk_space": "ok",
+    "tools_write": "ok",
+    "long_paths": "ok",
+    "download_hosts": "not_checked"
+   }
   },
   "source": "live"
  },
@@ -2023,6 +2487,357 @@
   "Gate summary"
  ],
  "hermes_gates": [],
+ "benchmark": {
+  "generated_utc": "2026-10-10T17:08:41Z",
+  "config": {
+   "name": "default + optional Ghidra",
+   "analysis": {
+    "command": "aaa",
+    "analysis.timeout": 300,
+    "passes": [
+     "sigpacks",
+     "pdata",
+     "relocptrs",
+     "thunks"
+    ]
+   },
+   "decompile": {
+    "max_functions": 200
+   },
+   "strings": true,
+   "imports": true,
+   "dotnet": {
+    "enabled": true,
+    "timeout": 600
+   },
+   "packer": {
+    "check": true,
+    "unpack": true
+   },
+   "ghidra": {
+    "enabled": true,
+    "max_functions": 2000,
+    "per_function_timeout": 60,
+    "skip_rows": [
+     "go_pe_x64",
+     "go_elf_x64"
+    ]
+   },
+   "native_rebuild": {
+    "enabled": true,
+    "timeout": 900
+   }
+  },
+  "rows": [
+   {
+    "row": "c_msvc_x64_o2",
+    "status": "ok",
+    "recall": 0.9158,
+    "precision": 1.0,
+    "named_recall": 0.4737,
+    "decompile_coverage": 0.8636,
+    "packed": null,
+    "seconds": 19.585
+   },
+   {
+    "row": "c_msvc_x86_o2",
+    "status": "ok",
+    "recall": 0.9579,
+    "precision": 1.0,
+    "named_recall": 0.5368,
+    "decompile_coverage": 0.9545,
+    "packed": null,
+    "seconds": 16.562
+   },
+   {
+    "row": "cpp_msvc_x64_o2",
+    "status": "ok",
+    "recall": 0.8424,
+    "precision": 1.0,
+    "named_recall": 0.3207,
+    "decompile_coverage": 0.7895,
+    "packed": null,
+    "seconds": 23.804
+   },
+   {
+    "row": "dotnet_plain",
+    "status": "ok",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": 1.0,
+    "packed": null,
+    "seconds": 0.787
+   },
+   {
+    "row": "dotnet_renamed",
+    "status": "ok",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": 1.0,
+    "packed": null,
+    "seconds": 0.469
+   },
+   {
+    "row": "go_apk_arm64",
+    "status": "ok",
+    "recall": 0.9929,
+    "precision": 0.9724,
+    "named_recall": 0.9179,
+    "decompile_coverage": 1.0,
+    "packed": null,
+    "seconds": 16.975
+   },
+   {
+    "row": "go_elf_x64",
+    "status": "ok",
+    "recall": 0.9923,
+    "precision": 0.9908,
+    "named_recall": 0.937,
+    "decompile_coverage": 1.0,
+    "packed": null,
+    "seconds": 16.278
+   },
+   {
+    "row": "go_macho_arm64",
+    "status": "ok",
+    "recall": 0.9923,
+    "precision": 0.9549,
+    "named_recall": 0.9151,
+    "decompile_coverage": 1.0,
+    "packed": null,
+    "seconds": 13.17
+   },
+   {
+    "row": "go_macho_fat",
+    "status": "ok",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": 22.457
+   },
+   {
+    "row": "go_macho_x64",
+    "status": "ok",
+    "recall": 0.9921,
+    "precision": 0.9714,
+    "named_recall": 0.9166,
+    "decompile_coverage": 1.0,
+    "packed": null,
+    "seconds": 7.413
+   },
+   {
+    "row": "go_pe_x64",
+    "status": "ok",
+    "recall": 0.9943,
+    "precision": 0.9901,
+    "named_recall": 0.9448,
+    "decompile_coverage": 1.0,
+    "packed": null,
+    "seconds": 17.906
+   },
+   {
+    "row": "rust_msvc_x64",
+    "status": "ok",
+    "recall": 0.8446,
+    "precision": 0.8981,
+    "named_recall": 0.2513,
+    "decompile_coverage": 1.0,
+    "packed": null,
+    "seconds": 37.256
+   },
+   {
+    "row": "upx_c_msvc_x64",
+    "status": "ok",
+    "recall": 0.9158,
+    "precision": 1.0,
+    "named_recall": 0.4737,
+    "decompile_coverage": 0.8636,
+    "packed": "packed (UPX, confidence 0.95)",
+    "seconds": 24.738
+   },
+   {
+    "row": "c_mingw_x64_o2s",
+    "status": "not run: mingw-w64 (x86_64-w64-mingw32-gcc) is not installed on this host",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": null
+   },
+   {
+    "row": "c_mingw_x86_o2s",
+    "status": "not run: mingw-w64 (i686-w64-mingw32-gcc) is not installed on this host",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": null
+   },
+   {
+    "row": "c_gcc_elf_stripped",
+    "status": "not run: no gcc/clang/zig for an ELF C build on this host (the stripped-ELF row is go_elf_x64)",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": null
+   },
+   {
+    "row": "unity_il2cpp",
+    "status": "not run: needs the Unity editor with the IL2CPP module to build a project we own; not installed",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": null
+   },
+   {
+    "row": "gamemaker",
+    "status": "not run: no free GameMaker runner/CLI build is available on this host",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": null
+   },
+   {
+    "row": "dotnet_confuserex",
+    "status": "not run as ConfuserEx itself (.NET Framework GUI/CLI, unmaintained); renaming is reproduced by dotnet_rename.py (row dotnet_renamed)",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": null
+   },
+   {
+    "row": "pecli",
+    "status": "ok",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": 1.598
+   },
+   {
+    "row": "dotnetapp",
+    "status": "ok",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": 1.0,
+    "packed": null,
+    "seconds": 0.441
+   },
+   {
+    "row": "javacli",
+    "status": "not scored by R0 metrics: JVM jar (CFR path); parity is measured by its scenario oracle",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": null
+   },
+   {
+    "row": "godotgame",
+    "status": "not scored by R0 metrics: Godot PCK (GDRE path); recovery is checked by expected/resources.json",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": null
+   },
+   {
+    "row": "webapp",
+    "status": "not scored by R0 metrics: web/asar (no native code); parity is measured by its Playwright oracle",
+    "recall": null,
+    "precision": null,
+    "named_recall": null,
+    "decompile_coverage": null,
+    "packed": null,
+    "seconds": null
+   }
+  ]
+ },
+ "r_series": [
+  {
+   "id": "R0",
+   "title": "Benchmark corpus + scoreboard",
+   "status": "done 2026-10-10 (CI wiring still todo)"
+  },
+  {
+   "id": "R1",
+   "title": "No-AI native analysis depth",
+   "status": "done 2026-10-10 except mingw/Go signature packs (no mingw on the host; Go is already named from pclntab), Swift demangling (rizin 0.9.1 has no Swift demangler) and CI wiring of the Ghidra test"
+  },
+  {
+   "id": "R2",
+   "title": "MCP as an RE tool (Ghidra/Cutter-class)",
+   "status": "done 2026-10-10. Recorded client session: `evidence/mcp/claude-code-re-session.jsonl` \u2014 Claude Code 2.1.287 (haiku, headless, temporary --mcp-config, toolset re) opened pecli.exe, listed functions by size, decompiled, renamed, commented, re-decompiled and saw both, followed xrefs; 9 turns, $0.12. Finding for R1: on mingw-built pecli the largest function is reported as 23,718 bytes but decompiles t"
+  },
+  {
+   "id": "R3",
+   "title": "Cloud AI: keys in, verified live",
+   "status": "todo (blocked on keys)"
+  },
+  {
+   "id": "R4",
+   "title": "Rebuild in the original language first",
+   "status": "done 2026-10-10 except `cargo fix`/rustc suggested edits and `dotnet format` as repair steps (the error-driven rules below cover the compile errors seen on the corpus; formatting changes no behaviour) and a .NET Framework/Android path (C# target needs a .NET Core/5+ assembly; Android needs the Android SDK, refused with a plain reason)"
+  },
+  {
+   "id": "R5",
+   "title": "AI-assisted RE quality (local and cloud)",
+   "status": "todo"
+  },
+  {
+   "id": "R6",
+   "title": "RE workbench in the app",
+   "status": "todo"
+  },
+  {
+   "id": "R7",
+   "title": "More input kinds, each with a fixture we own",
+   "status": "done 2026-10-10 for Mach-O and Android native libraries; Unity IL2CPP, GameMaker and Unreal stay detected-only (no fixture we own can be built on this host)"
+  },
+  {
+   "id": "R8",
+   "title": "Release gates",
+   "status": "todo"
+  },
+  {
+   "id": "R9",
+   "title": "Granular AI control per task + JeV",
+   "status": "done 2026-10-10 except the recorded live JeV call (opt-in `tests/test_jev_live.py`, `REBUILD_LIVE_JEV=1`; not run by the implementing agent). Contract: docs/AI_LADDER.md section 9; tests `test_ai_control.py`, `test_jev.py`, `AiControl.test.tsx`"
+  },
+  {
+   "id": "R10",
+   "title": "No missing dependencies: checked, installed, running",
+   "status": "done 2026-10-10; installer gate executed in a local build (2026-10-10, after a StrictMode fix, commit 2db52f4) and in Windows CI"
+  }
+ ],
+ "installed_app_runs": [
+  "Run 1 \u2014 build d32eb7a (installer sha256 9a10a4fada7073e93c1db7c346ad454fc601bfc93ac23d6cfd4be210c57987e1, UNSIGNED)",
+  "Run 2 \u2014 build after commit 9774d49 work tree (installer sha256 7c9c3e5e4aaedca41a82f7d6a5e96d735a069cfef92b937a702375bd9257f276, UNSIGNED)",
+  "Run 3 \u2014 commit 80ff419 (installer sha256 b1c15bba9b17a0063eda218385e2f1cfe6a2d5adf3d1e31cb1bad929cef614c4, portable 21830bae\u2026, UNSIGNED)",
+  "Run 4 \u2014 commit 1d619ca+ab6494c (installer sha256 206a5a8e088cf90eab1b0ba977b32a86dae8e3b00a30a5df962dd1a0558f1032, portable b6fe6d64\u2026, UNSIGNED)",
+  "Run 5 \u2014 genuine install via Explorer (commit da31c6c build, installer sha256 dbfd651cc01f439b8a18abfaf0f583f4a781a0c0a4fef070efd3cf1c9b663383, UNSIGNED)",
+  "Run 7 \u2014 genuine install, build fc6abf6 (installer sha256 e189663ea67a97be21a3bc7ef5f3b22945917f9c37d3112acf5f69abc11f632d, UNSIGNED), 2026-10-07",
+  "Run 8 \u2014 .NET rebuild with local AI through the genuine install (2026-10-07/08)",
+  "Run 9 \u2014 .NET Notes app rebuilt as C# through the genuine install (2026-10-10, R4)"
+ ],
  "windows": {
   "host": "Interactive Windows desktop: Windows 11 Home 10.0.26200 x64, WebView2 154.0.4258.53, owner's account (admin-capable; per-user install needed no elevation), two monitors. Not a clean machine (developer tools installed). Driven through Windows UI Automation and shell launches by Claude Code; evidence in evidence/windows/20261006-jalon/GATE-LOG.md. IMPORTANT: installs in runs 1\u20134 were launched from inside the Claude desktop app (MSIX) and were file-system virtualized into its private AppData; run 5 is the genuine install launched from Explorer.",
   "build": "commit fc6abf6: RebuildStudio-0.1.0-x64-setup-UNSIGNED.exe sha256 e189663ea67a97be21a3bc7ef5f3b22945917f9c37d3112acf5f69abc11f632d (NSIS .exe, per-user); portable 88dacb69\u2026",
@@ -2125,9 +2940,9 @@
  "limits": [
   "Not certified: the interactive Windows host was the owner's developer machine (dev tools installed, admin-capable account), not a clean standard-user VM. Clean-machine and standard-user gates remain open.",
   "Installer and portable zip are UNSIGNED (no code-signing certificate available); SmartScreen will warn.",
-  "No AI provider key was available: the in-app implement/repair loop is verified against a scripted OpenAI-compatible server only; live Anthropic/OpenAI/Gemini/OpenRouter behaviour is UNVERIFIED and zero paid calls were made.",
+  "No cloud AI provider key was available: live Anthropic/OpenAI/Gemini/OpenRouter behaviour is UNVERIFIED and zero paid calls were made (R3 waits for the owner's key). Local AI (Ollama) is verified end to end; on an RTX 4070 12 GB, no local model produced a compiling Rust port of the .NET fixture (runs 1-7), while the C# target rebuilt it with no AI (run 9).",
   "Original-program isolation is damage limitation, not a security sandbox: Low integrity + Job Object limits on Windows; the program can still read most user files and the network is open unless the opt-in AppContainer mode is chosen (docs/ISOLATION.md).",
-  "Java (.jar) recovery is supported (CFR); Android code recovery needs jadx; Unity IL2CPP, GameMaker, Unreal and Mach-O are detected with explicit blockers and no code recovery.",
+  "Java (.jar) recovery is supported (CFR); Android code recovery needs jadx (native lib/<abi>/*.so libraries are analysed by Rizin per ABI); Mach-O is analysed by Rizin (fat files per slice; static only, Mach-O cannot run on Windows); Unity IL2CPP, GameMaker and Unreal are detected with explicit blockers and no code recovery.",
   "Scenario results are limited to the scenarios declared for each case. Passing them is not global parity: features with no scenario, Windows-only behaviour and undiscovered scope are not measured.",
   "Godot \u2192 Bevy produces a buildable scaffold plus recovered project; gameplay parity is untested because no gameplay scenarios exist.",
   "Scenario authoring in the UI covers command-line programs; web/GUI scenarios are declared through the API or inferred (one automatic start-page check)."
