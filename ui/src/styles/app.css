@@ -392,3 +392,16 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 .dep-bar .dep-sentence { min-width: 0; overflow-wrap: anywhere; }
 .dep-items { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
 .dep-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); }
+
+/* ---------- R6 functions list ---------- */
+.fn-head { justify-content: space-between; flex-wrap: wrap; gap: var(--s-2) var(--s-3); }
+.fn-table tbody tr { cursor: pointer; }
+.fn-table tbody tr:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.fn-table tbody tr.selected, .fn-table tbody tr.selected:hover { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.fn-table .fn-span { display: block; }
+.fn-table .fn-sig-inline { display: none; }
+.fn-pager { gap: var(--s-2); align-items: center; }
+@media (max-width: 820px) {
+  .fn-table .col-sig, .fn-table .col-blocks { display: none; }
+  .fn-table .fn-sig-inline { display: block; overflow-wrap: anywhere; }
+}

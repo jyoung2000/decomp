@@ -239,3 +239,39 @@ class ReWorkbench:
             return re.compile(pattern)
         except re.error as e:
             raise WorkbenchError("rejected", f"invalid regex: {e}", "") from None
+
+
+# ---------------------------------------------------------------------- function list (shared by MCP list_functions and the app)
+NATIVE_PROFILES = ("native_pe", "native_elf", "native_macho", "native_raw")
+FUNCTION_SORTS = ("addr", "size", "name")
+FUNCTION_FIELDS = ("addr", "name", "nbbs", "cc", "calltype", "signature", "noreturn")
+
+
+def function_code_size(f: dict[str, Any]) -> int:
+    """Code bytes of a rizin function. rizin's ``size`` is the address span (maxbound - minbound); one far-away block makes
+    an 18-byte function look 23 KB (seen on pecli). ``realsz`` is the sum of its blocks."""
+    return int(f.get("realsz") or f.get("size") or 0)
+
+
+def shape_functions(functions: list[Any], contains: Optional[str], sort: str, offset: int, limit: int) -> dict[str, Any]:
+    """Filter (case-insensitive name substring), sort (addr | size = code bytes, largest first | name) and page the rows of
+    ``op_functions``. Each row: addr, name, nbbs, cc, calltype, signature, noreturn (when present), size (code bytes) and
+    span (address span, only when it differs from size). Returns ``{functions, total, offset, returned, more}``."""
+    if sort not in FUNCTION_SORTS:
+        raise WorkbenchError("rejected", f"sort must be one of {', '.join(FUNCTION_SORTS)}.", "")
+    rows = [f for f in functions if isinstance(f, dict)]
+    if contains:
+        n = contains.lower()
+        rows = [f for f in rows if n in str(f.get("name") or "").lower()]
+    key = {"addr": lambda f: f.get("offset") or 0, "size": lambda f: -function_code_size(f),
+           "name": lambda f: str(f.get("name"))}[sort]
+    rows.sort(key=key)
+    slim = []
+    for f in rows:
+        row = {k: f.get(k) for k in FUNCTION_FIELDS if k in f}
+        row["size"] = function_code_size(f)
+        if f.get("size") and int(f["size"]) != row["size"]:
+            row["span"] = int(f["size"])
+        slim.append(row)
+    page = slim[offset:offset + limit]
+    return {"functions": page, "total": len(slim), "offset": offset, "returned": len(page), "more": offset + limit < len(slim)}

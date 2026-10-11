@@ -1036,21 +1036,11 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
                              sort: Literal["addr", "size", "name"] = "addr", offset: Offset = 0,
                              limit: Annotated[int, Field(ge=1, le=500)] = 100) -> CallToolResult:
         def shape(d: dict[str, Any]) -> dict[str, Any]:
-            rows = _filter(list(d.get("functions") or []), contains, ("name",))
-            # rizin's `size` is the address span (maxbound - minbound); one far-away block makes an 18-byte function look 23 KB
-            # (seen on pecli in a recorded client session). Sort and report by code bytes (`realsz`); keep the span separately.
-            def code(f: dict[str, Any]) -> int:
-                return int(f.get("realsz") or f.get("size") or 0)
-            key = {"addr": lambda f: f.get("offset") or 0, "size": lambda f: -code(f), "name": lambda f: str(f.get("name"))}[sort]
-            rows.sort(key=key)
-            slim = []
-            for f in rows:
-                row = {k: f.get(k) for k in ("addr", "name", "nbbs", "cc", "calltype", "signature", "noreturn") if k in f}
-                row["size"] = code(f)
-                if f.get("size") and int(f["size"]) != row["size"]:
-                    row["span"] = int(f["size"])
-                slim.append(row)
-            return _paged(d, "functions", offset, limit, slim)
+            # one helper with the app's Functions view (GET /cases/{c}/modules/{m}/functions), so the two cannot diverge
+            from ..re_workbench import shape_functions
+            p = shape_functions(list(d.get("functions") or []), contains, sort, offset, limit)
+            return {"functions": p["functions"], "total": p["total"], "offset": p["offset"], "returned": p["returned"],
+                    "evidence_ids": d.get("evidence_ids", []), "_truncated": p["more"]}
         return await run("list_functions", rt.t_re(session_id, "functions", shape))
 
     @spec("get_function", "One function: signature, calling convention, size, basic blocks, variables (args/locals with types) "

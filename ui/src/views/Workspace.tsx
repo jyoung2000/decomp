@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { ConfirmDialog } from '../components/Dialog';
 import { Empty } from '../components/Empty';
@@ -19,6 +19,8 @@ import { AdvancedTab } from './workspace/Advanced';
 import { AiTab } from './workspace/AiTab';
 import { LiveLogTab } from './workspace/LiveLog';
 import { ScenariosTab } from './workspace/Scenarios';
+import { FunctionsTab } from './workspace/Functions';
+import { isNativeModule } from '../lib/re';
 import { ConsentCard, PERMISSION_RE } from '../components/ConsentCard';
 import { PreflightCard, usePreflight } from '../components/Preflight';
 
@@ -36,6 +38,11 @@ export function WorkspaceView() {
   const [busy, setBusy] = useState<string | null>(null);
   const liveStatus = cs?.case?.value?.status ?? fetched.data?.status;
   const preflight = usePreflight(caseId, liveStatus === 'running' || liveStatus === 'queued');
+  // R6: the Functions tab appears once the scan has found native code (re-checked on status changes, and on new evidence until found)
+  const nativeFound = useRef(false);
+  const modules = useResource(() => api.modules(caseId), [api, caseId, liveStatus], nativeFound.current ? -1 : (cs?.versions.evidence ?? 0));
+  const hasNative = (modules.data ?? []).some(isNativeModule);
+  nativeFound.current = hasNative;
 
   useEffect(() => {
     if (caseId) setSelectedCase(caseId);
@@ -139,6 +146,7 @@ export function WorkspaceView() {
             { to: `${base}/feedback`, label: 'Feedback', badge: openFeedback || null, testId: 'tab-feedback' },
             { to: `${base}/scenarios`, label: 'Scenarios', testId: 'tab-scenarios' },
             { to: `${base}/comparisons`, label: 'Comparisons', testId: 'tab-comparisons' },
+            ...(hasNative ? [{ to: `${base}/functions`, label: 'Functions', testId: 'tab-functions' }] : []),
             { to: `${base}/live-log`, label: 'Live log', testId: 'tab-live-log' },
             { to: `${base}/ai`, label: 'AI', testId: 'tab-ai' },
             { to: `${base}/advanced`, label: 'Advanced', testId: 'tab-advanced' },
@@ -156,6 +164,7 @@ export function WorkspaceView() {
           <Route path="feedback" element={<FeedbackTab caseId={caseId} />} />
           <Route path="scenarios" element={<ScenariosTab caseId={caseId} />} />
           <Route path="comparisons" element={<ComparisonsTab caseId={caseId} />} />
+          <Route path="functions" element={<FunctionsTab caseId={caseId} />} />
           <Route path="live-log" element={<LiveLogTab caseId={caseId} />} />
           <Route path="ai" element={<AiTab caseId={caseId} />} />
           <Route path="advanced" element={<AdvancedTab caseId={caseId} />} />

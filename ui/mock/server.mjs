@@ -344,6 +344,55 @@ function mockScoreboard() {
       implementation: { runs: 3, ok: 3, compiled: 0, verified: 0, median_latency_ms: 221000, sources: ['case'] } } },
   ], recent: [] };
 }
+// ---- R6: functions list of a native module (same row shape as the controller's shared helper: size = code bytes, span only when it differs)
+function mockFunctionRows(m) {
+  S.fnRows ??= new Map();
+  if (S.fnRows.has(m.module_id)) return S.fnRows.get(m.module_id);
+  const dll = /\.dll$/i.test(m.rel_path);
+  const base = dll ? 0x180001000 : 0x140001000;
+  const named = dll
+    ? ['entry0', 'sym.core.dll_DllMain', 'sym.core.dll_ItemStore_Open', 'sym.core.dll_ItemStore_Close', 'sym.core.dll_ItemStore_Find', 'sym.core.dll_ParseIni']
+    : ['entry0', 'main', 'fcn.parse_args', 'sym.InventoryTool.exe_print_usage', 'sym.imp.KERNEL32.dll_CreateFileW', 'sym.imp.KERNEL32.dll_ReadFile', 'sym.imp.KERNEL32.dll_WriteFile', 'sym.imp.KERNEL32.dll_Sleep', 'sym.imp.msvcrt.dll_printf', 'sym.imp.msvcrt.dll_malloc'];
+  const count = dll ? 118 : 342;
+  let addr = base, seed = dll ? 7 : 3;
+  const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const rows = [];
+  for (let i = 0; i < count; i++) {
+    const realsz = Math.max(6, Math.round(rnd() ** 3 * 2400));
+    const name = named[i] ?? `fcn.${addr.toString(16).padStart(8, '0')}`;
+    const imp = name.startsWith('sym.imp.');
+    const nbbs = imp ? 1 : Math.max(1, Math.round(realsz / 22));
+    const row = { addr: '0x' + addr.toString(16), name, nbbs, cc: imp ? 1 : Math.max(1, Math.round(nbbs / 3)), calltype: 'ms', size: imp ? 6 : realsz };
+    if (!imp && i % 9 === 4) row.signature = `int ${name.replace(/^sym\./, '').replace(/\./g, '_')}(int64_t arg1, int64_t arg2);`;
+    if (name === 'main') row.signature = 'int main(int argc, char **argv, char **envp);';
+    if (name === 'entry0') row.signature = 'void entry0(void);';
+    if (i === 17) row.span = 23718;          // one far-away block: code bytes stay small, the address span is large
+    rows.push({ ...row, _off: addr });
+    addr += Math.ceil(((row.span ?? row.size) + 1) / 16) * 16;
+  }
+  S.fnRows.set(m.module_id, rows);
+  return rows;
+}
+function mockFunctions(cid, mid, q) {
+  const m = S.modules.get(mid);
+  if (!m || m.case_id !== cid) return [404, { error: { code: 'not_found', message: `module ${mid} not found`, next_action: 'check that the id exists (it may belong to another data directory)' } }];
+  if (!/^native_/.test(m.profile)) return [409, { error: { code: 'not_native', message: `${m.rel_path} is not native code (it was detected as ${m.profile}), so it has no machine-code functions to list.`, next_action: 'Pick a native module (.exe, .dll, .so or Mach-O) in the module picker; managed and script code is shown under Overview and Plan.' } }];
+  S.fnAnalysed ??= new Set(['mod_' + sha('InventoryTool.exe').slice(0, 12)]);
+  if (!S.fnAnalysed.has(mid)) {
+    if (q.get('analyze') !== 'true' && q.get('analyze') !== '1') return [409, { error: { code: 'not_analyzed', message: `${m.rel_path} has not been analysed yet.`, next_action: "Choose 'Analyse now' (about a minute for a small program, longer for large ones), or start the project's analysis from Overview." } }];
+    S.fnAnalysed.add(mid);
+  }
+  const sort = q.get('sort') || 'addr';
+  if (!['addr', 'size', 'name'].includes(sort)) return [400, { error: { code: 'validation', message: 'sort: must be addr, size or name', next_action: 'correct the highlighted fields and retry' } }];
+  const contains = (q.get('contains') || '').toLowerCase();
+  const offset = Math.max(0, Number(q.get('offset') || 0));
+  const limit = Math.min(500, Math.max(1, Number(q.get('limit') || 100)));
+  let rows = mockFunctionRows(m).filter((f) => !contains || f.name.toLowerCase().includes(contains));
+  const key = { addr: (f) => f._off, size: (f) => -f.size, name: (f) => f.name }[sort];
+  rows = [...rows].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+  const page = rows.slice(offset, offset + limit).map(({ _off, ...f }) => f);
+  return [200, { functions: page, total: rows.length, offset, returned: page.length, more: offset + limit < rows.length, session_id: 'res_' + sha(mid).slice(0, 22), module_id: mid, case_id: cid, sort, contains: q.get('contains') || '', truncated: false, cached: true, evidence_ids: [] }];
+}
 function mockAnnotations(cid, parts, m, body) {
   const mid = parts[1];
   S.annotations ??= new Map();
@@ -695,7 +744,7 @@ const STEPS = [
     progressJob(j, { done: 48, total: null, unit: 'files', current: 'Scanning data/plugins' });
     log(j, 'Scanning the installation folder… 48 files so far');
     log(j, 'Not analysed: data/plugins/a.plg — unknown binary format (kept as evidence only)', 'warn');
-    for (const [rel, fmt, prof, size] of [['InventoryTool.exe', 'pe', 'native', 1843200], ['core.dll', 'pe', 'native', 512000], ['data/items.ini', 'ini', 'data', 2048]]) {
+    for (const [rel, fmt, prof, size] of [['InventoryTool.exe', 'pe', 'native_pe', 1843200], ['core.dll', 'pe', 'native_pe', 512000], ['data/items.ini', 'ini', 'data', 2048]]) {
       const m = { module_id: 'mod_' + sha(rel).slice(0, 12), case_id: DEMO, rel_path: rel, sha256: sha(rel), size, format: fmt, profile: prof, arch: fmt === 'pe' ? 'x86_64' : null };
       S.modules.set(m.module_id, m);
     }
@@ -1051,6 +1100,10 @@ async function handle(req, res) {
     }
     if (sub === 'jobs') return send(res, 200, [...S.jobs.values()].filter((j) => j.case_id === cid));
     if (sub === 'modules') return send(res, 200, [...S.modules.values()].filter((x) => x.case_id === cid));
+    if (/^modules\/[^/]+\/functions$/.test(sub) && m === 'GET') {
+      const r = mockFunctions(cid, sub.split('/')[1], url.searchParams);
+      return send(res, r[0], r[1]);
+    }
     if (sub.startsWith('modules/') && (sub.endsWith('/annotations') || sub.includes('/annotations/') || sub.endsWith('/ai/naming'))) {
       const r = mockAnnotations(cid, sub.split('/'), m, body);
       if (r) return send(res, r[0], r[1]);

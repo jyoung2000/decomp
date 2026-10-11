@@ -762,6 +762,7 @@ def create_app(studio: StudioServices, token: str, mcp_token: str | None = None)
     from .health_routes import mount_health_routes; mount_health_routes(app, studio)  # R10 dependency health + install queue
     from .ai_quality_routes import mount_ai_quality_routes; mount_ai_quality_routes(app, studio)  # R5 scoreboard, AI naming, annotation review
     from .maintenance_routes import mount_maintenance_routes; mount_maintenance_routes(app, studio)  # R11 backups
+    from .re_routes import mount_re_routes; mount_re_routes(app, studio)  # R6 RE workbench: functions list
     return app
 
 
