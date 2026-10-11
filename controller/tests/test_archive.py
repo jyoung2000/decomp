@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.backends.archive import (ArchiveError, ArchiveLimitError, ArchiveLimits, AsarReader, asar_read_file,
                                                  detect_format, discover_executable, extract_archive, link_escapes, list_archive,
                                                  read_asar_header, verify_asar_integrity)
@@ -284,7 +285,7 @@ def test_existing_symlink_destination_and_parent_redirect_refused(tmp_path):
 # asar (native) vs the real asar CLI
 # ---------------------------------------------------------------------------------------------------------------------
 def real_asar_cli() -> Path | None:
-    return discover_executable(Settings(), ["asar"], subdirs=["asar"])
+    return discover_executable(tool_settings(), ["asar"], subdirs=["asar"])
 
 
 def test_asar_listing_matches_real_cli():

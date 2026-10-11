@@ -412,6 +412,8 @@ class Runtime:
             if self._studio is None:
                 try:
                     self._studio = self._factory()
+                except ToolFailure:
+                    raise
                 except Exception as exc:  # controller cannot start (e.g. data dir locked, partial install)
                     log.error("controller unavailable: %r", exc)
                     raise ToolFailure("controller_unavailable", "The Rebuild Studio controller could not be opened.",
@@ -1369,7 +1371,8 @@ def _parse_args(argv: Optional[list[str]]) -> argparse.Namespace:
     p.add_argument("--allow-execute-original", action="store_true",
                    help="let models create cases that run the original program (default: refused)")
     p.add_argument("--runner", choices=("auto", "always", "never"), default="auto",
-                   help="in-process job runner: auto = only when no controller process is running")
+                   help="in-process job runner while this server opens the data folder itself (only when no app/controller "
+                        "runs; otherwise every call is forwarded to the app): auto/always = run jobs, never = do not")
     p.add_argument("--data-dir", default=None, help="override the data directory (REBUILD_STUDIO_DATA)")
     p.add_argument("--named-pipe", action="store_true", help="Windows named pipe transport (not available; stdio only)")
     p.add_argument("--list-tools", action="store_true", help="print the tools this configuration would load and exit")
@@ -1400,40 +1403,178 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.data_dir:
         os.environ["REBUILD_STUDIO_DATA"] = args.data_dir
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(asctime)s %(name)s %(message)s")
-
-    holder: dict[str, Any] = {}
-
-    def factory() -> StudioLike:
-        from ..services import StudioServices
-        from ..config import get_settings
-        from ..cli import controller_status
+    from ..config import DataDirRequired, get_settings
+    try:
         settings = get_settings()
-        start = args.runner == "always" or (args.runner == "auto" and not controller_status(settings.data_dir)["running"])
-        studio = StudioServices(settings, start_runner=bool(start))
-        holder["studio"] = studio
-        holder["runner_started"] = bool(start)
-        return studio
+    except DataDirRequired as exc:
+        print(f"rebuild-mcp: {exc}", file=sys.stderr)
+        return 2
 
-    max_bytes = args.max_context_bytes
-    if max_bytes is None:
-        try:
-            from ..config import get_settings
-            max_bytes = get_settings().limits.max_context_bytes
-        except Exception:
-            max_bytes = DEFAULT_MAX_CONTEXT_BYTES
+    max_bytes = args.max_context_bytes if args.max_context_bytes is not None else settings.limits.max_context_bytes
     cfg = ServerConfig(toolset=args.toolset, diagnostic=args.diagnostic, max_context_bytes=max_bytes,
                        allow_execute_original=args.allow_execute_original, runner=args.runner)
-    server = build_server(factory, cfg)
+    gate = StoreGate(settings, cfg)
+    server = build_server(gate.open_direct, cfg)
+    gate.attach(server)
+    gate.start_watch()
     try:
         server.run("stdio")
     finally:
-        studio = holder.get("studio")
-        if studio is not None:
-            try:
-                studio.stop()
-            except Exception:
-                pass
+        gate.close()
     return 0
+
+
+class StoreGate:
+    """R11 (one writer per data folder) for the stdio server. Per tool call:
+
+    * a live controller serves the data folder -> the call is forwarded to its /mcp endpoint (token from controller.json);
+    * otherwise the store is opened here, under the same data-folder lock the controller takes, and never from inside a
+      Windows package context. The direct session is closed (lock released) after ``idle_seconds`` without calls and no
+      running in-process job, or as soon as a starting controller asks for the folder (``studio.lock.yield``).
+    """
+
+    def __init__(self, settings: Any, cfg: ServerConfig, *, idle_seconds: Optional[float] = None):
+        from ..store.safety import StoreLock
+        self.settings, self.cfg = settings, cfg
+        self.data_dir = Path(settings.data_dir)
+        self.lock = StoreLock(self.data_dir, "mcp")
+        self.idle_seconds = float(os.environ.get("REBUILD_MCP_IDLE_RELEASE_SECS", "60")) if idle_seconds is None else idle_seconds
+        self._mu = threading.Lock()
+        self._inflight = 0
+        self._last = time.monotonic()
+        self._stop = threading.Event()
+        self.rt: Optional[Runtime] = None
+        self.forwarded = 0
+
+    # -- direct mode ---------------------------------------------------------------------------------
+    def open_direct(self) -> StudioLike:
+        from ..remote import live_controller
+        from ..store import safety
+        try:
+            safety.refuse_if_packaged("rebuild-mcp")
+        except safety.PackagedClientRefused as exc:
+            raise ToolFailure("packaged_client", str(exc), "Configure this client with the HTTP connection from the Rebuild Studio "
+                              "app (Settings -> Use Rebuild Studio from an AI client).") from None
+        if not self.lock.acquire(wait=3.0):
+            if live_controller(self.data_dir) is not None:
+                raise ToolFailure("retry", "The Rebuild Studio app has just started and now owns the data folder.",
+                                  "Call the tool again; it is forwarded to the app.")
+            raise ToolFailure("data_folder_in_use", str(safety.DataFolderInUse(self.data_dir, safety.read_holder(self.data_dir))),
+                              "Start the Rebuild Studio app (every client then shares it), or close the other client, then retry.")
+        try:
+            ok, detail = safety.quick_check(self.settings.db_path)
+            if not ok:
+                raise ToolFailure("store_damaged", f"The project database is damaged ({detail}). Nothing was changed.",
+                                  "Ask the user to start the Rebuild Studio app; it offers to restore the last good backup.")
+            from ..services import StudioServices
+            # We hold the folder lock, so no controller runs: auto behaves like always.
+            return StudioServices(self.settings, start_runner=self.cfg.runner in ("auto", "always"))
+        except BaseException:
+            self.lock.release()
+            raise
+
+    def _release_direct(self, force: bool) -> bool:
+        """Close the direct session if allowed. Caller holds ``_mu``."""
+        rt = self.rt
+        if rt is None or rt._studio is None or self._inflight:
+            return False
+        studio = rt._studio
+        if not force:
+            runner = getattr(studio, "runner", None)
+            if runner is not None and getattr(runner, "_active", None):
+                return False
+        with rt._lock:
+            rt._studio = None
+        try:
+            studio.stop()  # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001
+            log.exception("closing the direct session failed")
+        self.lock.release()
+        log.info("released the data folder (%s)", "a controller asked for it" if force else "idle")
+        return True
+
+    def watch_once(self) -> bool:
+        from ..store.safety import yield_requested
+        with self._mu:
+            if self.rt is None or self.rt._studio is None:
+                return False
+            if yield_requested(self.data_dir):
+                return self._release_direct(force=True)
+            if self.idle_seconds >= 0 and time.monotonic() - self._last > self.idle_seconds:
+                return self._release_direct(force=False)
+        return False
+
+    def start_watch(self) -> None:
+        def loop() -> None:
+            while not self._stop.wait(0.5):
+                try:
+                    self.watch_once()
+                except Exception:  # noqa: BLE001
+                    log.exception("store watch failed")
+        threading.Thread(target=loop, name="mcp-store-gate", daemon=True).start()
+
+    def close(self) -> None:
+        self._stop.set()
+        with self._mu:
+            self._inflight = 0
+            self._release_direct(force=True)
+        self.lock.release()
+
+    # -- routing -------------------------------------------------------------------------------------
+    def _enter(self) -> bool:
+        with self._mu:
+            self._inflight += 1
+            return self.rt is not None and self.rt._studio is not None
+
+    def _leave(self) -> None:
+        with self._mu:
+            self._inflight -= 1
+            self._last = time.monotonic()
+
+    def forward(self, link: Any, tool: str, arguments: dict[str, Any]) -> CallToolResult:
+        from ..remote import RemoteError
+        assert self.rt is not None
+        op, t0 = new_id("op"), time.monotonic()
+        try:
+            res = link.call_tool(tool, arguments)
+            self.forwarded += 1
+            return CallToolResult.model_validate(res)
+        except (RemoteError, OSError, ValueError) as exc:
+            return self.rt._error(op, tool, t0, ToolFailure(
+                "controller_unavailable", "The running Rebuild Studio app did not answer this call.",
+                "Retry; if the app was closed, the next call opens the data folder directly.", detail=str(exc)[:300]))
+
+    def diagnostics(self, link: Any) -> CallToolResult:
+        assert self.rt is not None
+        info = {"server_version": __version__, "mcp_sdk": _sdk_version(), "python": platform.python_version(),
+                "toolset": self.cfg.toolset, "tools": sorted(self.rt.tool_names), "mode": "forwarding",
+                "data_dir": str(self.data_dir), "controller": {"port": link.port, "pid": link.pid}, "forwarded_calls": self.forwarded}
+        env = {"operation_id": new_id("op"), "tool": DIAGNOSTIC_TOOL, "ok": True, "evidence_revision": None, "truncated": False,
+               "data": wrap_untrusted(info)}
+        return self.rt._result(env, False, env["operation_id"], DIAGNOSTIC_TOOL, time.monotonic())
+
+    def attach(self, server: MCPServer) -> None:
+        from ..remote import live_controller
+        self.rt = server._rebuild_runtime  # type: ignore[attr-defined]
+        original = server.call_tool
+        rt = self.rt
+
+        async def call_tool(name: str, arguments: dict[str, Any], context: Any = None) -> Any:
+            if name not in rt.tool_names:
+                return await original(name, arguments, context)
+            direct = await anyio.to_thread.run_sync(self._enter)
+            try:
+                if not direct:
+                    link = await anyio.to_thread.run_sync(live_controller, self.data_dir)
+                    if link is not None:
+                        if name == DIAGNOSTIC_TOOL:
+                            return self.diagnostics(link)
+                        return await anyio.to_thread.run_sync(self.forward, link, name, dict(arguments or {}))
+                return await original(name, arguments, context)
+            finally:
+                await anyio.to_thread.run_sync(self._leave)
+
+        server.call_tool = call_tool  # type: ignore[method-assign]
 
 
 if __name__ == "__main__":

@@ -47,6 +47,9 @@ Kinds: `case.created|case.status`, `job.created|started|progress|log|retry|unblo
 - `GET /knowledge`; `GET /knowledge/{id}`; `POST /knowledge/{id}/validate`; `POST /knowledge/{id}/rollback`
 - `GET /settings` / `PUT /settings` (dependency manager, storage, concurrency, capture, network/output policies)
 - `GET /hermes/status`; `POST /hermes/pair` `{profile_path?}`; `POST /hermes/register_mcp` `{dry_run}`
+- `GET /maintenance/backups` → `{backups:[{name, taken_at, reason: start|periodic|manual|pre-migration-v<N>, projects, size, integrity}], last_backup, backups_dir, damaged_dir, policy:{keep_last: 5, keep_daily_days: 7, periodic_hours: 6, when[]}, last_recovery:{at, mode: restore|empty, restored, damaged_files[]}|null}` (R11; newest first)
+- `POST /maintenance/backup` → the new backup `{name, taken_at, reason: "manual", projects, size, integrity: "ok"}`; SQLite online backup into `<data>/backups/`, verified with `PRAGMA integrity_check` before it is kept; 409 `backup_failed` when the copy does not verify (nothing is kept)
+- Any request that hits a damaged database answers 503 `{"error": {code: "store_damaged", message, next_action}}` (restart the app: it checks the database at start and offers a restore)
 - `POST /fs/pick-folder` is NOT an HTTP endpoint: native pickers are Tauri commands (`pick_folder`). In browser dev mode the UI shows a text input.
 
 ## User-declared scenarios (command-line programs)
@@ -82,13 +85,23 @@ Two transports serve the same tools (`controller/rebuild_controller/mcp/server.p
 
 | Transport | How | Auth | When |
 |---|---|---|---|
-| stdio | the client starts `rebuild-mcp --toolset <set>` (installed at `<install>\runtime\Scripts\rebuild-mcp.exe`) | local process | permanent client setup; works without the app running |
-| streamable HTTP | `POST/GET/DELETE http://127.0.0.1:<port>/mcp` on the running controller (stateless, JSON responses) | the controller's per-launch bearer token (`Authorization: Bearer <token>`), Origin allow-list, Host header must be `127.0.0.1`/`localhost`/`[::1]` | an agent should see the same analysis sessions as the open app; token and port change on every launch |
+| stdio | the client starts `rebuild-mcp --toolset <set>` (installed at `<install>\runtime\Scripts\rebuild-mcp.exe`) | local process | works with or without the app: while a controller serves the data folder every call is **forwarded** to its `/mcp` (token from `controller.json`); only when none runs does rebuild-mcp open the database itself, under the data-folder lock (R11) |
+| streamable HTTP | `POST/GET/DELETE http://127.0.0.1:<port>/mcp` on the running controller (stateless, JSON responses) | the controller's per-launch bearer token, or the stable MCP token from `<data>/mcp-endpoint.json` (accepted on `/mcp` only); Origin allow-list; Host header must be `127.0.0.1`/`localhost`/`[::1]` | the default for the installed desktop app (R11) and the only choice for clients that run inside a Windows app package (Claude Desktop). The controller prefers the port in `mcp-endpoint.json` (default 47815; `REBUILD_STUDIO_MCP_PORT` overrides, `0` = random), so the config survives restarts unless that port is taken |
 
-`GET /mcp/config?client=claude-code|codex|gemini|hermes|generic&transport=stdio|http&toolset=all|re|...` returns
-`{client, transport, format: json|toml|yaml, where, text, notes[], command?, http_available}`: a ready-to-paste config
-snippet (Claude Code also gets a `claude mcp add ...` command). The app's Settings page shows it with a **Copy MCP config** button.
-Nothing is written to the client's files (use `scripts/install-clients.py` for that).
+`GET /mcp/config?client=claude-code|codex|gemini|hermes|generic&transport=auto|stdio|http&toolset=all|re|...` returns
+`{client, transport, format: json|toml|yaml, where, text, notes[], command?, http_available, recommended_transport}`: a
+ready-to-paste config snippet (Claude Code also gets a `claude mcp add ...` command). `transport=auto` (the default) resolves to
+`http` when the controller belongs to the installed desktop app (`REBUILD_STUDIO_INSTALL` set) and has the stable endpoint, else
+`stdio`. The app's Settings page shows it with a **Copy MCP config** button. Nothing is written to the client's files (use
+`scripts/install-clients.py` for that; its `--transport auto` default makes the same choice).
+
+**One writer per data folder (R11).** The serving controller holds `<data>/studio.lock` for its lifetime. `rebuild-mcp` and
+`rebuildctl` forward to a live controller (MCP over `/mcp`, the CLI over the REST endpoints above) and open SQLite directly only
+when no controller runs, taking the same lock. A direct-mode `rebuild-mcp` releases the folder after 60 s without calls
+(`REBUILD_MCP_IDLE_RELEASE_SECS`) or as soon as a starting controller asks for it (`studio.lock.yield`). A process with Windows
+package identity (`GetCurrentPackageFullName` succeeds) never opens the store: the tool answers `packaged_client` and names the
+HTTP setup. Forwarded calls follow the app's server policy (the stdio server's `--allow-execute-original` does not apply to them).
+`admin_diagnostics` reports `mode: "forwarding"` while calls go to the app.
 
 Toolsets: `minimal` ⊂ `analysis` ⊂ `rebuild` ⊂ `all`; `re` (reverse engineering, below) is its own set and is also part of `all`.
 Rules kept for every tool: typed arguments only (no raw rizin/shell command anywhere), unknown arguments rejected, results bounded

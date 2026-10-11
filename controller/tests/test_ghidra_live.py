@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.adapters.contract import Availability
 from rebuild_controller.backends.ghidra import GhidraBackend
 from rebuild_controller.config import Settings
@@ -23,7 +24,7 @@ C64 = REPO / "fixtures" / "bench" / "c_msvc_x64_o2" / "bin" / "benchc.exe"
 
 @pytest.fixture(scope="module")
 def ghidra():
-    g = GhidraBackend(Settings())
+    g = GhidraBackend(tool_settings())
     p = g.tool_probe()
     if p.availability != Availability.INSTALLED:
         pytest.skip(f"Ghidra not usable here: {p.detail}")

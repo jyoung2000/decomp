@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller import prompt_fit as pf
 from rebuild_controller import scoreboard
 from rebuild_controller.adapters.contract import OperationResult
@@ -396,7 +397,7 @@ def test_preset_proposes_the_measured_best_local_model_and_warns_about_never_com
 def _rizin():
     from rebuild_controller.backends.rizin_worker import find_rizin
     from rebuild_controller.config import Settings
-    return find_rizin(Settings()) is not None
+    return find_rizin(tool_settings()) is not None
 
 
 BENCH = REPO / "fixtures" / "bench" / "c_msvc_x64_o2"

@@ -1,9 +1,11 @@
 """MCP client configuration snippets ("Copy MCP config" in the app; `GET /mcp/config`).
 
 Two transports:
-  * stdio  - the client starts `rebuild-mcp` itself. Stable across app restarts (recommended).
-  * http   - the running desktop app serves the same tools at http://127.0.0.1:<port>/mcp with the controller's
-             per-launch bearer token. Valid only while this controller runs (the token and port change on restart).
+  * stdio  - the client starts `rebuild-mcp` itself. While the desktop app runs, rebuild-mcp forwards every call to it over
+             HTTP; it opens the database itself only when no app is running (R11: one writer per data folder).
+  * http   - the running desktop app serves the same tools at http://127.0.0.1:<port>/mcp. With the stable MCP token
+             (<data>/mcp-endpoint.json) and the app's preferred port the config survives restarts; the default when the
+             desktop app is installed, and the only safe choice for clients that run inside a Windows app package.
 
 Formats mirror scripts/install-clients.py (Claude Code / Gemini JSON, Codex TOML, Hermes YAML) plus a generic
 `mcpServers` JSON object. Nothing here writes a file; the text is shown and copied by the user.
@@ -47,7 +49,7 @@ def _q(s: str) -> str:
 
 
 def render(client: str, transport: str, *, toolset: str = "all", data_dir: Optional[str] = None, url: Optional[str] = None,
-           token: Optional[str] = None) -> dict[str, Any]:
+           token: Optional[str] = None, stable: bool = False) -> dict[str, Any]:
     if client not in CLIENTS:
         raise ValueError(f"client must be one of {', '.join(CLIENTS)}")
     if transport not in TRANSPORTS:
@@ -58,7 +60,10 @@ def render(client: str, transport: str, *, toolset: str = "all", data_dir: Optio
         cmd, base, how = server_command()
         args = base + ["--toolset", toolset]
         env = {"REBUILD_STUDIO_DATA": data_dir} if data_dir else {}
-        notes.append(f"Starts rebuild-mcp ({how}); works whether or not the desktop app is running.")
+        notes.append(f"Starts rebuild-mcp ({how}); works whether or not the desktop app is running. While the app runs, "
+                     "rebuild-mcp forwards to it; it opens the project database itself only when the app is closed.")
+        notes.append("Not for clients that run inside a Windows app package (Claude Desktop from the Microsoft Store): "
+                     "rebuild-mcp refuses to open the database there. Use the HTTP connection for those.")
         entry: dict[str, Any] = {"command": cmd, "args": args}
         if env:
             entry["env"] = env
@@ -84,8 +89,13 @@ def render(client: str, transport: str, *, toolset: str = "all", data_dir: Optio
 
     if not url or not token:
         raise ValueError("http transport needs the controller url and token")
-    notes.append("Uses the running desktop app (same tools, loopback only). The token and port change when the app restarts; "
-                 "copy the config again after a restart, or use stdio for a permanent setup.")
+    if stable:
+        notes.append("Uses the running desktop app (same tools, loopback only). The address and token stay the same when the app "
+                     "restarts; if another program took the port, the app uses a different one and you copy the config again. "
+                     "The app must be running while the client uses these tools.")
+    else:
+        notes.append("Uses the running desktop app (same tools, loopback only). The token and port change when the app restarts; "
+                     "copy the config again after a restart, or use stdio for a permanent setup.")
     headers = {"Authorization": f"Bearer {token}"}
     if client == "claude-code":
         text = json.dumps({"mcpServers": {key: {"type": "http", "url": url, "headers": headers}}}, indent=2)

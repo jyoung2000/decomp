@@ -5,7 +5,7 @@ import type {
   PlanRevision, Preview, PreviewOpenResult, TaskRoute, ToolSetupEntry, ToolSetupSnapshot,
   CaseLog, AiActivity, AiPolicy, Ladder, LadderPresetId, ModelCatalogItem, PresetResult,
   IsolationInfo, OriginalConsent, RecordResult, ScenarioList, UserScenario, UserScenarioBody,
-  DownloadedModel, HfRepoFiles, HfSearchResult, LocalAiConfig, LocalAiSnapshot, LocalJob, McpClient, McpConfig,
+  BackupStatus, DownloadedModel, HfRepoFiles, HfSearchResult, LocalAiConfig, LocalAiSnapshot, LocalJob, McpClient, McpConfig, StoreBackup,
   DependencyReport, DepQueue, DepSettings, Preflight, ImplementationForecast, OutputType, TargetLanguage,
 } from './types';
 
@@ -219,7 +219,9 @@ export class Api {
   rollbackKnowledge = (id: string) => this.post<KnowledgeEntry>(`/knowledge/${enc(id)}/rollback`);
   settings = () => this.get<Record<string, unknown>>('/settings');
   putSettings = (b: Record<string, unknown>) => this.put<Record<string, unknown>>('/settings', b);
-  mcpConfig = (client: McpClient, transport: 'stdio' | 'http', toolset = 'all') =>
+  backups = () => this.get<BackupStatus>('/maintenance/backups');
+  backupNow = () => this.post<StoreBackup>('/maintenance/backup');
+  mcpConfig = (client: McpClient, transport: 'auto' | 'stdio' | 'http', toolset = 'all') =>
     this.get<McpConfig>(`/mcp/config?client=${encodeURIComponent(client)}&transport=${transport}&toolset=${encodeURIComponent(toolset)}`);
   hermesStatus = () => this.get<HermesStatus>('/hermes/status');
   hermesPair = (profilePath?: string) => this.post<HermesStatus>('/hermes/pair', profilePath ? { profile_path: profilePath } : {});

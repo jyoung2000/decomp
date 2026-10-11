@@ -23,6 +23,7 @@ from pathlib import Path
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.backends import members
 from rebuild_controller.backends import support as sp
 from rebuild_controller.backends.detect import detect_path, sniff
@@ -191,7 +192,7 @@ def test_detect_path_on_the_universal_fixture_carries_the_supported_statement():
 def _rizin_available() -> bool:
     from rebuild_controller.backends.rizin_worker import find_rizin
     from rebuild_controller.config import Settings
-    t = find_rizin(Settings())
+    t = find_rizin(tool_settings())
     return t is not None and bool(t.version)
 
 

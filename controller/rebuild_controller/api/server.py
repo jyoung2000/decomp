@@ -152,7 +152,8 @@ def _implementation_summary(studio: StudioServices) -> dict[str, Any] | None:
         return None
 
 
-def create_app(studio: StudioServices, token: str) -> FastAPI:
+def create_app(studio: StudioServices, token: str, mcp_token: str | None = None) -> FastAPI:
+    """``mcp_token``: the stable MCP-client token from <data>/mcp-endpoint.json; accepted on /mcp only (R11)."""
     app = FastAPI(title="Rebuild Studio controller", version=__version__, docs_url=None, redoc_url=None)
     started_at = now_iso()
     loop_holder: dict[str, asyncio.AbstractEventLoop] = {}
@@ -189,7 +190,10 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
             }), origin)
         if request.url.path not in ("/health",):
             hdr = request.headers.get("authorization", "")
-            if not secrets.compare_digest(hdr, f"Bearer {token}"):
+            ok = secrets.compare_digest(hdr, f"Bearer {token}")
+            if not ok and mcp_token and request.url.path == "/mcp":
+                ok = secrets.compare_digest(hdr, f"Bearer {mcp_token}")
+            if not ok:
                 return _cors(JSONResponse({"error": {"code": "auth", "message": "missing or invalid token"}}, status_code=401), origin)
         return _cors(await call_next(request), origin)
 
@@ -207,6 +211,11 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
 
     @app.exception_handler(Exception)
     async def any_exc(request: Request, exc: Exception):
+        from ..store.safety import is_damage_error
+        if is_damage_error(exc):
+            return JSONResponse({"error": {"code": "store_damaged", "message": f"The project database is damaged: {str(exc)[:300]}",
+                                           "next_action": "Close Rebuild Studio and start it again: it checks the database and offers "
+                                                          "to restore the last good backup (the damaged file is kept)."}}, status_code=503)
         name = type(exc).__name__
         code = {KeyError: 404, ValueError: 400, PermissionError: 403}.get(type(exc), 500)
         next_action = "check that the id exists (it may belong to another data directory)" if isinstance(exc, KeyError) else None
@@ -248,21 +257,26 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
                 pass
 
     @app.get("/mcp/config")
-    def mcp_config(request: Request, client: str = "claude-code", transport: str = "stdio", toolset: str = "all"):
-        """Config snippet for an MCP client (UI: Settings -> Copy MCP config). stdio is stable; http uses this controller."""
+    def mcp_config(request: Request, client: str = "claude-code", transport: str = "auto", toolset: str = "all"):
+        """Config snippet for an MCP client (UI: Settings -> Copy MCP config). ``auto`` (default) = http when this controller
+        belongs to the installed desktop app and serves /mcp with a stable token, else stdio (R11)."""
         from ..mcp.client_config import render
         from ..mcp.server import TOOLSETS
         if toolset not in TOOLSETS:
             raise _err("validation", f"toolset must be one of {', '.join(sorted(TOOLSETS))}", 400)
+        recommended = "http" if (mcp_http is not None and mcp_token and os.environ.get("REBUILD_STUDIO_INSTALL")) else "stdio"
+        if transport == "auto":
+            transport = recommended
         if transport == "http" and mcp_http is None:
             raise _err("unavailable", "the MCP HTTP transport is not available in this controller", 503)
         base = f"http://127.0.0.1:{request.url.port}" if request.url.port else str(request.base_url).rstrip("/")
         try:
             out = render(client, transport, toolset=toolset, data_dir=str(studio.settings.data_dir),
-                         url=base + "/mcp", token=token)
+                         url=base + "/mcp", token=mcp_token or token, stable=bool(mcp_token))
         except ValueError as e:
-            raise _err("validation", str(e), 400, next_action="choose client claude-code|codex|gemini|hermes|generic, transport stdio|http")
+            raise _err("validation", str(e), 400, next_action="choose client claude-code|codex|gemini|hermes|generic, transport stdio|http|auto")
         out["http_available"] = mcp_http is not None
+        out["recommended_transport"] = recommended
         return out
 
     # ---------------------------------------------------------------- health / events
@@ -747,6 +761,7 @@ def create_app(studio: StudioServices, token: str) -> FastAPI:
     from .ai_control_routes import mount_ai_control_routes; mount_ai_control_routes(app, studio)  # R9: JeV, cooldowns, rules, dry run
     from .health_routes import mount_health_routes; mount_health_routes(app, studio)  # R10 dependency health + install queue
     from .ai_quality_routes import mount_ai_quality_routes; mount_ai_quality_routes(app, studio)  # R5 scoreboard, AI naming, annotation review
+    from .maintenance_routes import mount_maintenance_routes; mount_maintenance_routes(app, studio)  # R11 backups
     return app
 
 
@@ -783,26 +798,119 @@ def write_controller_info(data_dir: Path, port: int, token: str) -> Path:
     return p
 
 
-def serve(port: int = 0, data_dir: str | None = None, token: str | None = None, *, host: str = "127.0.0.1") -> None:
+MCP_ENDPOINT_FILE = "mcp-endpoint.json"
+DEFAULT_MCP_PORT = 47815
+
+
+def load_mcp_endpoint(data_dir: Path, *, create: bool = True) -> dict[str, Any] | None:
+    """Stable MCP-client endpoint (R11): ``{"token", "port"}`` in <data>/mcp-endpoint.json, created once (0600). The token is
+    accepted on /mcp only; the controller prefers ``port`` so an HTTP MCP config keeps working across app restarts."""
+    p = Path(data_dir) / MCP_ENDPOINT_FILE
+    try:
+        info = json.loads(p.read_text("utf-8"))
+        if isinstance(info.get("token"), str) and len(info["token"]) >= 32 and isinstance(info.get("port"), int):
+            return info
+    except (OSError, ValueError, AttributeError):
+        pass
+    if not create:
+        return None
+    info = {"token": secrets.token_urlsafe(32), "port": DEFAULT_MCP_PORT}
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(info))
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    os.replace(tmp, p)
+    return info
+
+
+def _free_port(host: str, preferred: int = 0) -> int:
     import socket
+    for want in ([preferred] if preferred else []) + [0]:
+        with socket.socket() as s:
+            try:
+                s.bind((host, want))
+            except OSError:
+                continue
+            return s.getsockname()[1]
+    raise OSError("no free loopback port")
+
+
+def _fail(code: int, message: str) -> None:
+    import sys
+    print(f"rebuild-studio controller: {message}", file=sys.stderr, flush=True)
+    raise SystemExit(code)
+
+
+def serve(port: int = 0, data_dir: str | None = None, token: str | None = None, *, host: str = "127.0.0.1") -> None:
     import uvicorn
     from ..config import Settings, set_settings
+    from ..store import safety
     settings = Settings(data_dir=Path(data_dir)) if data_dir else Settings()
     set_settings(settings)
     settings.ensure_dirs()
-    token = token or os.environ.get("REBUILD_STUDIO_TOKEN") or secrets.token_urlsafe(32)
-    if port == 0:
-        with socket.socket() as s:
-            s.bind((host, 0)); port = s.getsockname()[1]
-    studio = StudioServices(settings, start_runner=True)
-    app = create_app(studio, token)
-    write_controller_info(settings.data_dir, port, token)
-    if os.environ.get("REBUILD_NO_LOCAL_DETECT") != "1" and studio.connections is not None:
-        app.state.local_ai.detect_async()      # loopback-only probe of Ollama / LM Studio / llama.cpp; never blocks startup
-    if os.environ.get("REBUILD_NO_DEP_STARTUP") != "1":
-        app.state.dependency_health.startup_async()   # clean leftovers, report/resume an interrupted install, cache the health
-    print(json.dumps({"port": port, "controller_json": str(settings.data_dir / "controller.json")}), flush=True)
+    # R11 (d): never open the store from inside a Windows package context (redirected AppData).
     try:
+        safety.refuse_if_packaged("The Rebuild Studio controller")
+    except safety.PackagedClientRefused as e:
+        _fail(safety.EXIT_PACKAGED, str(e))
+    # R11 (c): one writer per data folder. A CLI / rebuild-mcp holding the folder directly is asked to let go.
+    lock = safety.StoreLock(settings.data_dir, "controller")
+    wait = float(os.environ.get("REBUILD_STUDIO_LOCK_WAIT_SECS", "15") or 15)
+    if not lock.acquire(wait=wait, request_yield=True):
+        holder = safety.read_holder(settings.data_dir)
+        _fail(safety.EXIT_DATA_IN_USE, f"the data folder {settings.data_dir} is in use by {safety.describe_holder(holder)}. "
+                                       "Close the program that uses it (for example the AI client that started rebuild-mcp), "
+                                       "then choose Try again.")
+    studio = None
+    periodic = None
+    try:
+        # R11 (b): the user's recovery choice (set by the desktop shell), then the integrity check before any service starts.
+        try:
+            choice = safety.parse_recover_env(os.environ.pop(safety.ENV_RECOVER, None))
+            if choice:
+                res = safety.recover_store(settings.data_dir, choice[0], choice[1])
+                print(json.dumps({"store_recovered": res}), flush=True)
+        except (ValueError, safety.BackupFailed, OSError) as e:
+            safety.write_recovery_file(settings.data_dir, f"recovery failed: {e}")
+            _fail(safety.EXIT_STORE_DAMAGED, f"the recovery you chose could not be done: {e}")
+        try:
+            safety.check_store(settings.data_dir)
+        except safety.StoreDamaged as e:
+            _fail(safety.EXIT_STORE_DAMAGED, f"{e}. Nothing was deleted; the app offers to restore the last good backup.")
+        token = token or os.environ.get("REBUILD_STUDIO_TOKEN") or secrets.token_urlsafe(32)
+        endpoint = load_mcp_endpoint(settings.data_dir)
+        if port == 0:
+            pref = os.environ.get("REBUILD_STUDIO_MCP_PORT")
+            preferred = int(pref) if pref and pref.isdigit() else (int(endpoint["port"]) if endpoint else 0)
+            port = _free_port(host, preferred)
+        try:
+            studio = StudioServices(settings, start_runner=True)
+        except Exception as e:  # noqa: BLE001
+            if safety.is_damage_error(e):
+                safety.write_recovery_file(settings.data_dir, f"{type(e).__name__}: {e}")
+                _fail(safety.EXIT_STORE_DAMAGED, f"the project database is damaged ({e}). Nothing was deleted.")
+            raise
+        # R11 (a): a verified backup at every successful start, then one every 6 h while running.
+        try:
+            b = safety.backup_store(settings.db_path, "start")
+            print(json.dumps({"backup": b["name"]}), flush=True)
+        except Exception as e:  # noqa: BLE001 - reported, never blocks the start
+            print(f"rebuild-studio controller: startup backup failed: {e}", flush=True)
+        periodic = safety.PeriodicBackup(settings.db_path, float(os.environ.get("REBUILD_STUDIO_BACKUP_SECS") or safety.PERIODIC_SECONDS))
+        periodic.start()
+        app = create_app(studio, token, mcp_token=endpoint["token"] if endpoint else None)
+        write_controller_info(settings.data_dir, port, token)
+        if os.environ.get("REBUILD_NO_LOCAL_DETECT") != "1" and studio.connections is not None:
+            app.state.local_ai.detect_async()      # loopback-only probe of Ollama / LM Studio / llama.cpp; never blocks startup
+        if os.environ.get("REBUILD_NO_DEP_STARTUP") != "1":
+            app.state.dependency_health.startup_async()   # clean leftovers, report/resume an interrupted install, cache the health
+        print(json.dumps({"port": port, "controller_json": str(settings.data_dir / "controller.json")}), flush=True)
         uvicorn.run(app, host=host, port=port, log_level="warning", ws_ping_interval=10, ws_ping_timeout=20)
     finally:
-        studio.stop()
+        if periodic is not None:
+            periodic.stop()
+        if studio is not None:
+            studio.stop()
+        lock.release()

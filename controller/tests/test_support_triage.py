@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.adapters.contract import Availability
 from rebuild_controller.backends import android_info
 from rebuild_controller.backends import support as sp
@@ -274,7 +275,7 @@ def test_unity_mono_is_detected_and_routed_to_ilspy(tmp_path):
     assert "ILSpy" in prof["support_statement"] and "IL2CPP" not in prof["support_statement"]
     # routing: the profile has a recovery stage and the ILSpy backend serves it
     assert stages.PROFILE_STAGE["unity_mono"] == "recover_managed"
-    assert "unity_mono" in ILSpyBackend().probe().profiles
+    assert "unity_mono" in ILSpyBackend(tool_settings()).probe().profiles
     assert sniff(tmp_path / "Game_Data" / "Managed" / "Assembly-CSharp.dll").profile == "unity_mono"
     assert sniff(tmp_path / "UnityPlayer.dll").flags["engine_binary"] == "unity"
 
@@ -415,7 +416,7 @@ def test_every_status_is_valid_and_non_supported_kinds_name_a_blocker():
 # triage backend
 # ---------------------------------------------------------------------------------------------------------------------
 def test_triage_probe_smoke_and_registry():
-    b = TriageBackend()
+    b = TriageBackend(tool_settings())
     info = b.probe()
     assert info.experimental and info.availability == Availability.INSTALLED and set(info.profiles) == {"unity_il2cpp", "gamemaker", "unreal", "native_macho"}
     assert info.resources["recovers_code"] is False and {o.name for o in info.operations} == {"describe", "inspect"}
@@ -423,7 +424,7 @@ def test_triage_probe_smoke_and_registry():
 
 
 def test_triage_describe_and_inspect_record_evidence_and_never_claim_recovery(tmp_path, studio, case, cases):
-    b = TriageBackend()
+    b = TriageBackend(tool_settings())
     p = tmp_path / "global-metadata.dat"
     p.write_bytes(il2cpp_metadata(["Player", "Enemy"]))
     r = b.inspect(p, studio=studio, case_id=case["case_id"])
@@ -442,13 +443,13 @@ def test_triage_describe_and_inspect_record_evidence_and_never_claim_recovery(tm
 def test_triage_inspect_reports_parse_failure_instead_of_crashing(tmp_path):
     p = tmp_path / "global-metadata.dat"
     p.write_bytes(b"\0" * 400)
-    r = TriageBackend().inspect(p)
+    r = TriageBackend(tool_settings()).inspect(p)
     assert not r.ok and "encrypted or obfuscated" in r.error and r.data["recovered"] is False
-    assert not TriageBackend().inspect(tmp_path / "missing").ok
+    assert not TriageBackend(tool_settings()).inspect(tmp_path / "missing").ok
 
 
 def test_triage_inspect_each_kind(tmp_path):
-    b = TriageBackend()
+    b = TriageBackend(tool_settings())
     (tmp_path / "m").write_bytes(macho_fat([macho_thin(0x01000007), macho_thin(0x0100000C)]))
     (tmp_path / "data.win").write_bytes(gamemaker_form(with_code=True, strings=["s"]))
     (tmp_path / "p.pak").write_bytes(pak_file())

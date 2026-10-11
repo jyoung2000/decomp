@@ -25,9 +25,11 @@ except ImportError:  # pragma: no cover
 
 
 @pytest.fixture
-def home(tmp_path):
+def home(tmp_path, monkeypatch):
     h = tmp_path / "home"
     h.mkdir()
+    # Hermes entries name the data folder explicitly; R11 (e): in tests that is never the real per-user folder.
+    monkeypatch.setenv("REBUILD_STUDIO_DATA", str(tmp_path / "studio-data"))
     return h
 
 
@@ -121,13 +123,65 @@ def test_data_dir_option_sets_env(home):
 
 
 def test_default_data_dir_mirror_matches_controller(monkeypatch, tmp_path):
-    from rebuild_controller.config import default_data_dir
+    from rebuild_controller.config import DataDirRequired, default_data_dir
     for env in ({"REBUILD_STUDIO_DATA": str(tmp_path / "x")}, {"XDG_DATA_HOME": str(tmp_path / "xdg")}, {}):
         monkeypatch.delenv("REBUILD_STUDIO_DATA", raising=False)
         monkeypatch.delenv("XDG_DATA_HOME", raising=False)
         for k, v in env.items():
             monkeypatch.setenv(k, v)
-        assert inst.default_data_dir() == default_data_dir()
+        if "REBUILD_STUDIO_DATA" not in env:
+            # R11 (e): in test/script contexts both refuse to fall back to the per-user folder ...
+            with pytest.raises(RuntimeError):
+                inst.default_data_dir()
+            with pytest.raises(DataDirRequired):
+                default_data_dir()
+            # ... and outside them they agree (the guard is lifted only for this comparison; nothing is opened).
+            monkeypatch.delenv("REBUILD_STUDIO_REQUIRE_EXPLICIT_DATA")
+            assert inst.default_data_dir() == default_data_dir()
+            monkeypatch.setenv("REBUILD_STUDIO_REQUIRE_EXPLICIT_DATA", "1")
+        else:
+            assert inst.default_data_dir() == default_data_dir()
+
+
+def test_transport_auto_http_and_explicit_http(home, tmp_path, monkeypatch):
+    """R11 (d): with the desktop app installed and its stable endpoint present, the default writes an HTTP entry."""
+    data = tmp_path / "studio-data"
+    data.mkdir()
+    code, out = run(home, "--client", "claude-code", "--transport", "http", "--data-dir", str(data))
+    assert code == 1 and "start the app once" in out, "no endpoint yet -> refused with instructions"
+    (data / "mcp-endpoint.json").write_text(json.dumps({"token": "T" * 43, "port": 47815}))
+    inst_dir = tmp_path / "Rebuild Studio"
+    inst_dir.mkdir()
+    monkeypatch.setenv("REBUILD_STUDIO_INSTALL", str(inst_dir))
+    code, out = run(home, "--client", "claude-code", "--data-dir", str(data))   # --transport auto
+    assert code == 0 and "transport: http" in out, out
+    e = json.loads(config_files(home)["claude-code"].read_text())["mcpServers"]["rebuild-studio"]
+    assert e == {"type": "http", "url": "http://127.0.0.1:47815/mcp", "headers": {"Authorization": "Bearer " + "T" * 43}}
+    for c in ("codex", "gemini", "hermes"):
+        assert run(home, "--client", c, "--transport", "http", "--data-dir", str(data))[0] == 0
+    cx = tomllib.loads(config_files(home)["codex"].read_text())["mcp_servers"]["rebuild_studio"]
+    assert cx["url"] == "http://127.0.0.1:47815/mcp" and cx["http_headers"]["Authorization"].startswith("Bearer ")
+    ge = json.loads(config_files(home)["gemini"].read_text())["mcpServers"]["rebuild-studio"]
+    assert ge["httpUrl"] == "http://127.0.0.1:47815/mcp"
+    if yaml:
+        hm = yaml.safe_load(config_files(home)["hermes"].read_text())["mcp_servers"]["rebuild_studio"]
+        assert hm["url"] == "http://127.0.0.1:47815/mcp" and hm["headers"]["Authorization"].startswith("Bearer ")
+    # switching back to stdio replaces our own http entry; --remove takes it out again
+    assert run(home, "--client", "claude-code", "--transport", "stdio")[0] == 0
+    e = json.loads(config_files(home)["claude-code"].read_text())["mcpServers"]["rebuild-studio"]
+    assert e["type"] == "stdio"
+    for c in ALL:
+        assert run(home, "--client", c, "--remove")[0] == 0
+
+
+def test_transport_auto_is_stdio_without_the_app(home, tmp_path, monkeypatch):
+    monkeypatch.delenv("REBUILD_STUDIO_INSTALL", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "la"))
+    data = tmp_path / "d"
+    data.mkdir()
+    (data / "mcp-endpoint.json").write_text(json.dumps({"token": "T" * 43, "port": 47815}))
+    code, out = run(home, "--client", "claude-code", "--data-dir", str(data))
+    assert code == 0 and "transport: stdio" in out
 
 
 # ------------------------------------------------------------------------------------------------ merge preserves unrelated content
@@ -421,6 +475,7 @@ def test_claude_config_dir_env_is_honoured_when_home_is_not_forced(tmp_path, mon
     # Direct unit check of the path logic (the --home flag deliberately ignores *_HOME overrides).
     env = inst.Env(home=tmp_path / "h", explicit_home=False, clients_dir=CLIENTS, rules=False,
                    spec_args={"mcp_command": MCP, "toolset": "all", "data_dir": None})
+    monkeypatch.setenv("REBUILD_STUDIO_DATA", str(tmp_path / "studio-data"))  # R11: Hermes names the data folder
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cc"))
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "cx"))
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hh"))

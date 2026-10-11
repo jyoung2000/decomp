@@ -1,6 +1,10 @@
 """`rebuildctl`: command line front end over StudioServices (same typed operations the GUI and the MCP server use).
 
 Exit codes: 0 success, 1 the requested operation failed/was incomplete, 2 usage error, 3 controller/environment unavailable.
+
+R11 (one writer per data folder): when the desktop app's controller serves the data folder, every command is forwarded to
+it over loopback HTTP (``RemoteStudio``); the SQLite store is opened directly only when no controller is alive, under the
+same data-folder lock the controller takes, and never from inside a Windows package context.
 """
 from __future__ import annotations
 
@@ -52,13 +56,59 @@ def _make_settings(data_dir: str | None):
     return get_settings()
 
 
+_OPENED: list[tuple[Any, Any]] = []   # (studio, lock) opened directly by this process; released at the end of main()
+
+
 def _open_studio(args: argparse.Namespace, *, start_runner: bool = False):
-    settings = _make_settings(getattr(args, "data_dir", None))
+    from ..config import DataDirRequired
+    from ..remote import live_controller
+    from ..store import safety
     try:
+        settings = _make_settings(getattr(args, "data_dir", None))
+    except DataDirRequired as exc:
+        raise CliError(str(exc), 2) from exc
+    link = live_controller(settings.data_dir)
+    if link is not None:
+        from .remote_studio import RemoteStudio
+        return RemoteStudio(link, settings.data_dir)
+    try:
+        safety.refuse_if_packaged("rebuildctl")
+    except safety.PackagedClientRefused as exc:
+        raise CliError(str(exc), 3) from exc
+    lock = safety.StoreLock(settings.data_dir, "cli")
+    if not lock.acquire(wait=3.0):
+        link = live_controller(settings.data_dir)   # the app may have just started
+        if link is not None:
+            from .remote_studio import RemoteStudio
+            return RemoteStudio(link, settings.data_dir)
+        raise CliError(str(safety.DataFolderInUse(settings.data_dir, safety.read_holder(settings.data_dir))) +
+                       " Try again when it has finished.", 3)
+    try:
+        if settings.db_path.exists():
+            ok, detail = safety.quick_check(settings.db_path)
+            if not ok:
+                raise CliError(f"the project database is damaged ({detail}). Nothing was changed. Start the Rebuild Studio app "
+                               "(it offers to restore the last good backup) or run `rebuildctl store restore`.", 3)
         from ..services import StudioServices
-        return StudioServices(settings, start_runner=start_runner)
-    except Exception as exc:  # partial install, locked data dir, ...
+        studio = StudioServices(settings, start_runner=start_runner)
+    except CliError:
+        lock.release()
+        raise
+    except Exception as exc:  # partial install, damaged store, ...
+        lock.release()
         raise CliError(f"controller unavailable: {type(exc).__name__}: {exc}", 3) from exc
+    _OPENED.append((studio, lock))
+    return studio
+
+
+def _release_opened() -> None:
+    while _OPENED:
+        studio, lock = _OPENED.pop()
+        try:
+            studio.stop()
+        except Exception:  # noqa: BLE001 - already stopped by the command
+            pass
+        lock.release()
 
 
 def _case_or_job(studio: Any, ident: str) -> dict[str, str]:
@@ -349,6 +399,75 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_store(args: argparse.Namespace) -> int:
+    """`rebuildctl store check|backup|backups|restore`: R11 data-safety operations."""
+    from ..config import DataDirRequired
+    from ..remote import RemoteError, live_controller
+    from ..store import safety
+    try:
+        settings = _make_settings(args.data_dir)
+    except DataDirRequired as exc:
+        raise CliError(str(exc), 2) from exc
+    data_dir = settings.data_dir
+    op = args.store_command
+    if op == "backups":
+        rows = safety.list_backups(data_dir)
+        if args.json:
+            _jprint({"backups_dir": str(safety.backups_dir(data_dir)), "backups": rows})
+        else:
+            print(f"backups in {safety.backups_dir(data_dir)}")
+            print(_table([(b["name"], b["taken_at"], b.get("projects"), b["size"]) for b in rows], ("name", "taken", "projects", "bytes")))
+        return 0
+    link = live_controller(data_dir)
+    if op == "backup" and link is not None:
+        try:
+            out = link.post("/maintenance/backup")
+        except (RemoteError, OSError) as exc:
+            raise CliError(f"the running app could not take a backup: {exc}", 1) from exc
+        _jprint(out) if args.json else print(f"backup taken by the running app: {out['name']}")
+        return 0
+    if link is not None:
+        raise CliError(f"the Rebuild Studio app is running and owns {data_dir}. Close it first"
+                       + (" (it checks the database at every start and offers a restore when it is damaged)." if op == "restore" else "."), 3)
+    try:
+        safety.refuse_if_packaged("rebuildctl")
+    except safety.PackagedClientRefused as exc:
+        raise CliError(str(exc), 3) from exc
+    lock = safety.StoreLock(data_dir, "cli")
+    if not lock.acquire(wait=3.0):
+        raise CliError(str(safety.DataFolderInUse(data_dir, safety.read_holder(data_dir))), 3)
+    try:
+        if op == "check":
+            ok, detail = safety.quick_check(settings.db_path, full=True)
+            res = {"ok": ok, "detail": detail, "db_path": str(settings.db_path)}
+            _jprint(res) if args.json else print(("ok: " if ok else "DAMAGED: ") + detail)
+            return 0 if ok else 1
+        if op == "backup":
+            try:
+                b = safety.backup_store(settings.db_path, "manual")
+            except safety.BackupFailed as exc:
+                raise CliError(str(exc), 1) from exc
+            _jprint(b) if args.json else print(f"backup: {b['path']} ({b.get('projects')} projects, integrity ok)")
+            return 0
+        if op == "restore":
+            if not args.empty and not args.backup and not args.latest:
+                raise CliError("choose --latest, --backup NAME or --empty", 2)
+            try:
+                res = safety.recover_store(data_dir, "empty" if args.empty else "restore", args.backup)
+            except (ValueError, safety.BackupFailed) as exc:
+                raise CliError(str(exc), 1) from exc
+            if args.json:
+                _jprint(res)
+            else:
+                print(f"restored {res['restored']}" if res["restored"] else "started with an empty project list")
+                for f in res["damaged_files"]:
+                    print(f"  kept the previous file as {f}")
+            return 0
+        raise CliError(f"unknown store command {op}", 2)
+    finally:
+        lock.release()
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
     from ..mcp.server import main as mcp_main
     return mcp_main([a for a in args.mcp_args if a != "--"])
@@ -418,6 +537,18 @@ def build_parser() -> argparse.ArgumentParser:
     sv.add_argument("--port", type=int, default=0, help="0 = pick a free port (written to controller.json)")
     sv.set_defaults(fn=cmd_serve)
 
+    st = sub.add_parser("store", help="data safety: check, back up, list backups, restore (R11)")
+    stsub = st.add_subparsers(dest="store_command", required=True, metavar="subcommand")
+    stsub.add_parser("check", parents=[common], help="PRAGMA integrity_check of the project database (app must be closed)")
+    stsub.add_parser("backup", parents=[common], help="take a verified backup now (through the app when it runs)")
+    stsub.add_parser("backups", parents=[common], help="list the kept backups")
+    rs = stsub.add_parser("restore", parents=[common], help="restore a backup or start empty (app must be closed); the current file is kept")
+    g = rs.add_mutually_exclusive_group()
+    g.add_argument("--latest", action="store_true", help="the newest backup")
+    g.add_argument("--backup", default=None, help="a backup name from `rebuildctl store backups`")
+    g.add_argument("--empty", action="store_true", help="start with an empty project list")
+    st.set_defaults(fn=cmd_store)
+
     m = sub.add_parser("mcp", help="run the MCP server on stdio (every argument after `mcp` goes to rebuild-mcp)")
     m.set_defaults(fn=cmd_mcp, mcp_args=[], json=False, data_dir=None)
     return p
@@ -447,6 +578,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     except BrokenPipeError:
         return 0
+    finally:
+        _release_opened()
 
 
 if __name__ == "__main__":

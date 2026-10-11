@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.adapters.contract import Availability
 from rebuild_controller.backends import native
 from rebuild_controller.backends.ghidra import GhidraBackend
@@ -26,7 +27,7 @@ from rebuild_controller.ids import sha256_file, stable_json_hash
 DATA = Path(__file__).parent / "data"
 SAMPLES = {"pe": DATA / "sample_pe.exe", "elf": DATA / "sample_elf"}
 
-pytestmark = pytest.mark.skipif(find_rizin(Settings()) is None, reason="rizin not installed on this host")
+pytestmark = pytest.mark.skipif(find_rizin(tool_settings()) is None, reason="rizin not installed on this host")
 
 
 def _ensure_samples() -> None:

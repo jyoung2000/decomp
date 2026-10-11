@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 
+from support.data_dirs import tool_settings  # R11: never the real data folder
+
 REPO = Path(__file__).resolve().parents[2]
 BENCH = REPO / "fixtures" / "bench"
 
@@ -31,7 +33,7 @@ bm = _load_benchmark()
 def _rizin_available() -> bool:
     from rebuild_controller.backends.rizin_worker import find_rizin
     from rebuild_controller.config import Settings
-    t = find_rizin(Settings())
+    t = find_rizin(tool_settings())
     return t is not None and bool(t.version)
 
 

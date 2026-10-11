@@ -6,10 +6,56 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+ENV_REQUIRE_EXPLICIT = "REBUILD_STUDIO_REQUIRE_EXPLICIT_DATA"
+
+
+class DataDirRequired(RuntimeError):
+    """Raised in test/script contexts when no explicit data folder was given (R11: never fall back to the real one)."""
+
+
+def test_context() -> bool:
+    """True in test/script contexts: pytest (conftest) and the repo scripts set REBUILD_STUDIO_REQUIRE_EXPLICIT_DATA=1."""
+    return os.environ.get(ENV_REQUIRE_EXPLICIT) == "1"
+
+
+def require_explicit_data_dir() -> None:
+    """Called by tests and scripts: from now on (and in child processes) the per-user data folder is never used implicitly."""
+    os.environ[ENV_REQUIRE_EXPLICIT] = "1"
+
+
+def user_data_dir() -> Path:
+    """The per-user data folder the installed app uses (no environment override, no guard)."""
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+        return base / "RebuildStudio"
+    xdg = os.environ.get("XDG_DATA_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
+    return base / "rebuild-studio"
+
+
+def _same_path(a: Path, b: Path) -> bool:
+    try:
+        return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+    except (OSError, ValueError):
+        return False
+
+
+def guard_data_dir(path: Path) -> Path:
+    """In test/script contexts refuse the real per-user data folder even when it is named explicitly."""
+    if test_context() and _same_path(Path(path), user_data_dir()):
+        raise DataDirRequired(f"refusing to use the real Rebuild Studio data folder {path} from a test or script; "
+                              "pass a temporary --data-dir / Settings(data_dir=...)")
+    return Path(path)
+
+
 def default_data_dir() -> Path:
     env = os.environ.get("REBUILD_STUDIO_DATA")
     if env:
-        return Path(env)
+        return guard_data_dir(Path(env))
+    if test_context():
+        raise DataDirRequired("no data folder given: tests and scripts must pass an explicit temporary data folder "
+                              "(Settings(data_dir=...), --data-dir or REBUILD_STUDIO_DATA); the per-user folder is never used "
+                              f"implicitly while {ENV_REQUIRE_EXPLICIT}=1")
     if os.name == "nt":
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
         return base / "RebuildStudio"
@@ -50,6 +96,9 @@ class Settings:
     data_dir: Path = field(default_factory=default_data_dir)
     limits: Limits = field(default_factory=Limits)
     tools_dir: Path = field(default_factory=lambda: default_tools_dir())
+
+    def __post_init__(self) -> None:
+        self.data_dir = guard_data_dir(Path(self.data_dir))
 
     @property
     def db_path(self) -> Path:

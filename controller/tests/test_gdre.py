@@ -19,6 +19,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.adapters.contract import Availability
 from rebuild_controller.backends.gdre import (GDREBackend, build_probe_pck, clean_lines, parse_gdre_output, parse_project_godot,
                                               read_pck_header, summarize_entries)
@@ -181,7 +182,7 @@ def test_probe_reports_pinned_tool_with_verified_integrity(backend):
     t = info.tools[0]
     assert t.availability == Availability.INSTALLED and t.version == "2.7.0" and t.pinned == "2.7.0"
     assert t.license == "MIT" and "GDRETools/gdsdecomp" in t.source and Path(t.path).name == ("gdre_tools.exe" if os.name == "nt" else "gdre_tools.x86_64")
-    if (Path(Settings().tools_dir) / "GDRE_tools-v2.7.0-linux.zip").exists():
+    if (Path(tool_settings().tools_dir) / "GDRE_tools-v2.7.0-linux.zip").exists():
         assert t.integrity == PINNED_ZIP_SHA and "matches the pinned sha256" in t.detail
     assert info.profiles == ["godot"] and {o.name for o in info.operations} == {"detect", "recover"}
 

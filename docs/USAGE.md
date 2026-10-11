@@ -33,7 +33,15 @@ rebuildctl status <case_id> | jobs <case_id> | cancel <case_id> | resume <case_i
 rebuildctl evidence search <case_id> <query> | evidence get <evidence_id>
 rebuildctl export-plan <case_id>       # project-plan.json + project-plan.html under <output>/reports/
 rebuildctl mcp --toolset minimal|analysis|rebuild|all   # stdio MCP server for Claude Code / Codex / Gemini / Hermes
+rebuildctl store check | backups | backup | restore --latest|--backup <name>|--empty   # R11 data safety
 ```
+While the app (or `rebuildctl serve`) runs for the data folder, every `rebuildctl` command is sent to it over its loopback API; the
+CLI opens `studio.sqlite3` itself only when no controller runs, under the same `studio.lock`, and never from inside a Windows app
+package. `store restore` requires the app to be closed; the replaced file is moved to `<data>/damaged/`, never deleted.
+
+Tests and scripts never use the real data folder: pytest (and `scripts/benchmark.py`) set `REBUILD_STUDIO_REQUIRE_EXPLICIT_DATA=1`,
+under which `get_settings()` / `Settings()` without an explicit data folder raise, and the per-user folder is refused even when
+named. `scripts/benchmark.py` takes `--data-dir` (default: a new temporary folder).
 
 ## Model clients (optional)
 No global skill is required for the desktop app. To let an external client propose candidates:
@@ -42,6 +50,10 @@ python scripts/install-clients.py --client claude-code|codex|gemini|hermes|all -
 python scripts/install-clients.py --client claude-code                                     # idempotent merge, backup first
 python scripts/install-clients.py --client claude-code --remove
 ```
+`--transport auto` (default) writes an HTTP entry for the installed desktop app's stable MCP endpoint (`<data>/mcp-endpoint.json`;
+loopback URL + token that survive app restarts) when the app is installed and has started once, else a stdio entry for
+`rebuild-mcp` (which forwards to the app whenever it runs). `--transport http|stdio` forces one. Clients that run inside a Windows
+app package (Claude Desktop) must use HTTP.
 The client reads evidence (`search_evidence`, `get_evidence`, `get_function_briefing`), proposes files (`propose_candidate`),
 builds and compares; it can never set verification verdicts. See `examples/pecli-rust-from-evidence/`.
 

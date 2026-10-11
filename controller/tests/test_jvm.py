@@ -26,6 +26,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.adapters.contract import Availability
 from rebuild_controller.backends import android_info, jvm
 from rebuild_controller.backends.jvm import JVMBackend
@@ -52,7 +53,7 @@ def _download(url: str, sha: str, dest: Path) -> None:
 
 
 def _settings_with(*, cfr_dir: Path | None = None) -> Settings:
-    base = Settings()
+    base = tool_settings()
     if cfr_dir is not None:
         base.tools_dir = cfr_dir
     return base
@@ -61,7 +62,7 @@ def _settings_with(*, cfr_dir: Path | None = None) -> Settings:
 @pytest.fixture(scope="module")
 def real(tmp_path_factory) -> JVMBackend:
     """A backend with a working java + CFR (downloading the pinned CFR jar when absent)."""
-    b = JVMBackend(Settings())
+    b = JVMBackend(tool_settings())
     java = next(t for t in b.probe().tools if t.name == "java")
     if java.availability not in (Availability.INSTALLED, Availability.USABLE):
         pytest.skip(f"no Java runtime on this host: {java.detail}")
@@ -73,7 +74,7 @@ def real(tmp_path_factory) -> JVMBackend:
             _download(jvm.CFR_URL, jvm.CFR_SHA256, CACHE / "cfr" / "cfr-0.152.jar")
         except Exception as e:  # noqa: BLE001
             pytest.skip(f"cfr-0.152.jar not installed and download failed ({type(e).__name__}: {e}); set REBUILD_STUDIO_TOOLS to a tools dir with cfr/cfr-0.152.jar")
-        s = Settings()
+        s = tool_settings()
         s.tools_dir = CACHE
         b = JVMBackend(s)
         cfr = next(t for t in b.probe().tools if t.name == "cfr")
@@ -207,7 +208,7 @@ def test_inspect_jar_flags_obfuscation_spring_boot_and_nested_jars(tmp_path):
 
 
 def test_inspect_apk_manifest_and_dex_without_tools():
-    r = jvm.JVMBackend(Settings()).inspect(MINAPP)
+    r = jvm.JVMBackend(tool_settings()).inspect(MINAPP)
     assert r.ok
     ins = r.data["inspect"]
     m = ins["manifest"]
@@ -220,7 +221,7 @@ def test_inspect_apk_manifest_and_dex_without_tools():
 
 
 def test_inspect_records_evidence_with_module_sha(studio, case, cases):
-    r = JVMBackend(Settings()).inspect(JAR, studio=studio, case_id=case["case_id"])
+    r = JVMBackend(tool_settings()).inspect(JAR, studio=studio, case_id=case["case_id"])
     ev = cases.get_evidence(r.evidence_ids[0])
     body = cases.evidence_body(ev["evidence_id"])
     assert ev["kind"] == "jvm.inspect" and body["module"]["sha256"] == hashlib.sha256(JAR.read_bytes()).hexdigest()
@@ -233,13 +234,13 @@ def test_inspect_class_cap_truncation_is_disclosed(tmp_path, monkeypatch):
     with zipfile.ZipFile(p, "w") as z:
         for i in range(jvm.LIST_CAP + 5):
             z.writestr(f"pkg/Cls{i}.class", cls)
-    r = JVMBackend(Settings()).inspect(p)
+    r = JVMBackend(tool_settings()).inspect(p)
     assert r.truncated and r.data["inspect"]["classes"]["truncated"] and len(r.data["inspect"]["classes"]["items"]) == jvm.LIST_CAP
 
 
 def test_missing_cfr_blocks_jar_recovery_but_inspect_still_works(tmp_path, monkeypatch):
     monkeypatch.delenv("REBUILD_CFR_JAR", raising=False)
-    s = Settings()
+    s = tool_settings()
     s.tools_dir = tmp_path / "empty-tools"
     b = JVMBackend(s)
     b.find_cfr = lambda: None                      # type: ignore[method-assign]
@@ -253,7 +254,7 @@ def test_missing_cfr_blocks_jar_recovery_but_inspect_still_works(tmp_path, monke
 
 
 def test_apk_recovery_without_jadx_states_the_blocker(tmp_path):
-    s = Settings()
+    s = tool_settings()
     s.tools_dir = tmp_path / "t"
     b = JVMBackend(s)
     b.find_jadx = lambda: None                     # type: ignore[method-assign]
@@ -263,7 +264,7 @@ def test_apk_recovery_without_jadx_states_the_blocker(tmp_path):
 
 
 def test_decompile_refuses_bad_paths_and_non_jvm_input(tmp_path):
-    b = JVMBackend(Settings())
+    b = JVMBackend(tool_settings())
     assert not b.decompile(tmp_path / "nope.jar", tmp_path / "o").ok
     txt = tmp_path / "x.jar"
     txt.write_text("hello")
@@ -276,7 +277,7 @@ def test_decompile_refuses_bad_paths_and_non_jvm_input(tmp_path):
 
 
 def test_archive_limits_refuse_oversized_jars(tmp_path):
-    s = Settings()
+    s = tool_settings()
     s.limits = Limits(max_archive_entries=3)
     r = JVMBackend(s).decompile(JAR, tmp_path / "o")
     assert not r.ok and "limits" in r.error

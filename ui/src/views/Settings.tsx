@@ -3,9 +3,9 @@ import { Loading } from '../components/Empty';
 import { ErrorCallout } from '../components/ErrorCallout';
 import { StatusChip } from '../components/StatusChip';
 import { useToast } from '../components/Toasts';
-import { bytes, humanize } from '../lib/format';
+import { bytes, dateTime, humanize } from '../lib/format';
 import { useApi, useResource } from '../lib/store';
-import type { Availability, BackendEntry, McpClient, ToolProbe } from '../lib/types';
+import type { Availability, BackendEntry, McpClient, StoreBackup, ToolProbe } from '../lib/types';
 
 const AVAIL: Availability[] = ['missing', 'detected', 'installed', 'usable', 'verified'];
 const AVAIL_HELP: Record<Availability, string> = {
@@ -26,6 +26,7 @@ export function SettingsView() {
         </div>
       </div>
       <Doctor />
+      <DataSafetyCard />
       <McpConfigCard />
       <SettingsEditor />
     </div>
@@ -103,8 +104,10 @@ function McpConfigCard() {
   const api = useApi();
   const toast = useToast();
   const [client, setClient] = useState<McpClient>('claude-code');
-  const [transport, setTransport] = useState<'stdio' | 'http'>('stdio');
+  // R11: 'auto' lets the controller choose (HTTP to this app when it is the installed desktop app, else stdio).
+  const [transport, setTransport] = useState<'auto' | 'stdio' | 'http'>('auto');
   const res = useResource(() => api.mcpConfig(client, transport), [api, client, transport]);
+  const shown = transport === 'auto' ? (res.data?.transport ?? 'stdio') : transport;
   const copy = async (text: string, what: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -135,9 +138,9 @@ function McpConfigCard() {
         </label>
         <label className="stack" htmlFor="mcp-transport">
           <span className="small">Connection</span>
-          <select id="mcp-transport" value={transport} onChange={(e) => setTransport(e.target.value as 'stdio' | 'http')}>
-            <option value="stdio">Start its own server (stdio, permanent)</option>
-            <option value="http">Connect to this running app (HTTP, until restart)</option>
+          <select id="mcp-transport" value={shown} onChange={(e) => setTransport(e.target.value as 'stdio' | 'http')}>
+            <option value="http">Connect to this app (HTTP{res.data?.recommended_transport === 'http' ? ', recommended' : ''})</option>
+            <option value="stdio">Start its own server (stdio; uses this app while it runs)</option>
           </select>
         </label>
       </div>
@@ -173,6 +176,95 @@ function McpConfigCard() {
     </section>
   );
 }
+
+/** R11: the project database is backed up and checked; what is kept, where, and a manual backup. */
+function DataSafetyCard() {
+  const api = useApi();
+  const toast = useToast();
+  const res = useResource(() => api.backups(), [api]);
+  const [busy, setBusy] = useState(false);
+  const backupNow = async () => {
+    setBusy(true);
+    try {
+      const b = await api.backupNow();
+      toast.success('Backup taken', `${b.projects ?? 0} project${b.projects === 1 ? '' : 's'}, checked and complete.`);
+      res.reload();
+    } catch (e) {
+      toast.error('The backup could not be taken', e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const d = res.data;
+  return (
+    <section className="card" aria-labelledby="safety-h" data-testid="data-safety">
+      <div className="card-head">
+        <h3 id="safety-h">Project database backups</h3>
+        <div className="btn-group">
+          <button type="button" className="btn sm" data-testid="backup-now" disabled={busy} onClick={backupNow}>
+            {busy ? 'Backing up…' : 'Back up now'}
+          </button>
+          <button type="button" className="btn sm" onClick={res.reload}>
+            Refresh
+          </button>
+        </div>
+      </div>
+      <p className="small muted" style={{ marginBottom: 12 }}>
+        Your project list lives in one database file. Rebuild Studio copies it when the app starts, every{' '}
+        {d ? d.policy.periodic_hours : 6} hours while it runs and before every upgrade, and checks every copy. It keeps the newest{' '}
+        {d ? d.policy.keep_last : 5} copies plus one per day for the last {d ? d.policy.keep_daily_days : 7} days. If the database is ever
+        damaged, the app says so when it starts and offers to restore the last good copy; the damaged file is kept, never deleted.
+      </p>
+      {res.error ? (
+        <ErrorCallout error={res.error} title="Backup status unavailable" onRetry={res.reload} />
+      ) : !d ? (
+        <Loading what="backup status" />
+      ) : (
+        <div className="stack">
+          <div className="small" data-testid="last-backup">
+            {d.last_backup ? <>Last backup: {dateTime(d.last_backup)} · {d.backups.length} kept</> : 'No backup yet.'}
+          </div>
+          <div className="xs muted mono wrap-any">Folder: {d.backups_dir}</div>
+          {d.last_recovery && (
+            <p className="small" data-testid="last-recovery">
+              Last recovery {dateTime(d.last_recovery.at)}:{' '}
+              {d.last_recovery.mode === 'restore' ? `restored ${d.last_recovery.restored}` : 'started with an empty project list'}. The previous
+              file is kept in <span className="mono">{d.damaged_dir}</span>.
+            </p>
+          )}
+          {d.backups.length > 0 && (
+            <div className="table-wrap">
+              <table className="table" aria-label="Kept backups">
+                <thead>
+                  <tr>
+                    <th scope="col">Taken</th>
+                    <th scope="col">Why</th>
+                    <th scope="col">Projects</th>
+                    <th scope="col">Size</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.backups.map((b: StoreBackup) => (
+                    <tr key={b.name}>
+                      <td className="small" title={b.name}>
+                        {dateTime(b.taken_at)}
+                      </td>
+                      <td className="small">{BACKUP_REASON[b.reason] ?? (b.reason.startsWith('pre-migration') ? 'Before an upgrade' : humanize(b.reason))}</td>
+                      <td className="small">{b.projects ?? '—'}</td>
+                      <td className="small">{bytes(b.size)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const BACKUP_REASON: Record<string, string> = { start: 'App start', periodic: 'Every 6 hours', manual: 'Back up now' };
 
 function DoctorRow({ b, t }: { b: BackendEntry; t: ToolProbe | null }) {
   const state = (t?.availability ?? b.availability) as Availability;

@@ -11,6 +11,7 @@ mod credentials;
 mod error;
 mod paths;
 mod procs;
+mod recovery;
 
 use std::path::PathBuf;
 
@@ -187,10 +188,80 @@ fn ask_startup_recovery(app: &AppHandle, message: &str) -> StartupChoice {
     startup_choice(&r)
 }
 
+/// R11: the project database is damaged. Ask what to do; `Some(choice)` restarts the controller with it, `None` quits.
+fn ask_store_recovery(app: &AppHandle, data_dir: &std::path::Path, rec: &recovery::StoreRecovery) -> Option<String> {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+    if let Some(w) = app.get_webview_window(STARTUP_LABEL) {
+        let _ = w.hide();
+    }
+    loop {
+        let (a, b, c) = recovery::buttons(rec);
+        let r = app
+            .dialog()
+            .message(recovery::dialog_text(rec, data_dir))
+            .title("Rebuild Studio: the project list needs your decision")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::YesNoCancelCustom(a, b, c))
+            .blocking_show_with_result();
+        let action = match recovery::recovery_choice(&r, rec) {
+            recovery::RecoveryAction::More => {
+                let r2 = app
+                    .dialog()
+                    .message(recovery::MORE_TEXT)
+                    .title("Rebuild Studio: more options")
+                    .kind(MessageDialogKind::Info)
+                    .buttons(MessageDialogButtons::YesNoCancelCustom(
+                        recovery::OPEN_LOG_LABEL.into(),
+                        recovery::QUIT_LABEL.into(),
+                        recovery::BACK_LABEL.into(),
+                    ))
+                    .blocking_show_with_result();
+                match recovery::more_choice(&r2) {
+                    recovery::MoreAction::OpenLog => recovery::RecoveryAction::OpenLog,
+                    recovery::MoreAction::Quit => recovery::RecoveryAction::Quit,
+                    recovery::MoreAction::Back => continue,
+                }
+            }
+            other => other,
+        };
+        match action {
+            recovery::RecoveryAction::Recover(choice) => return Some(choice),
+            recovery::RecoveryAction::OpenLog => {
+                use tauri_plugin_opener::OpenerExt;
+                let _ = app.opener().open_path(data_dir.to_string_lossy(), None::<&str>);
+            }
+            recovery::RecoveryAction::Quit | recovery::RecoveryAction::More => return None,
+        }
+    }
+}
+
 fn boot(app: AppHandle) {
     let state = app.state::<AppState>();
+    let mut recover: Option<String> = None;
     loop {
-        let failure = match controller::start(&app, &state.controller, &state.data_dir) {
+        let result = controller::start(&app, &state.controller, &state.data_dir, recover.as_deref());
+        recover = None;
+        if let Err(e) = &result {
+            if e.exit_code() == Some(recovery::EXIT_STORE_DAMAGED) {
+                if let Some(rec) = recovery::read_recovery(&state.data_dir) {
+                    state.controller.record_error(e.to_string());
+                    match ask_store_recovery(&app, &state.data_dir, &rec) {
+                        Some(choice) => {
+                            recover = Some(choice);
+                            if let Some(w) = app.get_webview_window(STARTUP_LABEL) {
+                                let _ = w.show();
+                            }
+                            continue;
+                        }
+                        None => {
+                            app.exit(1);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        let failure = match result {
             Ok(file) => {
                 controller::spawn_monitor(app.clone());
                 match create_main(&app, &file) {
@@ -203,10 +274,16 @@ fn boot(app: AppHandle) {
                     }
                 }
             }
-            Err(e) => match e.log_path() {
-                Some(lp) => format!("{e}\n\nLog file: {}", lp.display()),
-                None => e.to_string(),
-            },
+            Err(e) => {
+                let base = match e.log_path() {
+                    Some(lp) => format!("{e}\n\nLog file: {}", lp.display()),
+                    None => e.to_string(),
+                };
+                match recovery::exit_heading(e.exit_code()) {
+                    Some(h) => format!("{h}\n\n{base}"),
+                    None => base,
+                }
+            }
         };
         state.controller.record_error(failure.clone());
         loop {

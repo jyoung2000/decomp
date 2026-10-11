@@ -52,6 +52,11 @@ class Database:
             self._conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             row = self._conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
             current = int(row["value"]) if row else 0
+            pending = [v for v, _ in MIGRATIONS if v > current]
+            if pending and current > 0:
+                # R11: a verified copy of the store as it was before any schema change (kept with the other backups).
+                from .safety import backup_store
+                backup_store(self.path, f"pre-migration-v{current}", source=self._conn)
             for version, sql in MIGRATIONS:
                 if version > current:
                     self._conn.executescript("BEGIN;\n" + sql + "\nCOMMIT;")

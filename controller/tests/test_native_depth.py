@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.backends import demangle, packer, rizin_passes, xref_index
 from rebuild_controller.backends.rizin_worker import RizinBackend, find_rizin
 from rebuild_controller.config import Limits, Settings
@@ -27,8 +28,8 @@ C86 = BENCH / "c_msvc_x86_o2" / "bin" / "benchc32.exe"
 CPP = BENCH / "cpp_msvc_x64_o2" / "bin" / "benchcpp.exe"
 RUST = BENCH / "rust_msvc_x64" / "bin" / "benchrs.exe"
 
-needs_rizin = pytest.mark.skipif(find_rizin(Settings()) is None, reason="rizin not installed on this host")
-needs_upx = pytest.mark.skipif(packer.find_upx(Settings().tools_dir) is None, reason="pinned UPX not installed (Tools page: UPX)")
+needs_rizin = pytest.mark.skipif(find_rizin(tool_settings()) is None, reason="rizin not installed on this host")
+needs_upx = pytest.mark.skipif(packer.find_upx(tool_settings().tools_dir) is None, reason="pinned UPX not installed (Tools page: UPX)")
 
 
 def _sha(p: Path) -> str:
@@ -96,7 +97,7 @@ def test_unpack_upx_into_work_folder_never_in_place(tmp_path):
     src = src_dir / UPX_ROW.name
     shutil.copy2(UPX_ROW, src)
     before = _sha(src)
-    upx = packer.find_upx(Settings().tools_dir)
+    upx = packer.find_upx(tool_settings().tools_dir)
     with pytest.raises(packer.UnpackError):
         packer.unpack_upx(src, src_dir, upx)            # refuses the folder holding the original
     res = packer.unpack_upx(src, tmp_path / "work", upx)
@@ -200,7 +201,7 @@ def test_decompile_order_entry_first_then_largest():
 # ------------------------------------------------------------------------------------------------ real rizin
 @pytest.fixture(scope="module")
 def backend():
-    b = RizinBackend(Settings(limits=Limits()))
+    b = RizinBackend(tool_settings(limits=Limits()))
     yield b
     b.close()
 
@@ -317,7 +318,7 @@ def test_pdb_download_keeps_only_a_verified_file(built_c_row, tmp_path):
 @needs_rizin
 def test_sidecar_pdb_is_loaded_and_names_functions(built_c_row):
     exe, _p = built_c_row
-    b = RizinBackend(Settings(limits=Limits()), analysis={"command": "aaa", "analysis.timeout": 300, "passes": []})
+    b = RizinBackend(tool_settings(limits=Limits()), analysis={"command": "aaa", "analysis.timeout": 300, "passes": []})
     try:
         s = b.session_for_path(exe)
         rep = s.analyze()
@@ -326,7 +327,7 @@ def test_sidecar_pdb_is_loaded_and_names_functions(built_c_row):
         assert sum(n.startswith("pdb.") for n in names) >= 20 and "pdb.benchc.bench_base64" in names
     finally:
         b.close()
-    nb = RizinBackend(Settings(limits=Limits()), analysis={"command": "aaa", "analysis.timeout": 300, "passes": []}, use_pdb=False)
+    nb = RizinBackend(tool_settings(limits=Limits()), analysis={"command": "aaa", "analysis.timeout": 300, "passes": []}, use_pdb=False)
     try:
         s = nb.session_for_path(exe)
         assert s.analyze()["pdb"] is None and not any(f["name"].startswith("pdb.") for f in s.cached_functions())

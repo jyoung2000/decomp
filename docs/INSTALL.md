@@ -58,6 +58,26 @@ You now have: a **Start menu** entry "Rebuild Studio", a **desktop icon** (if yo
 * AI keys: Windows Credential Manager (entries named `RebuildStudio:…`), never in plain files.
 * Rebuilt programs: the output folder you chose for each project.
 
+### Your project list is backed up
+
+The project list (with evidence index, plans and history) is one database file, `studio.sqlite3` in the data folder.
+Rebuild Studio protects it:
+
+* **Backups** go to `%LOCALAPPDATA%\RebuildStudio\backups`: one at every app start, one every 6 hours while the app runs,
+  one before any database upgrade, and one whenever you press **Settings → Project database backups → Back up now**. Every copy is
+  checked (`PRAGMA integrity_check`) before it is kept. The newest 5 are kept, plus one per day for the last 7 days.
+* **Checked at every start.** If the database is damaged, the app does not start half-working. It asks:
+  **Restore the last good backup (taken …)**, **Start with an empty project list**, or **More options…** (Open log folder / Quit).
+  Whatever you choose, the damaged file is moved to `%LOCALAPPDATA%\RebuildStudio\damaged` and kept; it is never deleted.
+  Output folders on disk are never touched. Without a backup the choices are Start with an empty project list / Open log folder / Quit.
+* **One program at a time.** Only the running app writes the database. AI clients (Claude Code, Codex, Gemini, Hermes, Claude Desktop)
+  reach it through the app: the HTTP connection from **Settings → Use Rebuild Studio from an AI client**, or `rebuild-mcp`, which
+  forwards to the app whenever it runs. Programs started from inside another app's Windows package (for example Claude Desktop
+  from the Microsoft Store) are never allowed to open the database directly, because Windows gives them a private copy of the
+  AppData folder; they must use the HTTP connection.
+* From a terminal (app closed): `rebuildctl store check`, `rebuildctl store backups`, `rebuildctl store backup`,
+  `rebuildctl store restore --latest | --backup <name> | --empty`.
+
 ## Update
 
 Run the newer setup file. It replaces the program and keeps your projects, tools, keys and settings.
@@ -75,3 +95,7 @@ Run the newer setup file. It replaces the program and keeps your projects, tools
 A window titled **"Rebuild Studio could not start"** explains what failed and offers **Try again**, **Open log folder** and
 **Quit**. Try again first; if it keeps failing, reinstall (your data is kept) and send `controller.log` from the log folder with
 your report.
+
+If another Rebuild Studio program is using the data folder (for example `rebuild-mcp` started by an AI client while the app was
+closed), the app first asks it to let go and waits up to 15 seconds; if it does not, the window says which program holds the folder.
+Close that program and choose Try again. A damaged project database gets its own window (see *Your project list is backed up*).

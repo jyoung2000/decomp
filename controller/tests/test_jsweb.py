@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.adapters.contract import Availability
 from rebuild_controller.backends.archive import discover_executable
 from rebuild_controller.backends.jsweb import JSWebBackend, build_asar, sanitize_source_path, tree_digest
@@ -136,7 +137,7 @@ def test_inspect_electron_app(backend, studio, case, cases):
 
 
 def test_inspect_asar_listing_matches_real_asar_cli(backend):
-    cli = discover_executable(Settings(), ["asar"], subdirs=["asar"])
+    cli = discover_executable(tool_settings(), ["asar"], subdirs=["asar"])
     if cli is None:
         pytest.skip("@electron/asar CLI not installed")
     out = subprocess.run([str(cli), "list", str(ELECTRON / "resources" / "app.asar")], capture_output=True, text=True, check=True, timeout=60).stdout

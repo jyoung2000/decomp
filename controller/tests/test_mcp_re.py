@@ -15,6 +15,7 @@ import pytest
 pytest.importorskip("mcp")
 from mcp import Client  # noqa: E402
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller import config  # noqa: E402
 from rebuild_controller.backends.rizin_worker import find_rizin  # noqa: E402
 from rebuild_controller.config import Limits, Settings, set_settings  # noqa: E402
@@ -25,7 +26,7 @@ REPO = Path(__file__).resolve().parents[2]
 PECLI = REPO / "fixtures" / "pecli" / "original" / "pecli.exe"
 FN = "0x140001190"          # a pecli function with a stack local (var_38h) and many callees
 
-pytestmark = [pytest.mark.skipif(find_rizin(Settings()) is None, reason="rizin not installed on this host"),
+pytestmark = [pytest.mark.skipif(find_rizin(tool_settings()) is None, reason="rizin not installed on this host"),
               pytest.mark.skipif(not PECLI.is_file(), reason="pecli fixture missing")]
 
 RE_TOOLS = set(TOOLSETS["re"]) - {"doctor"}

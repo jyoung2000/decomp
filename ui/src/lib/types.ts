@@ -958,6 +958,26 @@ export interface McpConfig {
   notes: string[];
   command?: string;
   http_available?: boolean;
+  /** R11: what `auto` resolves to (http for the installed desktop app with a stable MCP endpoint). */
+  recommended_transport?: 'stdio' | 'http';
+}
+
+/** R11 data safety (GET /maintenance/backups, POST /maintenance/backup). */
+export interface StoreBackup {
+  name: string;
+  taken_at: string;
+  reason: string;
+  projects: number | null;
+  size: number;
+  integrity: string;
+}
+export interface BackupStatus {
+  backups: StoreBackup[];
+  last_backup: string | null;
+  backups_dir: string;
+  damaged_dir: string;
+  policy: { keep_last: number; keep_daily_days: number; periodic_hours: number; when: string[] };
+  last_recovery: { at: string; mode: 'restore' | 'empty'; restored: string | null; damaged_files: string[] } | null;
 }
 
 // ---- dependency health (R10: GET /health/dependencies, GET /cases/{id}/preflight) ----

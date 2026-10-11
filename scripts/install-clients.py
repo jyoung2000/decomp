@@ -11,10 +11,14 @@ Design rules
   * A skill named `rebuild-studio` that came from another source is never overwritten or duplicated: the run refuses.
   * `--remove` takes out exactly what was added and leaves the rest of every file as it was.
   * The desktop app needs no global skill; installing these packages is optional and only for CLI agents.
+  * Transport (R11): ``--transport auto`` (default) writes an HTTP entry for the installed desktop app's stable MCP endpoint
+    (``<data>/mcp-endpoint.json``: loopback URL + token, valid across app restarts) when the app is installed and has run
+    once; otherwise a stdio entry that starts ``rebuild-mcp`` (which forwards to the app whenever it runs).
 
 Usage:
   install-clients.py --client claude-code|codex|gemini|hermes|all [--dry-run] [--remove] [--mcp-command PATH]
                      [--data-dir DIR] [--toolset all] [--rules] [--home DIR] [--clients-dir DIR]
+                     [--transport auto|stdio|http]
 Exit codes: 0 ok, 1 refused (conflict / unparsable config), 2 usage.
 """
 from __future__ import annotations
@@ -114,6 +118,54 @@ class ServerSpec:
     command: str
     args: list[str]
     env: dict[str, str]
+    url: Optional[str] = None                       # http transport: the app's loopback /mcp endpoint
+    headers: dict[str, str] = field(default_factory=dict)
+
+
+ENDPOINT_FILE = "mcp-endpoint.json"
+
+
+def read_endpoint(data_dir: Path) -> Optional[dict[str, Any]]:
+    """The desktop app's stable MCP endpoint ({token, port}) written by its controller at first start, or None."""
+    try:
+        info = json.loads((Path(data_dir) / ENDPOINT_FILE).read_text("utf-8"))
+        if isinstance(info.get("token"), str) and isinstance(info.get("port"), int):
+            return info
+    except (OSError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def app_installed() -> bool:
+    """True when the Rebuild Studio desktop app is installed for this user (NSIS currentUser install or REBUILD_STUDIO_INSTALL)."""
+    inst = os.environ.get("REBUILD_STUDIO_INSTALL")
+    if inst and Path(inst).is_dir():
+        return True
+    if os.name == "nt":
+        la = os.environ.get("LOCALAPPDATA")
+        if la and (Path(la) / "Rebuild Studio" / "rebuild-studio.exe").is_file():
+            return True
+    return False
+
+
+def http_spec(data_dir: Path) -> ServerSpec:
+    ep = read_endpoint(data_dir)
+    if ep is None:
+        raise Refused(f"no MCP endpoint in {data_dir} ({ENDPOINT_FILE} is written when the Rebuild Studio app starts); start the "
+                      "app once, or use --transport stdio")
+    return ServerSpec("", [], {}, url=f"http://127.0.0.1:{ep['port']}/mcp", headers={"Authorization": f"Bearer {ep['token']}"})
+
+
+def choose_transport(requested: str, explicit_home: bool, data_dir: Optional[str]) -> str:
+    if requested != "auto":
+        return requested
+    if explicit_home and not data_dir:
+        return "stdio"   # tests / sandboxes: never look at the real app or data folder implicitly
+    try:
+        dd = Path(data_dir) if data_dir else default_data_dir()
+    except RuntimeError:
+        return "stdio"
+    return "http" if app_installed() and read_endpoint(dd) is not None else "stdio"
 
 
 def resolve_server_spec(mcp_command: Optional[str], toolset: str, data_dir: Optional[str], hermes: bool) -> ServerSpec:
@@ -135,10 +187,12 @@ def resolve_server_spec(mcp_command: Optional[str], toolset: str, data_dir: Opti
 
 
 def default_data_dir() -> Path:
-    """Mirror of rebuild_controller.config.default_data_dir (kept in sync by a test)."""
+    """Mirror of rebuild_controller.config.default_data_dir (kept in sync by a test), including the R11 test/script guard."""
     e = os.environ.get("REBUILD_STUDIO_DATA")
     if e:
         return Path(e)
+    if os.environ.get("REBUILD_STUDIO_REQUIRE_EXPLICIT_DATA") == "1":
+        raise RuntimeError("no data folder given (REBUILD_STUDIO_REQUIRE_EXPLICIT_DATA=1): pass --data-dir")
     if os.name == "nt":
         return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "RebuildStudio"
     xdg = os.environ.get("XDG_DATA_HOME")
@@ -149,6 +203,9 @@ def default_data_dir() -> Path:
 def _is_ours_json(entry: Any) -> bool:
     if not isinstance(entry, dict):
         return False
+    url = str(entry.get("url") or entry.get("httpUrl") or "")
+    if url.startswith("http://127.0.0.1:") and url.endswith("/mcp"):
+        return True
     blob = " ".join([str(entry.get("command", ""))] + [str(a) for a in entry.get("args", []) if isinstance(entry.get("args"), list)])
     return "rebuild-mcp" in blob or "rebuild_controller.mcp.server" in blob
 
@@ -206,6 +263,10 @@ def _detect_indent(text: str) -> Any:
 
 
 def json_entry(spec: ServerSpec, claude: bool) -> dict[str, Any]:
+    if spec.url:
+        if claude:
+            return {"type": "http", "url": spec.url, "headers": dict(spec.headers)}
+        return {"httpUrl": spec.url, "headers": dict(spec.headers)}
     e: dict[str, Any] = {}
     if claude:
         e["type"] = "stdio"
@@ -218,6 +279,9 @@ def json_entry(spec: ServerSpec, claude: bool) -> dict[str, Any]:
 
 # ------------------------------------------------------------------------------------------------ TOML merge (Codex)
 def toml_block(spec: ServerSpec) -> str:
+    if spec.url:
+        hdr = ", ".join(f"{k} = {_q(v)}" for k, v in spec.headers.items())
+        return "\n".join([BEGIN, "[mcp_servers.rebuild_studio]", f"url = {_q(spec.url)}", f"http_headers = {{ {hdr} }}", END]) + "\n"
     lines = [BEGIN, "[mcp_servers.rebuild_studio]", f"command = {_q(spec.command)}",
              "args = [" + ", ".join(_q(a) for a in spec.args) + "]", "startup_timeout_sec = 30"]
     if spec.env:
@@ -268,7 +332,7 @@ def merge_toml(text: Optional[str], spec: ServerSpec) -> str:
             got = tomllib.loads(new)["mcp_servers"]["rebuild_studio"]
         except Exception as exc:
             raise Refused(f"merged config.toml would not be valid TOML ({exc}); add this block by hand:\n{block}")
-        if got.get("command") != spec.command or got.get("args") != spec.args:
+        if (got.get("url") != spec.url) if spec.url else (got.get("command") != spec.command or got.get("args") != spec.args):
             raise Refused("merged config.toml does not contain the expected server entry")
     return new
 
@@ -301,6 +365,11 @@ def _cut_block(text: str, span: tuple[int, int]) -> Optional[str]:
 # ------------------------------------------------------------------------------------------------ YAML merge (Hermes)
 def yaml_child_block(spec: ServerSpec, indent: int) -> str:
     p = " " * indent
+    if spec.url:
+        lines = [f"{p}{BEGIN}", f"{p}rebuild_studio:", f"{p}  url: {_q(spec.url)}", f"{p}  headers:"]
+        lines += [f"{p}    {k}: {_q(v)}" for k, v in spec.headers.items()]
+        lines += [f"{p}  timeout: 120", f"{p}{END}"]
+        return "\n".join(lines) + "\n"
     lines = [f"{p}{BEGIN}", f"{p}rebuild_studio:", f"{p}  command: {_q(spec.command)}",
              f"{p}  args: [" + ", ".join(_q(a) for a in spec.args) + "]", f"{p}  timeout: 120", f"{p}  connect_timeout: 60"]
     if spec.env:
@@ -386,7 +455,7 @@ def _check_yaml(new: str, spec: ServerSpec) -> str:
     except Exception as exc:
         raise Refused(f"merged config.yaml would not be valid / lacks the entry ({exc}); add the block by hand:\n"
                       + yaml_child_block(spec, 2))
-    if got.get("command") != spec.command or got.get("args") != spec.args:
+    if (got.get("url") != spec.url) if spec.url else (got.get("command") != spec.command or got.get("args") != spec.args):
         raise Refused("merged config.yaml does not contain the expected server entry")
     return new
 
@@ -547,7 +616,16 @@ def plan_client(client: str, env: Env, remove: bool) -> Plan:
     if not remove and not skill_src.is_dir():
         raise Refused(f"skill source {skill_src} not found (use --clients-dir)")
     sa = env.spec_args
-    spec = resolve_server_spec(sa["mcp_command"], sa["toolset"], sa["data_dir"], client == "hermes")
+    if sa.get("transport") == "http" and not remove:
+        dd = Path(sa["data_dir"]) if sa["data_dir"] else default_data_dir()
+        spec = http_spec(dd)
+        plan.notes.append(f"{client}: HTTP connection to the Rebuild Studio app ({spec.url}); the app must be running while the client "
+                          "uses the tools. The address and token stay valid across app restarts.")
+    else:
+        try:
+            spec = resolve_server_spec(sa["mcp_command"], sa["toolset"], sa["data_dir"], client == "hermes")
+        except RuntimeError as exc:
+            raise Refused(str(exc))
     files = collect_skill_files(skill_src, reference, client) if not remove else {}
 
     if client == "claude-code":
@@ -684,6 +762,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rules", action="store_true", help="also add the short rules block to the global AGENTS.md / GEMINI.md (Codex, Gemini)")
     p.add_argument("--home", default=None, help="treat this directory as the user's home (testing; ignores *_HOME env overrides)")
     p.add_argument("--clients-dir", default=None, help="directory holding the client packages (default: <repo>/clients)")
+    p.add_argument("--transport", choices=("auto", "stdio", "http"), default="auto",
+                   help="auto (default): http to the installed desktop app's stable MCP endpoint when the app is installed and "
+                        "has run once, else stdio (rebuild-mcp). http is required for clients inside a Windows app package.")
     return p
 
 
@@ -691,8 +772,12 @@ def main(argv: Optional[list[str]] = None, out: Callable[[str], None] = print) -
     args = build_parser().parse_args(argv)
     home = Path(args.home) if args.home else Path.home()
     clients_dir = Path(args.clients_dir) if args.clients_dir else Path(__file__).resolve().parent.parent / "clients"
+    transport = choose_transport(args.transport, bool(args.home), args.data_dir)
     env = Env(home=home, explicit_home=bool(args.home), clients_dir=clients_dir, rules=args.rules,
-              spec_args={"mcp_command": args.mcp_command, "toolset": args.toolset, "data_dir": args.data_dir})
+              spec_args={"mcp_command": args.mcp_command, "toolset": args.toolset, "data_dir": args.data_dir, "transport": transport})
+    if args.transport == "auto" and not args.remove:
+        out(f"transport: {transport}" + (" (the installed desktop app's MCP endpoint)" if transport == "http" else
+                                         " (rebuild-mcp; it forwards to the desktop app whenever the app runs)"))
     targets = list(CLIENTS) if args.client == "all" else [args.client]
     plans: list[Plan] = []
     try:

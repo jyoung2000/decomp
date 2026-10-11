@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.adapters.contract import Availability
 from rebuild_controller.backends.ilspy import (ILSpyBackend, MetadataError, count_markers, detect_unity, read_clr_metadata)
 from rebuild_controller.config import Limits, Settings
@@ -33,7 +34,7 @@ PINNED = "9.1.0.7988"
 
 @pytest.fixture(scope="module")
 def real_backend() -> ILSpyBackend:
-    b = ILSpyBackend(Settings())
+    b = ILSpyBackend(tool_settings())
     tool = b.probe().tools[0]
     if tool.availability not in (Availability.INSTALLED, Availability.USABLE):
         pytest.skip(f"ilspycmd not usable on this host: {tool.detail}")
@@ -60,7 +61,7 @@ def no_tools(tmp_path, monkeypatch):
     empty.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("PATH", str(empty))
-    return ILSpyBackend(Settings(tools_dir=tmp_path / "no_tools"))
+    return ILSpyBackend(tool_settings(tools_dir=tmp_path / "no_tools"))
 
 
 # ---------------------------------------------------------------------------------------------------------------------

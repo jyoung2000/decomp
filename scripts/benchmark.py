@@ -229,7 +229,7 @@ class Stopwatch:
 def rizin_backend(cfg: dict):
     from rebuild_controller.backends.rizin_worker import RizinBackend
     from rebuild_controller.config import Settings
-    b = RizinBackend(Settings(), analysis=dict(cfg["analysis"]))
+    b = RizinBackend(_settings(), analysis=dict(cfg["analysis"]))
     tool = b.tool()
     if tool is None or not tool.version:
         b.close()
@@ -334,7 +334,7 @@ def run_ghidra(binary: Path, truth: dict, gcfg: dict) -> dict:
     max_functions reaches) and real-decompiler coverage of our own source functions."""
     from rebuild_controller.backends.ghidra import GhidraBackend
     from rebuild_controller.config import Settings
-    g = GhidraBackend(Settings())
+    g = GhidraBackend(_settings())
     probe = g.tool_probe()
     if probe.version is None or probe.availability.value not in ("installed", "usable", "verified"):
         return {"status": f"not run: {probe.detail}"}
@@ -395,11 +395,11 @@ def ilspy_backend():
     if os.environ.get("LOCALAPPDATA"):
         cands.append(Path(os.environ["LOCALAPPDATA"]) / "RebuildStudio" / "tools")
     for d in cands:
-        b = ILSpyBackend(Settings(tools_dir=d))
+        b = ILSpyBackend(_settings(tools_dir=d))
         exe, ver = b._tool_version()
         if exe is not None and ver:
             return b, f"ilspycmd {ver} ({exe})"
-    b = ILSpyBackend(Settings())
+    b = ILSpyBackend(_settings())
     exe, ver = b._tool_version()
     if exe is not None and ver:
         return b, f"ilspycmd {ver} ({exe})"
@@ -792,6 +792,18 @@ def run_model_scoreboard(a: argparse.Namespace) -> dict:
     return rep
 
 
+_DATA_DIR: Path | None = None
+
+
+def _settings(**kw: Any) -> Any:
+    """Settings for backend construction. R11 (e): the data folder is --data-dir or a temporary folder, never the user's."""
+    global _DATA_DIR
+    from rebuild_controller.config import Settings
+    if _DATA_DIR is None:
+        _DATA_DIR = Path(tempfile.mkdtemp(prefix="rs-bench-data-"))
+    return Settings(data_dir=_DATA_DIR, **kw)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="R0 benchmark scoreboard")
     ap.add_argument("--rows", help="comma-separated row names (default: all)")
@@ -807,7 +819,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--naming-functions", type=int, default=4, help="R5: functions named per model")
     ap.add_argument("--repair-models", help="R5: models for the repair task (default: the first of --models)")
     ap.add_argument("--ollama", default="http://127.0.0.1:11434/v1", help="R5: the local Ollama endpoint")
+    ap.add_argument("--data-dir", type=Path, default=None,
+                    help="data folder for backend state (default: a new temporary folder; never the app's data folder)")
     a = ap.parse_args(argv)
+    from rebuild_controller.config import require_explicit_data_dir
+    require_explicit_data_dir()   # R11 (e): nothing in this run may fall back to the real data folder
+    global _DATA_DIR
+    if a.data_dir:
+        _DATA_DIR = a.data_dir
     override = json.loads(a.config.read_text(encoding="utf-8")) if a.config else None
     cfg = merge_config(DEFAULT_CONFIG, override)
     rows = discover_rows([r for r in a.rows.split(",") if r] if a.rows else None, not a.no_legacy)

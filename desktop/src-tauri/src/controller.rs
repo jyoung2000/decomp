@@ -67,6 +67,14 @@ pub enum StartError {
 }
 
 impl StartError {
+    /// Exit code of a controller that stopped during startup (R11 typed codes: 70 damaged store, 75 folder in use, 78 packaged).
+    pub fn exit_code(&self) -> Option<i32> {
+        match self {
+            StartError::ExitedEarly { code, .. } => *code,
+            _ => None,
+        }
+    }
+
     pub fn log_path(&self) -> Option<&Path> {
         match self {
             StartError::ExitedEarly { log_path, .. } | StartError::Timeout { log_path, .. } => Some(log_path),
@@ -282,7 +290,8 @@ fn plan(app: &AppHandle) -> Result<(Command, Mode), StartError> {
 }
 
 /// Start (or attach to) the controller and wait for it to be ready.
-pub fn start(app: &AppHandle, state: &ControllerState, data_dir: &Path) -> Result<ControllerFile, StartError> {
+/// `recover`: the user's answer to the R11 recovery dialog (`restore:<backup>` | `empty`), passed to this start only.
+pub fn start(app: &AppHandle, state: &ControllerState, data_dir: &Path, recover: Option<&str>) -> Result<ControllerFile, StartError> {
     let json_path = paths::controller_json(data_dir);
     let log_path = paths::controller_log(data_dir);
     let timeout = startup_timeout();
@@ -323,6 +332,10 @@ pub fn start(app: &AppHandle, state: &ControllerState, data_dir: &Path) -> Resul
         .stdin(Stdio::null())
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(log_err));
+    cmd.env_remove(crate::recovery::ENV_RECOVER);
+    if let Some(choice) = recover {
+        cmd.env(crate::recovery::ENV_RECOVER, choice);
+    }
     if std::env::var_os(paths::ENV_TOOLS).is_none() {
         cmd.env(paths::ENV_TOOLS, paths::tools_dir());
     }

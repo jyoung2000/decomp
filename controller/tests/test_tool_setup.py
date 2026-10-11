@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from support.data_dirs import tool_settings  # noqa: E402  (R11: never the real data folder)
 from rebuild_controller.api.server import create_app
 from rebuild_controller.config import Limits, Settings
 from rebuild_controller.services import StudioServices
@@ -357,7 +358,7 @@ def test_packaged_lock_copy_matches_docs():
 
 def test_real_lock_lists_expected_tools():
     from rebuild_controller.tool_setup import find_lock_path
-    ts = ToolSetup(Settings(tools_dir=Path("nonexistent-tools-dir")), None, find_lock_path())
+    ts = ToolSetup(tool_settings(tools_dir=Path("nonexistent-tools-dir")), None, find_lock_path())
     snap = {t["name"]: t for t in ts.snapshot()["tools"]}
     assert {"rizin", "gdre", "ilspycmd", "dotnet-runtime", "temurin-jre", "cfr", "jadx", "node"} <= set(snap)
     assert snap["ilspycmd"]["requires"] == ["dotnet-runtime"] and snap["node"]["optional"]
@@ -507,7 +508,7 @@ def test_post_install_program_must_live_in_the_staged_download(make_post):
 
 def test_real_lock_has_private_rust_entry():
     from rebuild_controller.tool_setup import FRIENDLY, find_lock_path
-    ts = ToolSetup(Settings(tools_dir=Path("nonexistent-tools-dir")), None, find_lock_path())
+    ts = ToolSetup(tool_settings(tools_dir=Path("nonexistent-tools-dir")), None, find_lock_path())
     t = {x["name"]: x for x in ts.snapshot()["tools"]}["rust"]
     assert t["title"] == FRIENDLY["rust"][0] == "Rust compiler (private)" and "Windows .exe" in t["purpose"] and t["optional"]   # only Rust remakes need it
     assert t["status"] == "not_installed" and t["blocked_reason"] is None and len(t["sha256"]) == 64
