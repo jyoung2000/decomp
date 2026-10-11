@@ -192,10 +192,7 @@ class ReWorkbench:
             raise WorkbenchError("unavailable", f"operation {op} is not available in this build.", "")
         return fn(self.studio, case_id=s["case_id"], module_id=s["module_id"], **kwargs), s
 
-    def decompile(self, session_id: str, function: str, decompiler: str = "rizin") -> tuple[OperationResult, dict[str, Any]]:
-        if decompiler == "rizin":
-            return self.call(session_id, "decompile", function=function)
-        s = self.get(session_id)
+    def ghidra_backend(self) -> Any:
         try:
             gh = self.studio.registry.get("ghidra")
         except (KeyError, AttributeError):
@@ -203,6 +200,33 @@ class ReWorkbench:
         if gh is None:
             from .backends.ghidra import GhidraBackend
             gh = GhidraBackend(self.studio.settings)
+        return gh
+
+    def decompilers(self) -> list[dict[str, Any]]:
+        """Which decompilers can run here (cheap probes, no analysis): rizin (rz-ghidra when loaded, else pseudo-code) and
+        Ghidra headless (optional)."""
+        out: list[dict[str, Any]] = []
+        try:
+            t = self.backend().tool()
+        except Exception:
+            t = None
+        real = bool(t is not None and getattr(t, "ghidra_plugin", None) and not getattr(t, "static", False))
+        out.append({"id": "rizin", "available": bool(t is not None and getattr(t, "version", None)), "real_decompiler": real,
+                    "label": "rizin (rz-ghidra)" if real else "rizin (pseudo-code fallback)"})
+        try:
+            probe = self.ghidra_backend().tool_probe()
+            ok = probe.availability.value in ("installed", "usable", "verified")
+            out.append({"id": "ghidra", "available": ok, "real_decompiler": True, "label": f"Ghidra {probe.version or ''}".strip(),
+                        "reason": None if ok else str(probe.detail or "")[:300]})
+        except Exception as e:  # a broken Ghidra install must not break the pane
+            out.append({"id": "ghidra", "available": False, "real_decompiler": True, "label": "Ghidra", "reason": str(e)[:300]})
+        return out
+
+    def decompile(self, session_id: str, function: str, decompiler: str = "rizin") -> tuple[OperationResult, dict[str, Any]]:
+        if decompiler == "rizin":
+            return self.call(session_id, "decompile", function=function)
+        s = self.get(session_id)
+        gh = self.ghidra_backend()
         probe = gh.tool_probe()
         if probe.availability.value not in ("installed", "usable", "verified"):
             raise WorkbenchError("unavailable", f"Ghidra headless is not available: {probe.detail}",
@@ -275,3 +299,34 @@ def shape_functions(functions: list[Any], contains: Optional[str], sort: str, of
         slim.append(row)
     page = slim[offset:offset + limit]
     return {"functions": page, "total": len(slim), "offset": offset, "returned": len(page), "more": offset + limit < len(slim)}
+
+
+# ---------------------------------------------------------------------- one function (shared by the app's detail pane; R6 piece 2)
+DISASM_PAGE_MAX = 2000                      # instructions per page in the app (MCP disassemble returns the whole function)
+DECOMPILERS = ("rizin", "ghidra")
+
+
+def function_header(info: dict[str, Any]) -> dict[str, Any]:
+    """Header of the app's detail pane from ``op_function``'s ``function`` (``native.summarize_function``): code size as in the
+    list (``realsz``), the address span only when it differs, and the first/last address of the code."""
+    code = function_code_size(info)
+    out = {k: info.get(k) for k in ("addr", "name", "signature", "cc", "calltype", "nbbs", "edges", "noreturn", "bits", "type",
+                                    "stackframe", "n_callrefs", "n_datarefs", "callees") if info.get(k) is not None}
+    out["size"] = code
+    if info.get("size") and int(info["size"]) != code:
+        out["span"] = int(info["size"])
+    lo, hi = info.get("minbound"), info.get("maxbound")
+    if isinstance(lo, int) and isinstance(hi, int):
+        out["range"] = {"start": f"0x{lo:x}", "end": f"0x{hi:x}"}
+    return out
+
+
+def page_disasm(data: dict[str, Any], offset: int, limit: int) -> dict[str, Any]:
+    """Page the ``ops`` of ``op_disasm`` (the same rows the MCP ``disassemble`` tool returns for a whole function)."""
+    if not 1 <= limit <= DISASM_PAGE_MAX or offset < 0:
+        raise WorkbenchError("rejected", f"limit must be 1..{DISASM_PAGE_MAX} and offset >= 0.", "")
+    d = dict(data.get("disasm") or {})
+    ops = [o for o in d.get("ops") or [] if isinstance(o, dict)]
+    page = ops[offset:offset + limit]
+    return {"function": data.get("function"), "addr": data.get("addr"), "ops": page, "total": len(ops), "offset": offset,
+            "returned": len(page), "more": offset + limit < len(ops)}

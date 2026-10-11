@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Empty, Loading } from '../../components/Empty';
 import { ErrorCallout } from '../../components/ErrorCallout';
 import { ApiError } from '../../lib/api';
 import { isNativeModule, reApi, type FunctionPage, type FunctionRow, type FunctionSort } from '../../lib/re';
 import { useApi, useResource } from '../../lib/store';
+import type { Decompiler } from '../../lib/re';
+import { FunctionPane, type CodeView } from './FunctionDetail';
 
 const SORTS: { id: FunctionSort; label: string }[] = [
   { id: 'addr', label: 'Address' },
@@ -17,16 +19,44 @@ export const SEARCH_DEBOUNCE_MS = 250;
 const n = (v: number) => v.toLocaleString('en-US');
 const bytes = (v: number) => `${n(v)} byte${v === 1 ? '' : 's'}`;
 
-/** R6 piece 1: the analysed functions of a native module. Selecting a row only highlights it for now (later pieces add the
- * code views, cross-references and editing). Backed by the same operation as the MCP list_functions tool. */
+/** R6: the analysed functions of a native module (piece 1) and, for the selected row, a side pane with the function's header,
+ * decompiled code and disassembly (piece 2). Backed by the same operations as the MCP list_functions / get_function /
+ * decompile / disassemble tools. The selection is in the URL (?module=&fn=&view=&decompiler=), so it can be linked to. */
 export function FunctionsTab({ caseId }: { caseId: string }) {
   const api = useApi();
   const modules = useResource(() => api.modules(caseId), [api, caseId]);
   const native = useMemo(() => (modules.data ?? []).filter(isNativeModule), [modules.data]);
-  const [moduleId, setModuleId] = useState('');
+  const [params, setParams] = useSearchParams();
+  const moduleId = params.get('module') ?? '';
+  const fn = /^0x[0-9a-f]{1,16}$/i.test(params.get('fn') ?? '') ? params.get('fn')!.toLowerCase() : null;
+  const view: CodeView = params.get('view') === 'disassembly' ? 'disassembly' : 'decompiled';
+  const decompiler: Decompiler = params.get('decompiler') === 'ghidra' ? 'ghidra' : 'rizin';
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const [refocus, setRefocus] = useState<string | null>(null);
+  const update = useCallback(
+    (patch: Record<string, string | null>) =>
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null) next.delete(k);
+            else next.set(k, v);
+          }
+          return next;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const closePane = useCallback(() => {
+    if (fn) setRefocus(fn);
+    update({ fn: null });
+  }, [fn, update]);
   useEffect(() => {
-    if (native.length && !native.some((m) => m.module_id === moduleId)) setModuleId(native[0].module_id);
-  }, [native, moduleId]);
+    if (!refocus || fn) return;
+    layoutRef.current?.querySelector<HTMLElement>(`[data-testid="fn-row-${refocus}"]`)?.focus();
+    setRefocus(null);
+  }, [refocus, fn]);
 
   if (modules.error) return <ErrorCallout error={modules.error} title="Modules could not be loaded" onRetry={modules.reload} />;
   if (!modules.data) return <Loading what="modules" />;
@@ -40,6 +70,7 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
     );
   }
   const module = native.find((m) => m.module_id === moduleId) ?? native[0];
+  const setModuleId = (id: string) => update({ module: id, fn: null });
   return (
     <section className="stack" aria-labelledby="fn-h" data-testid="functions-tab">
       <div className="row fn-head">
@@ -63,12 +94,28 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
           </span>
         )}
       </div>
-      <FunctionList key={module.module_id} caseId={caseId} moduleId={module.module_id} moduleName={module.rel_path} />
+      <div ref={layoutRef} className={`fn-layout${fn ? ' with-pane' : ''}`}>
+        <div className="fn-list-col stack">
+          <FunctionList key={module.module_id} caseId={caseId} moduleId={module.module_id} moduleName={module.rel_path} selected={fn} onSelect={(addr) => update({ module: module.module_id, fn: addr })} onClose={closePane} />
+        </div>
+        {fn && (
+          <FunctionPane
+            caseId={caseId}
+            moduleId={module.module_id}
+            addr={fn}
+            view={view}
+            decompiler={decompiler}
+            onView={(v) => update({ view: v === 'decompiled' ? null : v })}
+            onDecompiler={(d) => update({ decompiler: d === 'rizin' ? null : d })}
+            onClose={closePane}
+          />
+        )}
+      </div>
     </section>
   );
 }
 
-function FunctionList({ caseId, moduleId, moduleName }: { caseId: string; moduleId: string; moduleName: string }) {
+function FunctionList({ caseId, moduleId, moduleName, selected, onSelect, onClose }: { caseId: string; moduleId: string; moduleName: string; selected: string | null; onSelect: (addr: string) => void; onClose: () => void }) {
   const api = useApi();
   const re = useMemo(() => reApi(api), [api]);
   const [search, setSearch] = useState('');
@@ -82,19 +129,20 @@ function FunctionList({ caseId, moduleId, moduleName }: { caseId: string; module
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
   const [active, setActive] = useState(0);
-  const [selected, setSelected] = useState<string | null>(null);
   const [announce, setAnnounce] = useState('');
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
   const focusRow = useRef(false);
 
   // debounced search; any change of the query goes back to the first page
+  // (only when the text really changed: an unchanged box must not jump back to page 1 after the user paged)
   useEffect(() => {
+    if (search.trim() === contains) return;
     const t = setTimeout(() => {
       setContains(search.trim());
       setOffset(0);
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, contains]);
 
   useEffect(() => {
     let alive = true;
@@ -124,10 +172,13 @@ function FunctionList({ caseId, moduleId, moduleName }: { caseId: string; module
     focusRow.current = false;
   }, [active, rows]);
 
-  const select = useCallback((f: FunctionRow) => {
-    setSelected(f.addr);
-    setAnnounce(`Selected ${f.name} at ${f.addr}, ${bytes(f.size)}.`);
-  }, []);
+  const select = useCallback(
+    (f: FunctionRow) => {
+      onSelect(f.addr);
+      setAnnounce(`Selected ${f.name} at ${f.addr}, ${bytes(f.size)}. Its code is shown in the function pane.`);
+    },
+    [onSelect],
+  );
 
   const onKey = (e: KeyboardEvent<HTMLTableSectionElement>) => {
     if (!rows.length) return;
@@ -139,6 +190,11 @@ function FunctionList({ caseId, moduleId, moduleName }: { caseId: string; module
       case 'End': next = rows.length - 1; break;
       case 'PageDown': next = Math.min(rows.length - 1, active + 10); break;
       case 'PageUp': next = Math.max(0, active - 10); break;
+      case 'Escape':
+        if (!selected) return;
+        e.preventDefault();
+        onClose();
+        return;
       case 'Enter':
       case ' ':
         e.preventDefault();
@@ -299,8 +355,8 @@ function FunctionList({ caseId, moduleId, moduleName }: { caseId: string; module
             </div>
           )}
           <p id="fn-keys" className="xs muted">
-            Click a row, or use the arrow keys (Home, End, Page Up, Page Down) and press Enter or Space to select a function. Size is code bytes; when the
-            function’s code is spread out, the address span is shown under it.
+            Click a row, or use the arrow keys (Home, End, Page Up, Page Down) and press Enter or Space to open a function in the side pane; Escape
+            closes it. Size is code bytes; when the function’s code is spread out, the address span is shown under it.
           </p>
           {total > 0 && (
             <nav className="row fn-pager" aria-label="Function pages">

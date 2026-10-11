@@ -405,3 +405,28 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
   .fn-table .col-sig, .fn-table .col-blocks { display: none; }
   .fn-table .fn-sig-inline { display: block; overflow-wrap: anywhere; }
 }
+/* R6 piece 2: function detail pane — beside the list on wide screens, stacked below it at narrow widths */
+.fn-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); align-items: start; }
+.fn-layout.with-pane { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+.fn-pane { display: flex; flex-direction: column; gap: var(--s-2); position: sticky; top: var(--s-3); max-height: calc(100vh - 2 * var(--s-3)); overflow: auto; }
+.fn-pane-head { justify-content: space-between; align-items: flex-start; gap: var(--s-2); flex-wrap: nowrap; }
+.fn-pane-head h3 { margin: 0; font-size: var(--fs-lg, 1.1em); min-width: 0; }
+.fn-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px var(--s-3); margin: 0; }
+.fn-facts dt { color: var(--fg-3); }
+.fn-facts dd { margin: 0; min-width: 0; }
+.fn-code-bar { justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--s-2); }
+.fn-dec-switch { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3); border: 0; padding: 0; margin: 0; }
+.fn-dec-switch legend { float: left; margin-right: var(--s-2); color: var(--fg-3); }
+.fn-code { max-height: 60vh; white-space: pre; overflow: auto; overflow-wrap: normal; }
+.fn-disasm-wrap { max-height: 60vh; overflow: auto; }
+.fn-disasm td, .fn-disasm th { padding-top: 1px; padding-bottom: 1px; }
+.fn-disasm .col-bytes { max-width: 16ch; }
+@media (max-width: 1100px) {
+  .fn-layout.with-pane { grid-template-columns: minmax(0, 1fr); }
+  .fn-pane { position: static; max-height: none; }
+}
+@media (max-width: 820px) {
+  .fn-disasm .col-bytes { display: none; }
+  .fn-facts { grid-template-columns: minmax(0, 1fr); }
+  .fn-facts dt { margin-top: var(--s-1); }
+}

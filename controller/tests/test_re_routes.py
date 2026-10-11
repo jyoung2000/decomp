@@ -184,3 +184,176 @@ def test_functions_route_on_pecli_matches_the_mcp_tool(studio, tmp_path):
         via_http = c.get(url, params=args).json()
         assert unwrap(via_mcp["functions"]) == via_http["functions"], args
         assert (via_mcp["total"], via_mcp["offset"], via_mcp["returned"]) == (via_http["total"], via_http["offset"], via_http["returned"]), args
+
+
+# =============================================================================================== piece 2: one function
+FN_INFO = {"offset": 0x401000, "addr": "0x401000", "name": "entry0", "size": 23718, "realsz": 40, "nbbs": 3, "cc": 2,
+           "calltype": "ms", "signature": "void entry0(void);", "minbound": 0x401000, "maxbound": 0x406ca6, "n_callrefs": 2,
+           "n_datarefs": 0, "callees": 1}
+OPS = [{"offset": 0x401000 + i, "addr": hex(0x401000 + i), "size": 1, "bytes": "90", "disasm": "nop", "type": "nop"} for i in range(7)]
+
+
+class DetailBackend(FakeBackend):
+    def __init__(self):
+        super().__init__()
+        self.decompile_result = OperationResult(ok=True, data={
+            "function": "entry0", "addr": "0x401000", "decompiler": "rz-ghidra(pdg)", "is_real_decompiler": True,
+            "decompiled": {"untrusted": True, "note": "n", "text": "void entry0(void)\n{\n    <script>alert(1)</script>;\n}\n",
+                           "truncated": False, "total_bytes": 50}}, evidence_ids=["ev_d"])
+        self.targets: list[str] = []
+
+    def op_function(self, ctx, *, case_id, module_id, function):
+        self.targets.append(function)
+        if function != "0x401000":
+            return OperationResult(ok=False, error=f"invalid target: no analysed function contains {function}")
+        return OperationResult(ok=True, data={"function": dict(FN_INFO), "addr": "0x401000", "blocks": [], "variables": [],
+                                              "annotations": {"function": None, "locals": {}, "comments": []}}, evidence_ids=["ev_f"])
+
+    def op_decompile(self, ctx, *, case_id, module_id, function):
+        return self.decompile_result
+
+    def op_disasm(self, ctx, *, case_id, module_id, function):
+        return OperationResult(ok=True, data={"untrusted": True, "note": "n", "function": "entry0", "addr": "0x401000",
+                                              "disasm": {"name": "entry0", "addr": 0x401000, "size": 7, "ops": list(OPS)}},
+                               evidence_ids=["ev_s"])
+
+
+class _NoGhidra:
+    class _Probe:
+        class availability:
+            value = "missing"
+        detail = "GHIDRA_INSTALL_DIR is not set"
+        version = None
+
+    def tool_probe(self):
+        return self._Probe()
+
+
+def test_function_detail_routes_header_decompile_disassembly(studio, tmp_path, monkeypatch):
+    case = _case(studio, tmp_path)
+    mid = studio.cases.add_module(case["case_id"], "a.exe", "0" * 64, 66, "pe", "native_pe")
+    fake = DetailBackend()
+    monkeypatch.setattr(studio.re, "backend", lambda: fake)
+    monkeypatch.setattr(studio.re, "ghidra_backend", lambda: _NoGhidra())
+    c = _client(studio)
+    base = f"/cases/{case['case_id']}/modules/{mid}/functions"
+
+    r = c.get(f"{base}/401000")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "not_analyzed"          # same gate as the list
+    studio.cases.add_evidence(case["case_id"], "native.functions", "functions", body={"functions": []}, module_id=mid)
+    r = c.get(f"{base}/401000")
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert fake.targets[-1] == "0x401000"                                                # address normalised to 0x-hex
+    h = d["header"]
+    assert h["name"] == "entry0" and h["size"] == 40 and h["span"] == 23718 and h["signature"] == "void entry0(void);"
+    assert h["range"] == {"start": "0x401000", "end": "0x406ca6"} and h["cc"] == 2 and h["calltype"] == "ms"
+    assert d["untrusted"] is True and d["evidence_ids"] == ["ev_f"] and d["session_id"].startswith("res_")
+    dec = {x["id"]: x for x in d["decompilers"]}
+    assert dec["ghidra"]["available"] is False and "GHIDRA_INSTALL_DIR" in dec["ghidra"]["reason"]
+    assert dec["rizin"]["available"] is True
+
+    dz = c.get(f"{base}/0x401000/decompiled").json()
+    assert dz["engine"] == "rizin" and dz["is_real_decompiler"] is True and dz["decompiler"] == "rz-ghidra(pdg)"
+    assert dz["decompiled"]["text"].startswith("void entry0") and "<script>" in dz["decompiled"]["text"]   # plain text in JSON
+    assert dz["untrusted"] is True and dz["requested"] == "rizin" and dz["evidence_ids"] == ["ev_d"]
+    fake.decompile_result = OperationResult(ok=True, data={"function": "entry0", "addr": "0x401000", "decompiler": "pdc(pseudo)",
+                                                           "is_real_decompiler": False, "decompiled": {"text": "x", "truncated": True}},
+                                            truncated=True)
+    dz = c.get(f"{base}/0x401000/decompiled").json()
+    assert dz["is_real_decompiler"] is False and dz["truncated"] is True
+
+    g = c.get(f"{base}/0x401000/decompiled", params={"decompiler": "ghidra"})
+    assert g.status_code == 409
+    e = g.json()["error"]
+    assert e["code"] == "decompiler_unavailable" and "Ghidra is not installed" in e["message"] and "rizin" in e["next_action"]
+    assert c.get(f"{base}/0x401000/decompiled", params={"decompiler": "ida"}).status_code == 400
+
+    s = c.get(f"{base}/0x401000/disassembly", params={"limit": 3, "offset": 2}).json()
+    assert [o["addr"] for o in s["ops"]] == ["0x401002", "0x401003", "0x401004"]
+    assert s["total"] == 7 and s["returned"] == 3 and s["more"] is True and s["untrusted"] is True and s["function"] == "entry0"
+    assert c.get(f"{base}/0x401000/disassembly", params={"limit": 5000}).status_code == 400
+
+    nf = c.get(f"{base}/0x10")
+    assert nf.status_code == 404 and nf.json()["error"]["code"] == "function_not_found" and nf.json()["error"]["next_action"]
+    assert c.get(f"{base}/not-hex").status_code == 400
+    assert c.get(f"{base}/12345678901234567").status_code == 400                         # more than 16 hex digits
+
+
+def test_function_detail_routes_refuse_non_native(studio, tmp_path):
+    case = _case(studio, tmp_path)
+    mid = studio.cases.add_module(case["case_id"], "App.dll", "1" * 64, 10, "pe", "dotnet")
+    r = _client(studio).get(f"/cases/{case['case_id']}/modules/{mid}/functions/0x401000/decompiled")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "not_native"
+
+
+def _unwrap(v):
+    """Undo the MCP untrusted wrapping ({"untrusted": true, "text": ...} and untrusted_entries for program-supplied keys)."""
+    if isinstance(v, dict) and v.get("untrusted") is True and set(v) == {"untrusted", "text"}:
+        return v["text"]
+    if isinstance(v, dict) and set(v) == {"untrusted_entries"}:
+        return {_unwrap(e["key"]): _unwrap(e["value"]) for e in v["untrusted_entries"]}
+    if isinstance(v, dict):
+        return {k: _unwrap(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_unwrap(x) for x in v]
+    return v
+
+
+@pytest.mark.skipif(not _rizin() or not PECLI.is_file(), reason="needs rizin (REBUILD_STUDIO_TOOLS) and the pecli fixture")
+def test_function_detail_routes_on_pecli_match_the_mcp_tools(studio, tmp_path):
+    import anyio
+    pytest.importorskip("mcp")
+    from mcp import Client
+    from rebuild_controller.ids import sha256_file
+    from rebuild_controller.mcp.server import ServerConfig, build_server
+
+    src = tmp_path / "src"
+    src.mkdir()
+    shutil.copy2(PECLI, src / "pecli.exe")
+    case = _case(studio, tmp_path, src)
+    mid = studio.cases.add_module(case["case_id"], "pecli.exe", sha256_file(src / "pecli.exe"), (src / "pecli.exe").stat().st_size,
+                                  "pe", "native_pe")
+    c = _client(studio)
+    base = f"/cases/{case['case_id']}/modules/{mid}/functions"
+    assert c.get(f"{base}/0x140001190").json()["error"]["code"] == "not_analyzed"
+    sid = c.get(base, params={"analyze": "true", "limit": 1}).json()["session_id"]
+
+    async def mcp(tool, args):
+        async with Client(build_server(studio, ServerConfig(toolset="re"))) as cl:
+            res = await cl.call_tool(tool, {"session_id": sid, **args})
+        body = json.loads(res.content[0].text)
+        assert body["ok"], (tool, args, body)
+        return body
+
+    for fn in ("0x140001190", "0x140002b70", "140001000"):
+        d = c.get(f"{base}/{fn}")
+        assert d.status_code == 200, d.text
+        d = d.json()
+        assert d["session_id"] == sid
+        md = _unwrap(anyio.run(mcp, "get_function", {"address": fn})["data"])
+        for k in ("function", "addr", "blocks", "variables", "annotations"):
+            assert md[k] == d[k], (fn, k)
+        info = md["function"]
+        assert d["header"]["addr"] == info["addr"] and d["header"]["size"] == (info.get("realsz") or info["size"])
+        assert ("span" in d["header"]) == (info["size"] != d["header"]["size"])
+
+        z = c.get(f"{base}/{fn}/decompiled").json()
+        mz = _unwrap(anyio.run(mcp, "decompile", {"address": fn})["data"])
+        for k in ("function", "addr", "decompiler", "is_real_decompiler"):
+            assert mz[k] == z[k], (fn, k)
+        assert mz["decompiled"]["text"] == z["decompiled"]["text"] and z["decompiled"]["text"].strip()
+        assert z["engine"] == "rizin" and z["untrusted"] is True
+
+        s = c.get(f"{base}/{fn}/disassembly", params={"limit": 2000}).json()
+        ms = anyio.run(mcp, "disassemble", {"address": fn})
+        assert not ms["truncated"], fn
+        msd = _unwrap(ms["data"])
+        assert s["ops"] == msd["disasm"]["ops"] and s["total"] == len(s["ops"]) > 0, fn
+        assert s["function"] == msd["function"] and s["addr"] == msd["addr"]
+        if s["total"] > 3:                                                   # paging returns the same rows in slices
+            p = c.get(f"{base}/{fn}/disassembly", params={"offset": 1, "limit": 2}).json()
+            assert p["ops"] == s["ops"][1:3] and p["more"] is True
+
+    r = c.get(f"{base}/0x10/decompiled")
+    assert r.status_code == 404 and r.json()["error"]["code"] == "function_not_found"
