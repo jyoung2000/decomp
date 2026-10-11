@@ -134,6 +134,11 @@ async def test_listing_tools(env):
     _, big = await call(env, "list_functions", {"session_id": sid, "sort": "size", "limit": 3})
     sizes = [f["size"] for f in big["data"]["functions"]]
     assert sizes == sorted(sizes, reverse=True) and big["truncated"] is True
+    # size is code bytes, not the address span: pecli's fcn.140002b70 spans 23,718 bytes but holds 18 bytes of code
+    assert all(f["addr"] != "0x140002b70" for f in big["data"]["functions"])
+    _, spanned = await call(env, "list_functions", {"session_id": sid, "contains": "140002b70"})
+    row = spanned["data"]["functions"][0]
+    assert row["size"] < 100 and row["span"] > 20000
     _, ent = await call(env, "list_functions", {"session_id": sid, "contains": "entry"})
     assert ent["data"]["total"] >= 1
 
