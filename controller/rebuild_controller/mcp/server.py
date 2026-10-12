@@ -1175,24 +1175,19 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
         return await run("entry_points", rt.t_re(session_id, "entrypoints"))
 
     @spec("search_bytes", "Search the binary: hex = byte pattern with ?? wildcards (e.g. '48 8b ?? 24'), or string_regex = "
-                          "bounded regex over extracted strings. Give exactly one.", read_only=True)
+                          "bounded regex over extracted strings. Give exactly one. Each match: address, file offset, section, "
+                          "containing function (once the module is analysed) and the bytes around it as hex.", read_only=True)
     async def search_bytes(session_id: SID,
-                           hex: Optional[Annotated[str, Field(pattern=r"^[0-9a-fA-F?\s]{2,800}$")]] = None,
+                           hex: Optional[Annotated[str, Field(min_length=1, max_length=800)]] = None,
                            string_regex: Optional[Annotated[str, Field(min_length=1, max_length=200), AfterValidator(_check_no_controls)]] = None,
                            limit: Annotated[int, Field(ge=1, le=1000)] = 100) -> CallToolResult:
+        # one code path with the app's Search view (ReWorkbench.search): same pattern rules, refusals and match rows
         def body(s: StudioLike) -> Outcome:
-            if bool(hex) == bool(string_regex):
-                raise ToolFailure("rejected", "Provide exactly one of hex or string_regex.", "Retry with one of them.")
-            if hex:
-                return rt.t_re(session_id, "search_bytes", pattern=hex, limit=limit)(s)
-            from ..backends.rizin_worker import MAX_STRINGS
-            rx = rt._wb_guard(lambda: rt.workbench(s).compile_regex(string_regex))
-
-            def shape(d: dict[str, Any]) -> dict[str, Any]:
-                hits = [{"addr": "0x%x" % x["vaddr"] if isinstance(x.get("vaddr"), int) else None, "string": x.get("string"),
-                         "section": x.get("section")} for x in d.get("strings") or [] if isinstance(x, dict) and rx.search(str(x.get("string") or ""))]
-                return {"matches": hits[:limit], "total": len(hits), "evidence_ids": d.get("evidence_ids", []), "_truncated": len(hits) > limit}
-            return rt.t_re(session_id, "strings", shape, limit=MAX_STRINGS)(s)
+            wb = rt.workbench(s)
+            res, sess = rt._wb_guard(lambda: wb.search(session_id, hex=hex, string_regex=string_regex, limit=limit))
+            data = rt.op_data(res)
+            data["session_id"] = session_id
+            return Outcome(data, case_id=sess["case_id"], truncated=bool(res.truncated))
         return await run("search_bytes", body)
 
     @spec("get_annotations", "Current annotations of the session's module (renames, prototypes, local types, comments, declared "

@@ -293,13 +293,14 @@ export function buildCallTree(g: CallGraph): CallTreeNode {
 // ---- piece 4: module-level lists (strings, imports, exports, sections + entry points) and "used by" of one string or import.
 // Same workbench calls and shaping as the MCP strings / imports / exports / sections / entry_points tools (re_workbench.shape_*),
 // and "used by" = MCP xrefs_to with scope=address. All text is untrusted program data: rendered as plain text only.
-export type ModuleList = 'functions' | 'strings' | 'imports' | 'exports' | 'sections';
+export type ModuleList = 'functions' | 'strings' | 'imports' | 'exports' | 'sections' | 'search';
 export const MODULE_LISTS: { id: ModuleList; label: string }[] = [
   { id: 'functions', label: 'Functions' },
   { id: 'strings', label: 'Strings' },
   { id: 'imports', label: 'Imports' },
   { id: 'exports', label: 'Exports' },
   { id: 'sections', label: 'Sections' },
+  { id: 'search', label: 'Search' },
 ];
 
 export interface StringRow {
@@ -442,6 +443,112 @@ export const reListApi = (api: Api) => {
       api.get<UsedBy>(`${base(caseId, moduleId)}/used-by/${enc(addr)}?limit=${limit}${analyze ? '&analyze=true' : ''}`),
   };
 };
+
+// ---- piece 6: search the module for a byte pattern (hex, ?? = any byte) or a text pattern (a regex over the extracted strings).
+// GET .../pattern-search runs ReWorkbench.search, the call behind the MCP search_bytes tool (same rules, refusals and rows).
+export type SearchKind = 'hex' | 'text';
+
+export interface SearchMatch {
+  /** virtual address; null when the bytes are outside every mapped section (e.g. the file header) */
+  addr: string | null;
+  /** file offset */
+  paddr: string | null;
+  section?: string | null;
+  /** containing function, once the module has been analysed */
+  fcn_addr: string | null;
+  fcn_name: string | null;
+  /** raw bytes as hex ("4d 5a 90 00"), never decoded */
+  before?: string;
+  bytes?: string;
+  after?: string;
+  /** set when the hit is longer than the bytes shown */
+  bytes_clipped?: number;
+  /** text hits: the string (untrusted program text), its encoding and length in characters */
+  string?: string;
+  encoding?: string;
+  length?: number;
+}
+
+export interface SearchPage {
+  kind: SearchKind;
+  /** the pattern as searched (hex in canonical form) */
+  pattern: string;
+  matches: SearchMatch[];
+  /** hits listed (at most max_hits) */
+  listed: number;
+  offset: number;
+  returned: number;
+  more: boolean;
+  /** hits found: exact for text; for hex the listed hits (found_exact false when capped) */
+  found: number;
+  found_exact: boolean;
+  /** more hits exist than the max_hits listed */
+  capped: boolean;
+  max_hits: number;
+  functions_known: boolean;
+  scanned?: number | null;
+  truncated?: boolean;
+  untrusted: true;
+}
+
+export const SEARCH_PAGE_SIZES = [50, 100, 200];
+export const BYTE_PATTERN_EXAMPLE = '48 8b ?? 24';
+export const TEXT_PATTERN_EXAMPLE = '[Uu]sage';
+
+export const reSearchApi = (api: Api) => ({
+  search: (caseId: string, moduleId: string, q: { kind: SearchKind; pattern: string; offset?: number; limit?: number; analyze?: boolean }) => {
+    const p = new URLSearchParams();
+    p.set('kind', q.kind);
+    p.set('pattern', q.pattern);
+    p.set('offset', String(q.offset ?? 0));
+    p.set('limit', String(q.limit ?? 100));
+    if (q.analyze) p.set('analyze', 'true');
+    return api.get<SearchPage>(`/cases/${enc(caseId)}/modules/${enc(moduleId)}/pattern-search?${p.toString()}`);
+  },
+});
+
+/** What is wrong with a byte pattern, in the controller's words (re_workbench.check_byte_pattern), or null when it can be used.
+ * The controller checks again; this only lets the form say it while typing. */
+export function checkBytePattern(pattern: string): string | null {
+  if (!pattern.trim()) return 'Type the bytes to find.';
+  if (pattern.length > 800) return 'It is longer than 800 characters.';
+  if (/0[xX]/.test(pattern)) return 'Remove the 0x prefixes (write 48 8b, not 0x48 0x8b).';
+  const bad = /[^0-9a-fA-F?\s]/.exec(pattern);
+  if (bad) return `'${bad[0]}' is not a hex digit (0-9, a-f) or a ?? wildcard.`;
+  const p = pattern.replace(/\s+/g, '');
+  if (p.length % 2) return `It has an odd number of characters (${p.length}); every byte needs two hex digits (write 0f, not f).`;
+  const pairs = p.match(/../g) ?? [];
+  const half = pairs.find((x) => x.includes('?') && x !== '??');
+  if (half) return `'${half}' mixes a digit and '?'; a wildcard is a whole byte (??).`;
+  if (pairs.every((x) => x === '??')) return 'It has only wildcards; give at least one fixed byte.';
+  if (pairs.length > 256) return `It is ${pairs.length} bytes long; at most 256 bytes.`;
+  return null;
+}
+
+/** What is wrong with a text pattern (a regex unless `plain`), or null. Mirrors ReWorkbench.compile_regex's limits. */
+export function checkTextPattern(pattern: string, plain: boolean): string | null {
+  if (!pattern) return 'Type the text to find.';
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(pattern)) return 'It contains control characters.';
+  const rx = plain ? escapeRegex(pattern) : pattern;
+  if (rx.length > 200) return plain ? 'It is too long (at most about 200 characters).' : 'A regular expression can have at most 200 characters.';
+  if (plain) return null;
+  if ((/\)[*+?{]/.test(rx) && /[*+}]\)/.test(rx)) || /\\[1-9]/.test(rx)) return 'Nested quantifiers and backreferences are not allowed in string regexes.';
+  try {
+    new RegExp(rx);
+  } catch {
+    return 'It is not a valid regular expression; turn off “Regular expression” to search for the text as typed.';
+  }
+  return null;
+}
+
+/** Plain text as a regex that matches it literally (Python re syntax for these characters is the same). */
+export function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`);
+}
+
+/** The pattern sent for a text search: the regex as typed, or plain text escaped. */
+export const textPatternFor = (pattern: string, plain: boolean) => (plain ? escapeRegex(pattern) : pattern);
 
 /** rizin's permission string (-r-x, -rw-) as words. */
 export function permWords(perm?: string): string {

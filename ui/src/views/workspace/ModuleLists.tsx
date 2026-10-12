@@ -873,7 +873,7 @@ function SectionsView({ caseId, moduleId, moduleName, nav }: ViewProps) {
 }
 
 /** The non-function lists of the Functions area for one module. */
-export default function ModuleLists({ kind, ...props }: ViewProps & { kind: Exclude<ModuleList, 'functions'> }) {
+export default function ModuleLists({ kind, ...props }: ViewProps & { kind: Exclude<ModuleList, 'functions' | 'search'> }) {
   const View = { strings: StringsView, imports: ImportsView, exports: ExportsView, sections: SectionsView }[kind];
   return <View key={`${kind}|${props.moduleId}`} {...props} />;
 }

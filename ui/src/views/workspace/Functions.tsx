@@ -10,6 +10,8 @@ import { CODE_VIEWS, FunctionPane, type CodeView } from './FunctionDetail';
 
 // piece 4: Strings / Imports / Exports / Sections load on demand (keeps the main bundle under Vite's chunk warning)
 const ModuleLists = lazy(() => import('./ModuleLists'));
+// piece 6: the Search view (byte pattern / text), also on demand
+const ModuleSearch = lazy(() => import('./ModuleSearch'));
 const HEX = /^0x[0-9a-f]{1,16}$/i;
 
 const SORTS: { id: FunctionSort; label: string }[] = [
@@ -27,8 +29,9 @@ const bytes = (v: number) => `${n(v)} byte${v === 1 ? '' : 's'}`;
  * decompiled code and disassembly (piece 2), references and a bounded call graph whose function links select another function
  * (piece 3). Backed by the same operations as the MCP list_functions / get_function / decompile / disassemble / xrefs_to /
  * xrefs_from / call_graph tools. Piece 4 adds the module's Strings, Imports, Exports and Sections beside the list (?list=), with a
- * "Used by" pane for a selected string or import (?item=) whose functions open here. The selection is in the URL
- * (?module=&list=&item=&fn=&view=&decompiler=), so it can be linked to. */
+ * "Used by" pane for a selected string or import (?item=) whose functions open here. Piece 6 adds Search (?list=search): a byte or
+ * text pattern (?sq=&sk=text&sre=1, kept while a hit's function is open) whose hits link to their containing functions. The
+ * selection is in the URL (?module=&list=&item=&fn=&view=&decompiler=), so it can be linked to. */
 export function FunctionsTab({ caseId }: { caseId: string }) {
   const api = useApi();
   const modules = useResource(() => api.modules(caseId), [api, caseId]);
@@ -177,7 +180,18 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
         ))}
       </div>
       <div role="tabpanel" id="ml-panel" aria-labelledby={`ml-tab-${list}`}>
-        {list !== 'functions' ? (
+        {list === 'search' ? (
+          <Suspense fallback={<Loading what="the search view" />}>
+            <ModuleSearch
+              caseId={caseId}
+              moduleId={module.module_id}
+              moduleName={module.rel_path}
+              nav={nav}
+              query={{ pattern: params.get('sq') ?? '', kind: params.get('sk') === 'text' ? 'text' : 'hex', regex: params.get('sre') === '1' }}
+              onQuery={(q) => update({ sq: q.pattern || null, sk: q.kind === 'text' ? 'text' : null, sre: q.kind === 'text' && q.regex ? '1' : null })}
+            />
+          </Suspense>
+        ) : list !== 'functions' ? (
           <Suspense fallback={<Loading what={listLabel.toLowerCase()} />}>
             <ModuleLists kind={list} caseId={caseId} moduleId={module.module_id} moduleName={module.rel_path} item={list === 'strings' || list === 'imports' ? item : null} onItem={(a) => update({ item: a })} nav={nav} />
           </Suspense>

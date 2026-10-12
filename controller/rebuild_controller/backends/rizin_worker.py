@@ -1778,10 +1778,19 @@ class RizinBackend(BackendAdapter):
                 sec = next((x for x in secs or [] if isinstance(x.get("paddr"), int) and x.get("size")
                             and x["paddr"] <= off < x["paddr"] + x["size"]), None)
                 va = sec["vaddr"] + (off - sec["paddr"]) if sec and isinstance(sec.get("vaddr"), int) else None
-                hits.append({"paddr": native.hexaddr(off), "addr": native.hexaddr(va), "section": sec.get("name") if sec else None})
+                hits.append({"paddr": native.hexaddr(off), "addr": native.hexaddr(va), "section": sec.get("name") if sec else None,
+                             **byte_context(data, off, len(needle))})
             return {"pattern": canon, "matches": hits, "returned": len(hits), "limit": limit, "more": more}, more, {}
-        return self._op(ctx, case_id, module_id, op="search_bytes", args={"pattern": canon, "limit": limit}, analysis=False,
-                        untrusted=False, title=f"Byte search {canon[:60]}", body_fn=body)
+        return self._op(ctx, case_id, module_id, op="search_bytes", args={"pattern": canon, "limit": limit, "context": SEARCH_CONTEXT_BYTES},
+                        analysis=False, untrusted=False, title=f"Byte search {canon[:60]}", body_fn=body)
+
+    def bytes_context(self, ctx: Any, *, case_id: str, module_id: str, spans: list[tuple[int, int]]) -> list[dict[str, str]]:
+        """Hex context (``byte_context``) of file offsets in the file this module is analysed from (the consented unpacked copy
+        when there is one, as for every other operation), e.g. for string-search hits. Raw bytes as hex only, never decoded."""
+        cases = native.cases_of(ctx)
+        _module, sess = self.session_for(cases, case_id, module_id)
+        data = sess.path.read_bytes()
+        return [byte_context(data, int(off), int(n)) if 0 <= int(off) < len(data) else {} for off, n in spans]
 
     # ---- annotations (persisted as evidence revisions, re-applied after every re-analysis) -------------------------
     def op_annotations(self, ctx: Any, *, case_id: str, module_id: str, history: int = 0) -> OperationResult:
@@ -2235,6 +2244,22 @@ def _var_names(s: RizinSession, fa: int, poll) -> set[str]:
 
 def _var_types(s: RizinSession, fa: int, poll) -> dict[str, str]:
     return {v.get("name"): v.get("type") or "" for v in _var_rows(s, fa, poll)}
+
+
+SEARCH_CONTEXT_BYTES = 8          # bytes shown before and after a search hit
+SEARCH_MATCH_BYTES = 16           # bytes of the hit itself shown (longer hits are clipped)
+
+
+def byte_context(data: bytes, off: int, n: int) -> dict[str, str]:
+    """The bytes of a hit at file offset ``off`` (``n`` long, at most ``SEARCH_MATCH_BYTES`` shown) with up to
+    ``SEARCH_CONTEXT_BYTES`` before and after, as space-separated hex. Never decoded or interpreted."""
+    hx = lambda b: " ".join(f"{x:02x}" for x in b)  # noqa: E731
+    shown = max(0, min(int(n), SEARCH_MATCH_BYTES))
+    out = {"before": hx(data[max(0, off - SEARCH_CONTEXT_BYTES):off]), "bytes": hx(data[off:off + shown]),
+           "after": hx(data[off + int(n):off + int(n) + SEARCH_CONTEXT_BYTES]) if n <= SEARCH_MATCH_BYTES else ""}
+    if n > SEARCH_MATCH_BYTES:
+        out["bytes_clipped"] = int(n)
+    return out
 
 
 def parse_byte_pattern(pattern: str) -> list[int | None]:

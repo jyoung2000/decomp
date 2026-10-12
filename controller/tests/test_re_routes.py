@@ -1043,3 +1043,200 @@ def test_app_edits_on_pecli_match_mcp_edits_persist_and_undo(settings, tmp_path)
         check("redo by rolling forward")
     finally:
         studio.stop()
+
+
+# =============================================================================================== piece 6: search (byte pattern / string regex)
+FILE = bytes(range(256)) * 4                    # the fake module file: offset k holds byte k % 256
+HITS = [{"paddr": "0x10", "addr": "0x401010", "section": ".text"}, {"paddr": "0x4000", "addr": "0x405000", "section": ".text"},
+        {"paddr": "0x200", "addr": None, "section": None}, {"paddr": "0x300", "addr": "0x500000", "section": ".data"}]
+SEARCH_STRS = {"strings": [{"vaddr": 0x406000, "paddr": 0x40, "length": 5, "section": ".rdata", "type": "ascii", "string": "Usage"},
+                           {"vaddr": 0x406010, "paddr": 0x50, "length": 3, "section": ".rdata", "type": "utf16le", "string": "use"},
+                           {"vaddr": 0x406020, "paddr": 0x60, "length": 4, "section": ".rdata", "type": "ascii", "string": "nope"}],
+               "seen": 3}
+
+
+class SearchBackend(FakeBackend):
+    def __init__(self):
+        super().__init__()
+        self.ops: list[tuple] = []
+
+    def op_search_bytes(self, ctx, *, case_id, module_id, pattern, limit=100):
+        from rebuild_controller.backends.rizin_worker import byte_context, parse_byte_pattern
+        self.ops.append(("search_bytes", pattern, limit))
+        n = len(parse_byte_pattern(pattern))
+        rows = [{**h, **byte_context(FILE, int(h["paddr"], 16), n)} for h in HITS]
+        return OperationResult(ok=True, data={"pattern": pattern, "matches": rows[:limit], "returned": min(limit, 4), "limit": limit,
+                                              "more": limit < 4, "cached": False}, evidence_ids=["ev_sb"], truncated=limit < 4)
+
+    def op_strings(self, ctx, *, case_id, module_id, limit=2000):
+        self.ops.append(("strings", limit))
+        return OperationResult(ok=True, data=json.loads(json.dumps(SEARCH_STRS)), evidence_ids=["ev_str"])
+
+    def bytes_context(self, ctx, *, case_id, module_id, spans):
+        from rebuild_controller.backends.rizin_worker import byte_context
+        self.ops.append(("context", list(spans)))
+        return [byte_context(FILE, off, n) for off, n in spans]
+
+
+def test_search_patterns_are_explained_and_paged():
+    from rebuild_controller.backends.rizin_worker import byte_context
+    from rebuild_controller.re_workbench import check_byte_pattern, check_text_pattern, page_search
+    assert check_byte_pattern("48 8B ??24") == "48 8b ?? 24" and check_byte_pattern(" 4d5a ") == "4d 5a"
+    for bad, why in (("", "empty"), ("0x48 0x8b", "0x prefixes"), ("48 zz", "'z' is not a hex digit"), ("48 8", "odd number"),
+                     ("4? 00", "'4?' mixes"), ("?? ??", "only wildcards"), ("00" * 257, "at most 256 bytes"), ("4\x00", "U+0000")):
+        with pytest.raises(WorkbenchError) as e:
+            check_byte_pattern(bad)
+        assert e.value.code == "invalid_pattern" and why in e.value.message and "48 8b ?? 24" in e.value.next_action, (bad, e.value.message)
+    assert check_text_pattern("[Uu]sage").search("usage")
+    for bad, why in (("", "empty"), ("(a+)+", "nested quantifiers"), (r"(\w)\1", "backreferences"), ("a\nb", "control"), ("(", "invalid regex")):
+        with pytest.raises(WorkbenchError) as e:
+            check_text_pattern(bad)
+        assert e.value.code == "invalid_pattern" and why in e.value.message and "[Uu]sage" in e.value.next_action, (bad, e.value.message)
+    ctx = byte_context(FILE, 4, 2)
+    assert ctx == {"before": "00 01 02 03", "bytes": "04 05", "after": "06 07 08 09 0a 0b 0c 0d"}
+    long = byte_context(FILE, 100, 40)
+    assert long["bytes_clipped"] == 40 and len(long["bytes"].split()) == 16 and long["after"] == ""
+    p = page_search({"matches": list(range(5)), "total": 9, "total_exact": True, "more": True}, 2, 2)
+    assert p == {"matches": [2, 3], "listed": 5, "offset": 2, "returned": 2, "more": True, "found": 9, "found_exact": True, "capped": True}
+
+
+def test_search_route_refusals_shaping_containing_function_and_mcp_equivalence(studio, tmp_path, monkeypatch):
+    import anyio
+    case = _case(studio, tmp_path)
+    cid = case["case_id"]
+    mid = studio.cases.add_module(cid, "a.exe", "0" * 64, 66, "pe", "native_pe")
+    fake = SearchBackend()
+    monkeypatch.setattr(studio.re, "backend", lambda: fake)
+    c = _client(studio)
+    url = f"/cases/{cid}/modules/{mid}/pattern-search"
+    sid = studio.re.open(case_id=cid, module_id=mid)["session_id"]
+
+    # a pattern that cannot be used: plain message + a valid example, nothing runs; the MCP path refuses with the same words
+    for kind, pattern, why in (("hex", "0x48 0x8b", "0x prefixes"), ("hex", "48 8", "odd number"), ("hex", "", "empty"),
+                               ("hex", "4? 00", "mixes"), ("text", "(a+)+", "nested"), ("text", "", "empty")):
+        r = c.get(url, params={"kind": kind, "pattern": pattern})
+        assert r.status_code == 400, (kind, pattern, r.text)
+        e = r.json()["error"]
+        assert e["code"] == "invalid_pattern" and why in e["message"] and ("48 8b ?? 24" if kind == "hex" else "[Uu]sage") in e["next_action"]
+        if pattern:
+            with pytest.raises(WorkbenchError) as ex:
+                studio.re.search(sid, **({"hex": pattern} if kind == "hex" else {"string_regex": pattern}))
+            assert (ex.value.code, ex.value.message, ex.value.next_action) == (e["code"], e["message"], e["next_action"])
+    assert c.get(url, params={"kind": "regex", "pattern": "x"}).status_code == 400
+    assert c.get(url, params={"pattern": "4d", "limit": 201}).status_code == 400
+    with pytest.raises(WorkbenchError):
+        studio.re.search(sid, hex="4d", string_regex="x")
+    assert not fake.ops
+    monkeypatch.setattr(studio.re, "backend", lambda: FakeBackend(tool=None))
+    r = c.get(url, params={"pattern": "4d 5a"})
+    assert r.status_code == 503 and r.json()["error"]["code"] == "engine_missing"
+    monkeypatch.setattr(studio.re, "backend", lambda: fake)
+
+    # byte search before any analysis: no containing functions, and no analysis is started for them
+    r = c.get(url, params={"pattern": "10 11 ?? 13", "limit": 3})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert fake.ops == [("search_bytes", "10 11 ?? 13", 1000)] and fake.calls == 0
+    assert d["functions_known"] is False and d["listed"] == 4 and d["returned"] == 3 and d["more"] is True and d["capped"] is False
+    assert d["kind"] == "hex" and d["pattern"] == "10 11 ?? 13" and d["untrusted"] is True and d["max_hits"] == 1000
+    m0 = d["matches"][0]
+    assert m0 == {"addr": "0x401010", "paddr": "0x10", "section": ".text", "before": "08 09 0a 0b 0c 0d 0e 0f", "bytes": "10 11 12 13",
+                  "after": "14 15 16 17 18 19 1a 1b", "fcn_addr": None, "fcn_name": None}
+    assert c.get(url, params={"pattern": "10 11 ?? 13", "offset": 3, "limit": 3}).json()["matches"][0]["paddr"] == "0x300"
+    # analysed: the containing function of each hit (nearest entry owner, as in References), none outside functions / sections
+    c.get(url, params={"pattern": "1011??13", "analyze": "true"})
+    assert fake.calls == 1                                     # 'Analyse now' records the function list first
+    _analysed(studio, cid, mid)
+    r = c.get(url, params={"pattern": "1011??13"}).json()
+    assert r["functions_known"] is True
+    assert [(m["addr"], m["fcn_name"]) for m in r["matches"]] == [("0x401010", "entry0"), ("0x405000", "fcn.00401100"), (None, None),
+                                                                ("0x500000", None)]
+    assert r["matches"][1]["fcn_addr"] == "0x401100"
+
+    # text search: regex over extracted strings, with the bytes at each string as hex (utf-16 width counted)
+    t = c.get(url, params={"kind": "text", "pattern": "[Uu]s"}).json()
+    assert t["kind"] == "text" and t["found"] == 2 and t["found_exact"] is True and t["listed"] == 2
+    assert [(m["addr"], m["string"], m["encoding"]) for m in t["matches"]] == [("0x406000", "Usage", "ascii"), ("0x406010", "use", "utf16le")]
+    assert t["matches"][0]["bytes"] == "40 41 42 43 44" and t["matches"][1]["bytes"] == "50 51 52 53 54 55"
+    assert ("context", [(0x40, 5), (0x50, 6)]) in fake.ops
+
+    # one code path: the MCP search_bytes tool returns the same rows as the route
+    pytest.importorskip("mcp")
+    from mcp import Client
+    from rebuild_controller.mcp.server import ServerConfig, build_server
+
+    async def mcp(args):
+        async with Client(build_server(studio, ServerConfig(toolset="re"))) as cl:
+            res = await cl.call_tool("search_bytes", {"session_id": sid, **args})
+        return json.loads(res.content[0].text)
+
+    for args, params in (({"hex": "10 11 ?? 13", "limit": 4}, {"pattern": "10 11 ?? 13", "limit": 4}),
+                         ({"hex": "1011??13", "limit": 2}, {"pattern": "1011??13", "limit": 2}),
+                         ({"string_regex": "[Uu]s"}, {"kind": "text", "pattern": "[Uu]s"})):
+        m = anyio.run(mcp, args)
+        assert m["ok"], m
+        h = c.get(url, params=params).json()
+        assert _unwrap(m["data"]["matches"]) == h["matches"], args
+        assert m["data"]["functions_known"] is h["functions_known"] is True
+    bad = anyio.run(mcp, {"hex": "0x48"})
+    assert bad["ok"] is False and bad["error"]["code"] == "invalid_pattern"
+    assert c.get(url, params={"pattern": "0x48"}).json()["error"]["message"] in json.dumps(bad)
+
+
+@pytest.mark.skipif(not _rizin() or not PECLI.is_file(), reason="needs rizin (REBUILD_STUDIO_TOOLS) and the pecli fixture")
+def test_search_route_on_pecli_matches_the_mcp_tool(studio, tmp_path):
+    import anyio
+    pytest.importorskip("mcp")
+    from mcp import Client
+    from rebuild_controller.ids import sha256_file
+    from rebuild_controller.mcp.server import ServerConfig, build_server
+
+    src = tmp_path / "src"
+    src.mkdir()
+    shutil.copy2(PECLI, src / "pecli.exe")
+    case = _case(studio, tmp_path, src)
+    mid = studio.cases.add_module(case["case_id"], "pecli.exe", sha256_file(src / "pecli.exe"), (src / "pecli.exe").stat().st_size,
+                                  "pe", "native_pe")
+    c = _client(studio)
+    base = f"/cases/{case['case_id']}/modules/{mid}"
+    mz = c.get(f"{base}/pattern-search", params={"pattern": "4d 5a ?? 00"})          # no analysis needed
+    assert mz.status_code == 200, mz.text
+    mz = mz.json()
+    assert mz["matches"][0]["paddr"] == "0x0" and mz["matches"][0]["bytes"] == "4d 5a 90 00" and mz["functions_known"] is False
+    sid = mz["session_id"]
+    # the first bytes of a known function, found at its entry, inside it, once the module is analysed
+    assert c.get(f"{base}/functions", params={"analyze": "true", "limit": 1}).status_code == 200
+    ops = c.get(f"{base}/functions/0x140001190/disassembly", params={"limit": 3}).json()["ops"]
+    # every row carries its address as 0x-hex (the app's Disassembly rows are keyed and labelled by it; found by the R6 e2e)
+    assert ops[0]["addr"] == "0x140001190" and all(o["addr"] == "0x%x" % o["offset"] for o in ops)
+    pattern = " ".join(o["bytes"] for o in ops)
+    hit =c.get(f"{base}/pattern-search", params={"pattern": pattern}).json()
+    assert hit["functions_known"] is True
+    row = next(m for m in hit["matches"] if m["addr"] == "0x140001190")
+    flat = pattern.replace(" ", "")
+    assert row["fcn_addr"] == "0x140001190" and row["section"] == ".text" and row["bytes"].replace(" ", "") == flat[:32]
+    # the same bytes with the second one as a wildcard still find that place
+    wild = flat[:2] + " ?? " + " ".join(flat[i:i + 2] for i in range(4, min(len(flat), 16), 2))
+    assert any(m["addr"] == "0x140001190" for m in c.get(f"{base}/pattern-search", params={"pattern": wild}).json()["matches"])
+    txt = c.get(f"{base}/pattern-search", params={"kind": "text", "pattern": r"^error: key"}).json()
+    assert txt["found"] >= 1 and txt["matches"][0]["string"].startswith("error: key") and txt["matches"][0]["bytes"].startswith("65 72 72")
+
+    async def mcp(args):
+        async with Client(build_server(studio, ServerConfig(toolset="re"))) as cl:
+            res = await cl.call_tool("search_bytes", {"session_id": sid, **args})
+        body = json.loads(res.content[0].text)
+        assert body["ok"], (args, body)
+        return body["data"]
+
+    for args, params in (({"hex": "4d 5a ?? 00"}, {"pattern": "4d 5a ?? 00"}), ({"hex": pattern, "limit": 5}, {"pattern": pattern, "limit": 5}),
+                         ({"hex": "48 8b ?? 24", "limit": 50}, {"pattern": "48 8b ?? 24", "limit": 50}),
+                         ({"string_regex": r"^error: \w+"}, {"kind": "text", "pattern": r"^error: \w+"}),
+                         ({"string_regex": "[Uu]sage", "limit": 3}, {"kind": "text", "pattern": "[Uu]sage", "limit": 3})):
+        m = _unwrap(anyio.run(mcp, args))
+        h = c.get(f"{base}/pattern-search", params=params).json()
+        assert m["matches"] == h["matches"], args
+        assert m["functions_known"] == h["functions_known"], args
+    many = c.get(f"{base}/pattern-search", params={"pattern": "e8 ?? ?? ?? ??", "limit": 200}).json()
+    code = [x for x in many["matches"] if x["section"] == ".text"]
+    assert many["listed"] >= 200 and many["returned"] == 200 and many["more"] is True
+    assert sum(1 for x in code if x["fcn_addr"]) >= 0.8 * len(code)

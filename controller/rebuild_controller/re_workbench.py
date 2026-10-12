@@ -315,6 +315,81 @@ class ReWorkbench:
             return self.call(session_id, "apply_struct", declaration=declaration, author=author)
         raise WorkbenchError("rejected", f"unknown edit {action!r}.", "Use rename, set_type, comment or declare.")
 
+    # ------------------------------------------------------------------ search (MCP search_bytes and the app's Search view; R6 piece 6)
+    def analysed(self, case_id: str, module_id: str) -> bool:
+        """The module has an analysis on record (a function list or an analysis run)."""
+        return any(self.studio.cases.list_evidence(case_id, kind=k, module_id=module_id) for k in ("native.functions", "native.analyze"))
+
+    def search(self, session_id: str, *, hex: Optional[str] = None, string_regex: Optional[str] = None,
+               limit: int = 100) -> tuple[OperationResult, dict[str, Any]]:
+        """Byte pattern (``hex``: pairs of hex digits, ``??`` = any byte) over the module file, or a bounded regex over its
+        extracted strings (``string_regex``). One code path for the MCP ``search_bytes`` tool and the app's Search view.
+
+        Each match: ``addr`` (virtual address, null outside a mapped section), ``paddr`` (file offset), ``section``, the
+        containing function (``fcn_addr`` / ``fcn_name``; only when the module has been analysed, never starting an analysis:
+        ``functions_known`` says which) and ``before`` / ``bytes`` / ``after`` (raw bytes as hex, never decoded). String hits
+        also carry ``string`` (the extracted text, untrusted), ``encoding`` and ``length``. ``total`` counts every hit found
+        (for hex, the hits up to ``limit``), ``more`` says there are hits beyond the ones returned."""
+        s = self.get(session_id)
+        if bool(hex) == bool(string_regex):
+            raise WorkbenchError("rejected", "Provide exactly one of hex or string_regex.",
+                                 f"Retry with one of them, e.g. hex='{BYTE_PATTERN_EXAMPLE}' or string_regex='{TEXT_PATTERN_EXAMPLE}'.")
+        if not 1 <= int(limit) <= SEARCH_MAX:
+            raise WorkbenchError("rejected", f"limit must be 1..{SEARCH_MAX}.", "")
+        b = self.backend()
+        cid, mid = s["case_id"], s["module_id"]
+        if hex:
+            canon = check_byte_pattern(hex)
+            res = b.op_search_bytes(self.studio, case_id=cid, module_id=mid, pattern=canon, limit=int(limit))
+            if not res.ok:
+                return res, s
+            d = res.data or {}
+            rows = [{k: x.get(k) for k in SEARCH_ROW_FIELDS if k in x} for x in d.get("matches") or [] if isinstance(x, dict)]
+            more = bool(d.get("more"))
+            data: dict[str, Any] = {"kind": "hex", "pattern": canon, "matches": rows, "total": len(rows), "total_exact": not more,
+                                    "more": more}
+        else:
+            from .backends.rizin_worker import MAX_STRINGS
+            rx = check_text_pattern(string_regex or "")
+            res = b.op_strings(self.studio, case_id=cid, module_id=mid, limit=MAX_STRINGS)
+            if not res.ok:
+                return res, s
+            hits = [x for x in (res.data or {}).get("strings") or [] if isinstance(x, dict) and rx.search(str(x.get("string") or ""))]
+            rows = []
+            for x in hits[:int(limit)]:
+                rows.append({"addr": "0x%x" % x["vaddr"] if isinstance(x.get("vaddr"), int) else None,
+                             "paddr": "0x%x" % x["paddr"] if isinstance(x.get("paddr"), int) else None,
+                             "section": x.get("section"), "string": x.get("string"), "encoding": x.get("type"), "length": x.get("length")})
+            ctx_of = getattr(b, "bytes_context", None)
+            if ctx_of is not None and rows:
+                spans = [(int(r["paddr"], 16), _string_bytes(r)) for r in rows if r["paddr"]]
+                try:
+                    ctxs = iter(ctx_of(self.studio, case_id=cid, module_id=mid, spans=spans))
+                    for r in rows:
+                        if r["paddr"]:
+                            r.update(next(ctxs))
+                except Exception:   # the byte context is a convenience; a failure must not lose the hits
+                    pass
+            data = {"kind": "text", "pattern": string_regex, "matches": rows, "total": len(hits), "total_exact": True,
+                    "more": len(hits) > int(limit), "scanned": (res.data or {}).get("seen")}
+        known = self.analysed(cid, mid)
+        if known and data["matches"]:
+            fres = b.op_functions(self.studio, case_id=cid, module_id=mid)
+            if fres.ok:
+                from .backends.rizin_worker import function_owner
+                owner = function_owner(list((fres.data or {}).get("functions") or []))
+                for r in data["matches"]:
+                    f = owner(int(r["addr"], 16)) if r.get("addr") else None
+                    r["fcn_addr"] = "0x%x" % f["offset"] if f else None
+                    r["fcn_name"] = f.get("name") if f else None
+            else:
+                known = False
+        for r in data["matches"]:
+            r.setdefault("fcn_addr", None)
+            r.setdefault("fcn_name", None)
+        data.update({"returned": len(data["matches"]), "limit": int(limit), "functions_known": known})
+        return OperationResult(ok=True, data=data, evidence_ids=list(res.evidence_ids or []), truncated=bool(data["more"])), s
+
     # ------------------------------------------------------------------ list helpers (filter + page; shared by MCP and app)
     @staticmethod
     def page(rows: list[Any], offset: int, limit: int) -> dict[str, Any]:
@@ -340,6 +415,84 @@ class ReWorkbench:
             return re.compile(pattern)
         except re.error as e:
             raise WorkbenchError("rejected", f"invalid regex: {e}", "") from None
+
+
+# ---------------------------------------------------------------------- search patterns (shared by MCP search_bytes and the app's Search view)
+SEARCH_MAX = 1000                    # hits per search (the app pages through them; MCP returns up to its limit)
+SEARCH_PAGE_MAX = 200
+BYTE_PATTERN_EXAMPLE = "48 8b ?? 24"
+TEXT_PATTERN_EXAMPLE = "[Uu]sage"
+MAX_BYTE_PATTERN_CHARS = 800
+SEARCH_ROW_FIELDS = ("addr", "paddr", "section", "before", "bytes", "after", "bytes_clipped")
+
+
+def _pattern_refused(message: str, kind: str) -> WorkbenchError:
+    if kind == "hex":
+        return WorkbenchError("invalid_pattern", f"The byte pattern cannot be used: {message}.",
+                              f"Write pairs of hex digits, with ?? for any byte, e.g. {BYTE_PATTERN_EXAMPLE}")
+    return WorkbenchError("invalid_pattern", f"The text pattern cannot be used: {message}.",
+                          f"Use a simple regular expression over the program's strings, e.g. {TEXT_PATTERN_EXAMPLE}")
+
+
+def check_byte_pattern(pattern: str) -> str:
+    """Explain what is wrong with a byte pattern, or return it in canonical form ('48 8b ?? 24'). The backend parses it again
+    (``rizin_worker.parse_byte_pattern``) with the same rules."""
+    from .backends.rizin_worker import InvalidTarget, parse_byte_pattern
+    if not isinstance(pattern, str) or not pattern.strip():
+        raise _pattern_refused("it is empty", "hex")
+    if len(pattern) > MAX_BYTE_PATTERN_CHARS:
+        raise _pattern_refused(f"it is longer than {MAX_BYTE_PATTERN_CHARS} characters", "hex")
+    if re.search(r"0[xX]", pattern):
+        raise _pattern_refused("remove the 0x prefixes (write 48 8b, not 0x48 0x8b)", "hex")
+    bad = re.search(r"[^0-9a-fA-F?\s]", pattern)
+    if bad:
+        ch = bad.group(0)
+        shown = f"'{ch}'" if ch.isprintable() else f"U+{ord(ch):04X}"
+        raise _pattern_refused(f"{shown} is not a hex digit (0-9, a-f) or a ?? wildcard", "hex")
+    p = re.sub(r"\s+", "", pattern)
+    if len(p) % 2:
+        raise _pattern_refused(f"it has an odd number of characters ({len(p)}); every byte needs two hex digits (write 0f, not f)", "hex")
+    pairs = [p[i:i + 2] for i in range(0, len(p), 2)]
+    half = next((x for x in pairs if "?" in x and x != "??"), None)
+    if half:
+        raise _pattern_refused(f"'{half}' mixes a digit and '?'; a wildcard is a whole byte (??)", "hex")
+    if all(x == "??" for x in pairs):
+        raise _pattern_refused("it has only wildcards; give at least one fixed byte", "hex")
+    if len(pairs) > 256:
+        raise _pattern_refused(f"it is {len(pairs)} bytes long; at most 256 bytes", "hex")
+    try:
+        needle = parse_byte_pattern(pattern)
+    except InvalidTarget as e:
+        raise _pattern_refused(str(e), "hex") from None
+    return " ".join("??" if x is None else f"{x:02x}" for x in needle)
+
+
+def check_text_pattern(pattern: str) -> re.Pattern[str]:
+    """A string regex for search: no control characters, then ``ReWorkbench.compile_regex`` (length cap, no nested
+    quantifiers or backreferences)."""
+    if not isinstance(pattern, str) or not pattern:
+        raise _pattern_refused("it is empty", "text")
+    if any(ord(c) < 32 or ord(c) == 127 for c in pattern):
+        raise _pattern_refused("it contains control characters", "text")
+    try:
+        return ReWorkbench.compile_regex(pattern)
+    except WorkbenchError as e:
+        raise _pattern_refused(e.message.rstrip("."), "text") from None
+
+
+def _string_bytes(row: dict[str, Any]) -> int:
+    """Bytes a string occupies in the file, from its length in characters and encoding."""
+    width = {"utf16le": 2, "utf16be": 2, "utf32le": 4, "utf32be": 4}.get(str(row.get("encoding") or "").lower(), 1)
+    return max(1, int(row.get("length") or 1) * width)
+
+
+def page_search(data: dict[str, Any], offset: int, limit: int) -> dict[str, Any]:
+    """Page the matches of ``ReWorkbench.search`` (the app asks once for up to ``SEARCH_MAX`` and pages through them):
+    ``{matches, listed, offset, returned, more, found, found_exact, capped}``."""
+    rows = list(data.get("matches") or [])
+    page = rows[offset:offset + limit]
+    return {"matches": page, "listed": len(rows), "offset": offset, "returned": len(page), "more": offset + limit < len(rows),
+            "found": data.get("total"), "found_exact": bool(data.get("total_exact")), "capped": bool(data.get("more"))}
 
 
 # ---------------------------------------------------------------------- function list (shared by MCP list_functions and the app)
@@ -404,7 +557,9 @@ def page_disasm(data: dict[str, Any], offset: int, limit: int) -> dict[str, Any]
         raise WorkbenchError("rejected", f"limit must be 1..{DISASM_PAGE_MAX} and offset >= 0.", "")
     d = dict(data.get("disasm") or {})
     ops = [o for o in d.get("ops") or [] if isinstance(o, dict)]
-    page = ops[offset:offset + limit]
+    # rows get the address as 0x-hex (evidence cached before slim_disasm added it has only the integer offset)
+    page = [o if "addr" in o or not isinstance(o.get("offset"), int) else {**o, "addr": "0x%x" % o["offset"]}
+            for o in ops[offset:offset + limit]]
     return {"function": data.get("function"), "addr": data.get("addr"), "ops": page, "total": len(ops), "offset": offset,
             "returned": len(page), "more": offset + limit < len(ops)}
 

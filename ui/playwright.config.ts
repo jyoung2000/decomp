@@ -1,13 +1,26 @@
 import { defineConfig, devices } from '@playwright/test';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Default: UI tests run against the built UI served by the mock controller (ui/mock/server.mjs).
 // REAL_CONTROLLER=1: only e2e/real-controller.spec.ts runs, against `vite` dev proxied to a running Python controller
 //   (REAL_CONTROLLER_URL, default http://127.0.0.1:8765; token from REAL_CONTROLLER_TOKEN or <REAL_CONTROLLER_DATA>/controller.json).
 // Browsers come from PLAYWRIGHT_BROWSERS_PATH (preinstalled); never run `playwright install` here.
 const REAL_AI = process.env.REAL_AI === '1';
-const REAL = process.env.REAL_CONTROLLER === '1' || REAL_AI;
+// REAL_RE=1: only e2e/re-real-controller.spec.ts runs (R6 acceptance). Playwright starts BOTH servers: the real controller from
+//   controller/tests/support/live_re_server.py (temp data folder REAL_RE_DATA, default <tmp>/rs-e2e-re; real rizin from
+//   REBUILD_STUDIO_TOOLS, default D:/rs-test-tools) and `vite` proxied to it. Python: REAL_RE_PYTHON (default the repo .venv).
+const REAL_RE = process.env.REAL_RE === '1';
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+export const RE_DATA = process.env.REAL_RE_DATA ?? path.join(os.tmpdir(), 'rs-e2e-re');
+const RE_PORT = Number(process.env.REAL_RE_PORT ?? 8797);
+const RE_UI_PORT = Number(process.env.REAL_RE_UI_PORT ?? 5198);
+const RE_TOKEN = 'e2e-re-token-0f3c9a7d51b24e68a2c4';
+const RE_PYTHON =
+  process.env.REAL_RE_PYTHON ?? path.resolve(HERE, '..', '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+const REAL = process.env.REAL_CONTROLLER === '1' || REAL_AI || REAL_RE;
 const PORT = Number(process.env.E2E_PORT ?? 8790);
 const REAL_UI_PORT = Number(process.env.REAL_UI_PORT ?? 5199);
 export const E2E_TOKEN = 'e2e-token';
@@ -42,7 +55,7 @@ function realToken(): string {
 export default defineConfig({
   testDir: './e2e',
   outputDir: './test-results',
-  testMatch: REAL_AI ? ['ai-real-controller.spec.ts'] : REAL ? ['real-controller.spec.ts'] : ['*.spec.ts'],
+  testMatch: REAL_RE ? ['re-real-controller.spec.ts'] : REAL_AI ? ['ai-real-controller.spec.ts'] : REAL ? ['real-controller.spec.ts'] : ['*.spec.ts'],
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -50,7 +63,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: [['list']],
   use: {
-    baseURL: REAL ? `http://127.0.0.1:${REAL_UI_PORT}` : `http://127.0.0.1:${PORT}`,
+    baseURL: REAL_RE ? `http://127.0.0.1:${RE_UI_PORT}` : REAL ? `http://127.0.0.1:${REAL_UI_PORT}` : `http://127.0.0.1:${PORT}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     ...devices['Desktop Chrome'],
@@ -59,7 +72,26 @@ export default defineConfig({
     ...(process.env.PW_CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_PATH } } : {}),
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
-  webServer: REAL
+  webServer: REAL_RE
+    ? [
+        {
+          command: `"${RE_PYTHON}" tests/support/live_re_server.py --data "${RE_DATA}" --port ${RE_PORT} --token ${RE_TOKEN}`,
+          cwd: path.resolve(HERE, '..', 'controller'),
+          url: `http://127.0.0.1:${RE_PORT}/health`,
+          reuseExistingServer: false,
+          timeout: 120_000,
+          stdout: 'pipe',
+        },
+        {
+          command: `npx vite --host 127.0.0.1 --port ${RE_UI_PORT} --strictPort`,
+          url: `http://127.0.0.1:${RE_UI_PORT}/`,
+          reuseExistingServer: false,
+          timeout: 60_000,
+          stdout: 'pipe',
+          env: { VITE_CONTROLLER_URL: `http://127.0.0.1:${RE_PORT}`, VITE_CONTROLLER_TOKEN: RE_TOKEN },
+        },
+      ]
+    : REAL
     ? {
         command: `npx vite --host 127.0.0.1 --port ${REAL_UI_PORT} --strictPort`,
         url: `http://127.0.0.1:${REAL_UI_PORT}/`,

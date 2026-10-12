@@ -140,6 +140,9 @@ def slim_disasm(pdfj: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(pdfj, dict):
         return {"ops": []}
     ops = [{k: op[k] for k in DISASM_OP_FIELDS if k in op} for op in pdfj.get("ops") or [] if isinstance(op, dict)]
+    for op in ops:                     # the address as 0x-hex too (the app's Disassembly rows are keyed and labelled by it)
+        if isinstance(op.get("offset"), int):
+            op["addr"] = hexaddr(op["offset"])
     return {"name": pdfj.get("name"), "addr": pdfj.get("addr"), "size": pdfj.get("size"), "ops": ops}
 
 

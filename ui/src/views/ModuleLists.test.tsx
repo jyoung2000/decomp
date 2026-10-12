@@ -134,11 +134,11 @@ async function open(hash = '#/projects/c1/functions?list=strings', over: Routes 
 const listCalls = (calls: { path: string }[], tail: string) => calls.filter((c) => c.path.split('?')[0].endsWith(tail)).map((c) => c.path);
 
 describe('Module lists (R6 piece 4)', () => {
-  it('adds Functions | Strings | Imports | Exports | Sections tabs that keep the module and the URL in step', async () => {
+  it('adds Functions | Strings | Imports | Exports | Sections | Search tabs that keep the module and the URL in step', async () => {
     const user = userEvent.setup();
     const { store, tab } = await open('#/projects/c1/functions');
     const tabs = within(tab).getByRole('tablist', { name: 'Views of pecli.exe' });
-    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Functions', 'Strings', 'Imports', 'Exports', 'Sections']);
+    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Functions', 'Strings', 'Imports', 'Exports', 'Sections', 'Search']);
     expect(within(tabs).getByRole('tab', { name: 'Functions' })).toHaveAttribute('aria-selected', 'true');
     await user.click(within(tabs).getByRole('tab', { name: 'Imports' }));
     expect(await within(tab).findByTestId('imp-table')).toBeInTheDocument();

@@ -11,6 +11,10 @@ comment and declare C types (struct / union / enum / typedef), recorded as a per
 model proposals), so both refuse the same input with the same message; ``POST .../annotations/check`` runs the same grammar
 without storing anything (validate-as-you-type). History, review and roll back stay on the R5 routes in ``ai_quality_routes``.
 
+Piece 6 (search): ``GET .../pattern-search?kind=hex|text&pattern=`` (``.../search`` is the R1 cross-index query) runs ``ReWorkbench.search``, the call behind the MCP
+``search_bytes`` tool (same pattern rules and refusals, same match rows: address, file offset, section, containing function
+and the bytes around the hit as hex), and pages through up to ``SEARCH_MAX`` hits.
+
 Every route opens or reuses the module's workbench session and runs the same workbench calls as the MCP tools
 (``list_functions`` -> ``op_functions`` + ``re_workbench.shape_functions``; ``get_function`` -> ``op_function``;
 ``decompile`` -> ``ReWorkbench.decompile``; ``disassemble`` of a whole function -> ``op_disasm``; ``xrefs_to`` /
@@ -104,8 +108,9 @@ def edit_refusal(detail: str) -> HTTPException:
 
 
 def mount_re_routes(app: FastAPI, studio: Any) -> None:
-    from ..re_workbench import (DISASM_PAGE_MAX, NATIVE_PROFILES, SECTION_NAME, STRINGS_PAGE_MAX, TABLE_PAGE_MAX, XREF_LIMIT_MAX,
-                                EditRefused, WorkbenchError, add_section_entropy, function_header, page_disasm, shape_functions, shape_sections,
+    from ..re_workbench import (DISASM_PAGE_MAX, NATIVE_PROFILES, SEARCH_MAX, SEARCH_PAGE_MAX, SECTION_NAME, STRINGS_PAGE_MAX,
+                                TABLE_PAGE_MAX, XREF_LIMIT_MAX, EditRefused, WorkbenchError, add_section_entropy, check_byte_pattern,
+                                check_text_pattern, function_header, page_disasm, page_search, shape_functions, shape_sections,
                                 shape_strings, shape_table, shape_xrefs, string_sections)
 
     r = APIRouter(tags=["re"])
@@ -123,7 +128,7 @@ def mount_re_routes(app: FastAPI, studio: Any) -> None:
         return m
 
     def analysed(case_id: str, module_id: str) -> bool:
-        return any(studio.cases.list_evidence(case_id, kind=k, module_id=module_id) for k in ("native.functions", "native.analyze"))
+        return studio.re.analysed(case_id, module_id)
 
     def ready(case_id: str, module_id: str, analyze: bool, *, need_analysis: bool = True,
               what: str = "functions cannot be listed") -> dict[str, Any]:
@@ -346,6 +351,34 @@ def mount_re_routes(app: FastAPI, studio: Any) -> None:
         return {"addr": data.get("addr"), "refs": shaped["refs"], "total": shaped["total"], "more": shaped["more"], "limit": limit,
                 "functions": [{"addr": a, "name": nm} for a, nm in fns], **common(res, sid, case_id, module_id),
                 "untrusted": True, "note": UNTRUSTED_NOTE}
+
+    # ------------------------------------------------------------------ piece 6: search (byte pattern or string regex)
+    @r.get("/cases/{case_id}/modules/{module_id}/pattern-search")
+    def search(case_id: str, module_id: str, kind: Literal["hex", "text"] = "hex", pattern: str = Query(default="", max_length=800),
+               offset: int = Query(default=0, ge=0, le=SEARCH_MAX), limit: int = Query(default=100, ge=1, le=SEARCH_PAGE_MAX),
+               analyze: bool = False):
+        """Search the module: ``kind=hex`` = byte pattern over the file (pairs of hex digits, ``??`` = any byte, e.g.
+        ``48 8b ?? 24``), ``kind=text`` = bounded regex over its extracted strings (e.g. ``[Uu]sage``). The MCP
+        ``search_bytes`` call (``ReWorkbench.search``) for up to ``SEARCH_MAX`` hits, paged here. Each match: ``addr``,
+        ``paddr`` (file offset), ``section``, ``fcn_addr`` / ``fcn_name`` (the containing function, once the module is analysed;
+        ``analyze=true`` analyses it first) and ``before`` / ``bytes`` / ``after`` (hex, never decoded); text hits also carry
+        ``string``. A pattern that cannot be used is refused with 400 ``invalid_pattern``, what is wrong and a valid example."""
+        native_module(case_id, module_id)
+        try:                                   # explain a bad pattern before anything runs (also without rizin)
+            canon = check_byte_pattern(pattern) if kind == "hex" else None
+            if kind == "text":
+                check_text_pattern(pattern)
+        except WorkbenchError as e:
+            raise _err(e.code, e.message, 400, e.next_action) from None
+        ready(case_id, module_id, analyze, need_analysis=False, what="the module cannot be searched")
+        if analyze and not analysed(case_id, module_id):   # record the analysis like the Functions list does
+            run(case_id, module_id, lambda s: studio.re.call(s, "functions"))
+        res, sid = run(case_id, module_id, lambda s: studio.re.search(s, hex=canon, string_regex=pattern if kind == "text" else None,
+                                                                      limit=SEARCH_MAX))
+        data = dict(res.data or {})
+        return {**page_search(data, offset, limit), "kind": kind, "pattern": data.get("pattern"), "limit": limit,
+                "functions_known": bool(data.get("functions_known")), "scanned": data.get("scanned"), "max_hits": SEARCH_MAX,
+                **common(res, sid, case_id, module_id), "untrusted": True, "note": UNTRUSTED_NOTE}
 
     # ------------------------------------------------------------------ piece 5: edits (a person's annotations)
     def target_of(address: str | None, name: str | None) -> str:
