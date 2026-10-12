@@ -745,3 +745,301 @@ def test_module_lists_on_pecli_match_the_mcp_tools(studio, tmp_path):
         h = c.get(f"{base}/used-by/{addr}", params={"limit": 1000}).json()
         m = _unwrap(anyio.run(mcp, "xrefs_to", {"address": addr, "limit": 1000})["data"])
         assert m["refs"] == h["refs"] and m["total"] == h["total"] and m["addr"] == h["addr"], addr
+
+
+# =============================================================================================== piece 5: edits (a person's annotations)
+class EditBackend(FakeBackend):
+    """Records every edit operation; ``refuse`` makes the next one fail the way the rizin backend reports a refusal."""
+
+    def __init__(self):
+        super().__init__()
+        self.edits: list[tuple[str, dict]] = []
+        self.refuse: str | None = None
+        self.rev = 0
+
+    def _edit(self, op, kw):
+        self.edits.append((op, kw))
+        if self.refuse:
+            err, self.refuse = self.refuse, None
+            return OperationResult(ok=False, error=err)
+        self.rev += 1
+        return OperationResult(ok=True, data={"change": {"action": op, "author": kw.get("author")}, "revision": self.rev,
+                                              "applied_to_analysis": True, "note": "Persisted"}, evidence_ids=[f"ev_{self.rev}"])
+
+    def op_rename(self, ctx, *, case_id, module_id, **kw):
+        return self._edit("rename", kw)
+
+    def op_set_type(self, ctx, *, case_id, module_id, **kw):
+        return self._edit("set_type", kw)
+
+    def op_add_comment(self, ctx, *, case_id, module_id, **kw):
+        return self._edit("add_comment", kw)
+
+    def op_apply_struct(self, ctx, *, case_id, module_id, **kw):
+        return self._edit("apply_struct", kw)
+
+
+def _analysed(studio, cid, mid):
+    """What a real analysis leaves behind (the fake backend stores no evidence)."""
+    from rebuild_controller.backends import native
+    native.store_evidence(studio.cases, cid, mid, "native.functions", "Functions", {"functions": []}, {"op": "functions"}, untrusted=True)
+
+
+def _edit_setup(studio, tmp_path, monkeypatch):
+    case = _case(studio, tmp_path)
+    cid = case["case_id"]
+    mid = studio.cases.add_module(cid, "a.exe", "0" * 64, 66, "pe", "native_pe")
+    fake = EditBackend()
+    monkeypatch.setattr(studio.re, "backend", lambda: fake)
+    c = _client(studio)
+    return c, cid, mid, fake, f"/cases/{cid}/modules/{mid}/annotations"
+
+
+def test_edit_routes_refuse_bad_values_with_the_mcp_message_and_an_example(studio, tmp_path, monkeypatch):
+    from rebuild_controller.re_workbench import EditRefused
+    c, cid, mid, fake, base = _edit_setup(studio, tmp_path, monkeypatch)
+    r = c.post(f"{base}/rename", json={"kind": "function", "address": "0x401000", "new_name": "ok_name"})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "not_analyzed" and not fake.edits    # nothing is analysed implicitly
+    _analysed(studio, cid, mid)
+    sid = studio.re.open(case_id=cid, module_id=mid)["session_id"]
+
+    cases = [
+        ("rename", {"kind": "function", "address": "401000", "new_name": "2nd try"}, "name", "starts with a digit", "parse_args",
+         dict(kind="function", target="0x401000", new_name="2nd try")),
+        ("rename", {"kind": "local", "address": "0x401000", "variable": "var_8h", "new_name": "buf-len"}, "name", "'-'", "parse_args",
+         dict(kind="local", target="0x401000", variable="var_8h", new_name="buf-len")),
+        ("set-type", {"kind": "function", "address": "0x401000", "prototype": "int f(int a"}, "prototype", "exactly one '('",
+         "int parse_args(int argc, char **argv)", dict(kind="function", target="0x401000", prototype="int f(int a")),
+        ("set-type", {"kind": "local", "address": "0x401000", "variable": "var_8h", "type": "int[4]"}, "type", "no array sizes",
+         "struct point *", dict(kind="local", target="0x401000", variable="var_8h", ctype="int[4]")),
+        ("comment", {"address": "0x401000", "text": "two\nlines"}, "comment", "single line", "Opens the settings file",
+         dict(addr="0x401000", text="two\nlines")),
+        ("declare", {"declaration": "#include <windows.h>\nstruct a { int x; };"}, "declaration", "'#'",
+         "struct point { int x; int y; };", dict(declaration="#include <windows.h>\nstruct a { int x; };")),
+        ("declare", {"declaration": "struct a { int x;"}, "declaration", "unbalanced braces", "struct point", dict(declaration="struct a { int x;")),
+    ]
+    action = {"rename": "rename", "set-type": "set_type", "comment": "comment", "declare": "declare"}
+    for route, body, field, why, example, wb_args in cases:
+        r = c.post(f"{base}/{route}", json=body)
+        assert r.status_code == 400, (route, body, r.text)
+        e = r.json()["error"]
+        assert e["code"] == f"invalid_{field}" and why in e["message"] and example in e["next_action"], (route, e)
+        # the MCP path (author=model) refuses the same value with the same message, before rizin is touched
+        with pytest.raises(EditRefused) as ex:
+            studio.re.edit(sid, action[route], author="model", **wb_args)
+        assert ex.value.message == e["message"] and ex.value.next_action == e["next_action"] and ex.value.field == field
+    assert not fake.edits, "nothing reaches the backend for a value the grammar refuses"
+    # validate-as-you-type: the same grammar without storing anything
+    ok = c.post(f"{base}/check", json={"what": "prototype", "value": "int  parse(char *s,  int n)"}).json()
+    assert ok == {"ok": True, "what": "prototype", "normalized": "int parse(char *s, int n)", "example": "int parse_args(int argc, char **argv)"}
+    bad = c.post(f"{base}/check", json={"what": "name", "value": "a b"}).json()
+    assert bad["ok"] is False and "space" in bad["message"] and bad["example"] == "parse_args"
+    assert c.post(f"{base}/check", json={"what": "declaration", "value": "typedef struct { int x; } pt_t;"}).json()["normalized"] == "typedef pt_t"
+    assert c.post(f"{base}/check", json={"what": "shell", "value": "x"}).status_code == 400
+    assert not fake.edits
+
+
+def test_edit_routes_record_a_person_and_map_backend_refusals(studio, tmp_path, monkeypatch):
+    c, cid, mid, fake, base = _edit_setup(studio, tmp_path, monkeypatch)
+    _analysed(studio, cid, mid)
+    r = c.post(f"{base}/rename", json={"kind": "function", "address": "401000", "new_name": "init_runtime"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["revision"] == 1 and d["who"] == "person" and d["author"] == "user" and d["evidence_ids"] == ["ev_1"] and d["untrusted"] is True
+    assert fake.edits[-1] == ("rename", {"kind": "function", "target": "0x401000", "new_name": "init_runtime", "author": "user"})
+    c.post(f"{base}/rename", json={"kind": "local", "name": "init_runtime", "variable": "var_38h", "new_name": "start"})
+    assert fake.edits[-1] == ("rename", {"kind": "local", "target": "var_38h", "new_name": "start", "function": "init_runtime", "author": "user"})
+    c.post(f"{base}/rename", json={"kind": "global", "address": "0x402000", "new_name": "g_lock"})
+    assert fake.edits[-1][1]["target"] == "0x402000"
+    c.post(f"{base}/set-type", json={"kind": "local", "address": "0x401000", "variable": "start", "type": "char *"})
+    assert fake.edits[-1] == ("set_type", {"kind": "local", "target": "0x401000", "prototype": None, "variable": "start", "ctype": "char *",
+                                           "author": "user"})
+    c.post(f"{base}/set-type", json={"kind": "function", "address": "0x401000", "prototype": "int init_runtime(void)"})
+    assert fake.edits[-1][1]["prototype"] == "int init_runtime(void)"
+    r = c.post(f"{base}/comment", json={"address": "0x401004", "text": ""})                 # empty text removes
+    assert r.status_code == 200 and fake.edits[-1] == ("add_comment", {"addr": "0x401004", "text": "", "author": "user"})
+    r = c.post(f"{base}/declare", json={"declaration": "struct rs_point { int x; int y; };"})
+    assert r.status_code == 200 and fake.edits[-1] == ("apply_struct", {"declaration": "struct rs_point { int x; int y; };", "author": "user"})
+    assert all(kw["author"] == "user" for _, kw in fake.edits)
+    n = len(fake.edits)
+    # argument rules (shared with MCP), checked before the backend
+    for route, body, code in (("rename", {"kind": "global", "name": "x", "new_name": "g"}, "validation"),
+                              ("rename", {"kind": "function", "new_name": "g"}, "validation"),
+                              ("rename", {"kind": "function", "address": "0x1", "name": "x", "new_name": "g"}, "validation"),
+                              ("rename", {"kind": "local", "address": "0x401000", "new_name": "g"}, "rejected"),
+                              ("rename", {"kind": "function", "address": "0x401000", "variable": "v", "new_name": "g"}, "rejected"),
+                              ("set-type", {"kind": "local", "address": "0x401000", "type": "int"}, "rejected"),
+                              ("set-type", {"kind": "function", "address": "0x401000", "prototype": "int f(void)", "type": "int"}, "rejected")):
+        r = c.post(f"{base}/{route}", json=body)
+        assert r.status_code == 400 and r.json()["error"]["code"] == code, (route, body, r.text)
+    assert c.post(f"{base}/rename", json={"kind": "function", "address": "0x401000", "new_name": "g", "cmd": "q"}).status_code == 400
+    assert c.post(f"{base}/comment", json={"address": "zz", "text": "x"}).status_code == 400
+    assert len(fake.edits) == n
+    # refusals that need the program are mapped to plain messages with a next step
+    for err, code, status in (("invalid target: no variable 'var_9h' in main (variables: argc, argv)", "variable_not_found", 400),
+                              ("invalid target: rizin did not accept type 'struct nope *' for 'v' (now 'int'); declare structs first "
+                               "with apply_struct", "type_not_accepted", 400),
+                              ("invalid target: no function at 0x10", "function_not_found", 404),
+                              ("timeout: rizin took too long", "timeout", 504)):
+        fake.refuse = err
+        r = c.post(f"{base}/set-type", json={"kind": "local", "address": "0x401000", "variable": "v", "type": "int"})
+        e = r.json()["error"]
+        assert r.status_code == status and e["code"] == code and e["next_action"], (err, e)
+        if code == "variable_not_found":
+            assert "argc, argv" in e["message"]
+        if code == "type_not_accepted":
+            assert "Types" in e["next_action"] and "struct point" in e["next_action"]
+    other = studio.cases.add_module(cid, "App.dll", "1" * 64, 10, "pe", "dotnet")
+    r = c.post(f"/cases/{cid}/modules/{other}/annotations/rename", json={"kind": "function", "address": "0x1", "new_name": "x"})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "not_native"
+
+
+@pytest.mark.skipif(not _rizin() or not PECLI.is_file(), reason="needs rizin (REBUILD_STUDIO_TOOLS) and the pecli fixture")
+def test_app_edits_on_pecli_match_mcp_edits_persist_and_undo(settings, tmp_path):
+    """A person's edits in the app and a model's edits over MCP go through one path and store the same annotations (only the
+    provenance differs); they show in decompile/disassembly/the list, survive a rizin restart and a new controller, and undo /
+    roll back restore earlier states."""
+    import anyio
+    pytest.importorskip("mcp")
+    from mcp import Client
+    from rebuild_controller.backends import re_annotations as ann
+    from rebuild_controller.ids import sha256_file
+    from rebuild_controller.mcp.server import ServerConfig, build_server
+    from rebuild_controller.services import StudioServices
+
+    FN, GLOBAL = "0x140001190", "0x140052270"
+    studio = StudioServices(settings)
+    studio.ai.advisor = None
+    try:
+        src = tmp_path / "src"
+        src.mkdir()
+        shutil.copy2(PECLI, src / "pecli.exe")
+        case = _case(studio, tmp_path, src)
+        cid = case["case_id"]
+        sha, size = sha256_file(src / "pecli.exe"), (src / "pecli.exe").stat().st_size
+        app_mid = studio.cases.add_module(cid, "pecli.exe", sha, size, "pe", "native_pe")
+        mcp_mid = studio.cases.add_module(cid, "copy/pecli.exe", sha, size, "pe", "native_pe")   # same file, its own annotations
+        (src / "copy").mkdir()
+        shutil.copy2(PECLI, src / "copy" / "pecli.exe")
+        c = _client(studio)
+        mod = f"/cases/{cid}/modules/{app_mid}"
+        assert c.get(f"{mod}/functions", params={"analyze": "true", "limit": 1}).status_code == 200
+        original = c.get(f"{mod}/functions/{FN}").json()["header"]["name"]
+
+        decl = "struct rs_point { int x; int y; char tag[8]; };"
+        steps = [("declare", {"declaration": decl}, "apply_struct", {"declaration": decl}),
+                 ("rename", {"kind": "function", "address": FN, "new_name": "init_runtime"},
+                  "rename", {"kind": "function", "address": FN, "new_name": "init_runtime"}),
+                 ("rename", {"kind": "local", "address": FN, "variable": "var_38h", "new_name": "start_ptr"},
+                  "rename", {"kind": "local", "address": FN, "variable": "var_38h", "new_name": "start_ptr"}),
+                 ("set-type", {"kind": "local", "address": FN, "variable": "start_ptr", "type": "struct rs_point *"},
+                  "set_type", {"kind": "local", "address": FN, "variable": "start_ptr", "type": "struct rs_point *"}),
+                 ("set-type", {"kind": "function", "name": "init_runtime", "prototype": "int init_runtime(int argc, char **argv)"},
+                  "set_type", {"kind": "function", "name": "init_runtime", "prototype": "int init_runtime(int argc, char **argv)"}),
+                 ("comment", {"address": FN, "text": "CRT start-up: runs initialisers"},
+                  "add_comment", {"address": FN, "text": "CRT start-up: runs initialisers"}),
+                 ("rename", {"kind": "global", "address": GLOBAL, "new_name": "g_init_lock"},
+                  "rename", {"kind": "global", "address": GLOBAL, "new_name": "g_init_lock"})]
+        revs = []
+        for route, body, _, _ in steps:
+            r = c.post(f"{mod}/annotations/{route}", json=body)
+            assert r.status_code == 200, (route, r.text)
+            assert r.json()["who"] == "person"
+            revs.append(r.json()["revision"])
+        assert revs == sorted(revs) and len(set(revs)) == len(revs)
+
+        msid = studio.re.open(case_id=cid, module_id=mcp_mid)["session_id"]
+
+        async def mcp(tool, args, ok=True):
+            async with Client(build_server(studio, ServerConfig(toolset="re"))) as cl:
+                res = await cl.call_tool(tool, {"session_id": msid, **args})
+            try:
+                body = json.loads(res.content[0].text)
+            except ValueError:
+                body = {"ok": False, "error": {"code": "validation", "message": res.content[0].text}}
+            assert body["ok"] is ok, (tool, args, body)
+            return body
+
+        for _, _, tool, args in steps:
+            anyio.run(mcp, tool, args)
+        # equivalent annotations: same entries, only who made them differs
+        def strip(state):
+            s = json.loads(json.dumps(state))
+            for table in ("functions", "globals", "comments"):
+                for e in s[table].values():
+                    e.pop("prov", None)
+            for vars_ in s["locals"].values():
+                for e in vars_.values():
+                    e.pop("prov", None)
+            return s
+        _, app_state, _ = ann.load(studio.cases, cid, app_mid)
+        _, mcp_state, _ = ann.load(studio.cases, cid, mcp_mid)
+        assert strip(app_state) == strip(mcp_state)
+        assert app_state["functions"][FN]["prov"]["origin"] == "user" and mcp_state["functions"][FN]["prov"]["status"] == "proposed"
+        app_hist = ann.history(studio.cases, cid, app_mid)
+        mcp_hist = ann.history(studio.cases, cid, mcp_mid)
+        assert [h["who"] for h in app_hist] == ["person"] * 7 and [h["who"] for h in mcp_hist] == ["model-proposed"] * 7
+        drop = ("at", "author", "label")
+        assert [{k: v for k, v in h["change"].items() if k not in drop} for h in app_hist] == \
+               [{k: v for k, v in h["change"].items() if k not in drop} for h in mcp_hist]
+        view = c.get(f"{mod}/annotations?history=20").json()
+        assert view["open_proposals"] == 0 and [h["who"] for h in view["history"]] == ["person"] * 7
+        # the same invalid value is refused with the same message by both
+        bad = c.post(f"{mod}/annotations/set-type", json={"kind": "function", "address": FN, "prototype": "int f(int a"}).json()["error"]
+        via_mcp = anyio.run(lambda: mcp("set_type", {"kind": "function", "address": FN, "prototype": "int f(int a"}, ok=False))["error"]
+        assert bad["message"] == via_mcp["message"] and bad["next_action"] == via_mcp["next_action"]
+        r = c.post(f"{mod}/annotations/set-type", json={"kind": "local", "address": FN, "variable": "nope_var", "type": "int"})
+        assert r.status_code == 400 and r.json()["error"]["code"] == "variable_not_found" and "start_ptr" in r.json()["error"]["message"]
+
+        def check(tag, present=True):
+            dec = c.get(f"{mod}/functions/{FN}/decompiled").json()
+            code = dec["decompiled"]["text"]
+            assert ("init_runtime" in code) is present, (tag, code[:400])
+            assert ("CRT start-up: runs initialisers" in code) is present, tag
+            if present and dec["is_real_decompiler"]:
+                assert "start_ptr" in code and "rs_point" in code, (tag, code[:800])
+            det = c.get(f"{mod}/functions/{FN}").json()
+            vars_ = {v["name"]: v["type"] for v in det["variables"]}
+            if present:
+                assert det["header"]["name"] == "init_runtime" and vars_.get("start_ptr") == "struct rs_point *", (tag, vars_)
+                assert "init_runtime(" in det["header"]["signature"], tag
+            else:
+                assert det["header"]["name"] == original and "start_ptr" not in vars_, (tag, det["header"])
+            ops = c.get(f"{mod}/functions/{FN}/disassembly", params={"limit": 1}).json()["ops"]
+            assert (ops[0].get("user_comment") == "CRT start-up: runs initialisers") is present, tag
+            rows = c.get(f"{mod}/functions", params={"contains": "init_runtime"}).json()["functions"]
+            assert ([f["addr"] for f in rows] == [FN]) is present, (tag, rows)
+
+        check("live")
+        for s in studio.re.backend().pool.sessions():
+            s.kill()
+        check("after a rizin restart")
+        studio.stop()
+        studio = StudioServices(settings)                       # a brand-new controller on the same data folder
+        studio.ai.advisor = None
+        c = _client(studio)
+        check("new controller")
+
+        # undo the last change (the global): roll back to the previous revision through the R5 route
+        r = c.post(f"{mod}/annotations/rollback", json={"revision": revs[-2]})
+        assert r.status_code == 200 and r.json()["change"]["to_revision"] == revs[-2]
+        _, st, _ = ann.load(studio.cases, cid, app_mid)
+        assert GLOBAL not in st["globals"] and st["functions"][FN]["name"] == "init_runtime"
+        check("after undo")
+        # roll back to before the comment: the comment is gone, the names stay
+        c.post(f"{mod}/annotations/rollback", json={"revision": revs[-3]})
+        _, st, _ = ann.load(studio.cases, cid, app_mid)
+        assert not st["comments"] and st["functions"][FN]["name"] == "init_runtime"
+        # roll back to revision 0 (before any edit): the analysis names come back
+        r = c.post(f"{mod}/annotations/rollback", json={"revision": 0})
+        assert r.status_code == 200, r.text
+        _, st, _ = ann.load(studio.cases, cid, app_mid)
+        assert st == ann.empty()
+        check("rolled back to the start", present=False)
+        hist = c.get(f"{mod}/annotations?history=20").json()["history"]
+        assert [h["change"]["action"] for h in hist[-3:]] == ["rollback"] * 3 and all(h["who"] == "person" for h in hist)
+        # undoing a roll back is itself a roll back (nothing is ever deleted)
+        c.post(f"{mod}/annotations/rollback", json={"revision": revs[-1]})
+        check("redo by rolling forward")
+    finally:
+        studio.stop()

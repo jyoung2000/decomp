@@ -2,6 +2,7 @@
 // same workbench operation and shaping helper as the MCP list_functions tool. Kept in its own module like aiQuality.ts.
 import type { Api } from './api';
 import type { Module } from './types';
+import type { Proposal } from './aiQuality';
 
 export type FunctionSort = 'addr' | 'size' | 'name';
 
@@ -99,6 +100,8 @@ export interface FunctionDetail {
   blocks: { addr: string; size?: number; ninstr?: number }[];
   variables: FunctionVariable[];
   decompilers: DecompilerInfo[];
+  /** this function's annotations (piece 5 shows who made them) */
+  annotations?: { function?: { name?: string; prototype?: string; prov?: { origin?: string; status?: string } } | null; comments?: { addr: string; text: string }[] };
   session_id: string;
   untrusted: true;
 }
@@ -126,6 +129,8 @@ export interface DisasmOp {
   type?: string;
   comment?: string;
   user_comment?: string;
+  /** set when the comment is a model's: model-proposed / accepted by you / confirmed by a test */
+  comment_status?: string;
 }
 
 export interface DisasmPage {
@@ -443,4 +448,129 @@ export function permWords(perm?: string): string {
   if (!perm) return 'unknown';
   const w = [perm.includes('r') && 'read', perm.includes('w') && 'write', perm.includes('x') && 'execute'].filter(Boolean);
   return w.length ? w.join(', ') : 'none';
+}
+
+// ---- piece 5: edits (a person's annotations). POST .../annotations/{rename,set-type,comment,declare} go through the same
+// workbench path and value grammar as the MCP rename / set_type / add_comment / apply_struct tools (which store model proposals);
+// .../annotations/check runs that grammar without storing anything (validate as you type). History, review (accept / reject) and
+// roll back are the R5 routes (GET .../annotations, POST .../annotations/review and .../rollback).
+export type CheckWhat = 'name' | 'type' | 'prototype' | 'comment' | 'declaration';
+
+export interface CheckResult {
+  ok: boolean;
+  what: CheckWhat;
+  /** the value as it will be stored (whitespace normalised), when ok */
+  normalized?: string;
+  /** what is wrong, when not ok */
+  message?: string;
+  /** one valid value of this kind */
+  example: string;
+}
+
+export interface EditResult {
+  revision: number;
+  change: AnnotationChange;
+  author: 'user';
+  who: 'person';
+}
+
+export interface AnnotationChange {
+  action?: string;
+  kind?: string;
+  addr?: string;
+  function?: string;
+  old?: string | null;
+  new?: string;
+  original?: string;
+  prototype?: string;
+  variable?: string;
+  type?: string;
+  text?: string;
+  names?: { kind: string; name: string }[];
+  decision?: string;
+  key?: string;
+  local?: string | null;
+  value?: string | null;
+  to_revision?: number;
+  from_revision?: number;
+  author?: string;
+  label?: string;
+  at?: string;
+}
+
+export interface AnnotationRevision {
+  evidence_id: string;
+  revision: number;
+  change?: AnnotationChange | null;
+  /** person | model-proposed | confirmed by test */
+  who?: string;
+}
+
+export interface AnnotationState {
+  functions: Record<string, { name?: string; prototype?: string }>;
+  locals: Record<string, Record<string, { name?: string; type?: string }>>;
+  globals: Record<string, { name: string }>;
+  comments: Record<string, { text: string }>;
+  types: { decl: string; names: { kind: string; name: string }[]; sha256: string }[];
+}
+
+export interface AnnotationsHistory {
+  revision: number;
+  annotations: AnnotationState;
+  proposals: Proposal[];
+  open_proposals: number;
+  history?: AnnotationRevision[];
+}
+
+export const HISTORY_LIMIT = 50;
+export const CHECK_DEBOUNCE_MS = 150;
+
+export const reEditApi = (api: Api) => {
+  const base = (c: string, m: string) => `/cases/${enc(c)}/modules/${enc(m)}/annotations`;
+  return {
+    check: (caseId: string, moduleId: string, what: CheckWhat, value: string) => api.post<CheckResult>(`${base(caseId, moduleId)}/check`, { what, value }),
+    rename: (caseId: string, moduleId: string, b: { kind: 'function' | 'global' | 'local'; address?: string; variable?: string; new_name: string }) =>
+      api.post<EditResult>(`${base(caseId, moduleId)}/rename`, b),
+    setType: (caseId: string, moduleId: string, b: { kind: 'function' | 'local'; address: string; prototype?: string; variable?: string; type?: string }) =>
+      api.post<EditResult>(`${base(caseId, moduleId)}/set-type`, b),
+    comment: (caseId: string, moduleId: string, address: string, text: string) => api.post<EditResult>(`${base(caseId, moduleId)}/comment`, { address, text }),
+    declare: (caseId: string, moduleId: string, declaration: string) => api.post<EditResult>(`${base(caseId, moduleId)}/declare`, { declaration }),
+    history: (caseId: string, moduleId: string) => api.get<AnnotationsHistory>(`${base(caseId, moduleId)}?history=${HISTORY_LIMIT}`),
+    review: (caseId: string, moduleId: string, p: Pick<Proposal, 'kind' | 'key' | 'local'>, decision: 'accept' | 'reject') =>
+      api.post<{ revision: number }>(`${base(caseId, moduleId)}/review`, { kind: p.kind, key: p.key, local: p.local ?? null, decision }),
+    rollback: (caseId: string, moduleId: string, revision: number) => api.post<{ revision: number }>(`${base(caseId, moduleId)}/rollback`, { revision }),
+  };
+};
+
+/** Who made a revision, in plain words. */
+export function whoLabel(who?: string): { text: string; tone: 'ok' | 'warn' | 'outline' } {
+  if (who === 'model-proposed') return { text: 'model-proposed', tone: 'warn' };
+  if (who === 'confirmed by test') return { text: 'confirmed by a test', tone: 'ok' };
+  return { text: 'person', tone: 'outline' };
+}
+
+/** One plain sentence for a stored change ("Renamed function 0x401000 from fcn.00401000 to parse_args"). */
+export function describeChange(c?: AnnotationChange | null): string {
+  if (!c) return 'Change';
+  switch (c.action) {
+    case 'rename':
+      if (c.kind === 'local') return `Renamed variable ${c.old} to ${c.new} in function ${c.function}`;
+      if (c.kind === 'global') return c.old ? `Renamed global ${c.addr} from ${c.old} to ${c.new}` : `Named global ${c.addr} ${c.new}`;
+      return c.old ? `Renamed function ${c.addr} from ${c.old} to ${c.new}` : `Renamed function ${c.addr} to ${c.new}`;
+    case 'set_type':
+      if (c.kind === 'local') return `Set the type of ${c.variable} in function ${c.function} to ${c.type}`;
+      return `Set the prototype of function ${c.addr} to ${c.prototype}`;
+    case 'comment':
+      return c.text ? `Comment at ${c.addr}: ${c.text}` : `Removed the comment at ${c.addr}`;
+    case 'apply_struct':
+      return `Declared ${(c.names ?? []).map((n) => `${n.kind} ${n.name}`).join(', ') || 'C types'}`;
+    case 'review': {
+      const verb = c.decision === 'accept' ? 'Accepted' : c.decision === 'reject' ? 'Rejected' : 'Confirmed';
+      return `${verb} the model's ${c.kind} ${c.kind === 'local' ? `${c.local} in ${c.key}` : c.key}${c.value ? `: ${c.value}` : ''}`;
+    }
+    case 'rollback':
+      return c.to_revision === 0 ? 'Rolled back to before any change' : `Rolled back to revision ${c.to_revision}`;
+    default:
+      return c.action ?? 'Change';
+  }
 }

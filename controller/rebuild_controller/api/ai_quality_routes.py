@@ -25,7 +25,7 @@ class ReviewReq(BaseModel):
 
 
 class RollbackReq(BaseModel):
-    revision: int = Field(ge=1)
+    revision: int = Field(ge=0)          # 0 = before any annotation (undo of the first change)
 
 
 class ImportReq(BaseModel):

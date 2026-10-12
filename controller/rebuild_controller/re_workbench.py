@@ -37,6 +37,16 @@ class WorkbenchError(Exception):
         self.code, self.message, self.next_action = code, message, next_action
 
 
+class EditRefused(WorkbenchError):
+    """An annotation value that fails the grammar (name, C type, prototype, comment, declaration). ``field`` says which;
+    the message says what is wrong and ends with a valid example."""
+
+    def __init__(self, field: str, message: str):
+        from .backends.re_annotations import EXAMPLES
+        super().__init__("invalid_target", message, f"Fix the {field} and retry; a valid one looks like: {EXAMPLES[field]}")
+        self.field = field
+
+
 def _detect_format(path: Path) -> tuple[str, str]:
     with open(path, "rb") as f:
         head = f.read(4)
@@ -237,6 +247,73 @@ class ReWorkbench:
             res.data["annotations_applied"] = False
             res.data["annotations_note"] = "Ghidra headless runs on the original file; annotations are applied to rizin output only."
         return res, s
+
+    # ------------------------------------------------------------------ annotation edits (R2 tools and R6 piece 5: one code path)
+    def edit(self, session_id: str, action: str, *, author: str, kind: Optional[str] = None, target: Optional[str] = None,
+             variable: Optional[str] = None, new_name: Optional[str] = None, prototype: Optional[str] = None,
+             ctype: Optional[str] = None, addr: Optional[str] = None, text: Optional[str] = None,
+             declaration: Optional[str] = None) -> tuple[OperationResult, dict[str, Any]]:
+        """Rename / set a type / comment / declare types. Used by the MCP ``rename``, ``set_type``, ``add_comment`` and
+        ``apply_struct`` tools (author ``model``: stored as model-proposed) and by the app's edit routes (author ``user``: a
+        person's edit). The argument rules and the value grammar (``re_annotations.check_*``) are checked here, before rizin is
+        touched, so both callers refuse the same input with the same message; the backend operation validates again before it
+        builds a rizin command."""
+        from .backends import re_annotations as ann
+        if author not in ("user", "model"):
+            raise WorkbenchError("refused", "edits are made by a person (user) or proposed by a model.", "")
+
+        def need_target(what: str) -> str:
+            if not target:
+                raise WorkbenchError("rejected", "Provide exactly one of address or name.", f"Give the {what}.")
+            return str(target)
+
+        def check(what: str, value: Optional[str]) -> None:
+            if value is None:
+                return
+            try:
+                {"name": ann.check_ident, "type": ann.check_ctype, "prototype": ann.check_prototype, "comment": ann.check_comment,
+                 "declaration": ann.check_declaration}[what](value)
+            except ann.AnnotationError as e:
+                raise EditRefused(what, str(e)) from None
+
+        if action == "rename":
+            if kind not in ("function", "global", "local"):
+                raise WorkbenchError("rejected", "kind must be function, global or local.", "")
+            if new_name is None:
+                raise WorkbenchError("rejected", "new_name is required.", "Give the new name.")
+            check("name", new_name)
+            if kind == "local":
+                if not variable:
+                    raise WorkbenchError("rejected", "kind=local needs variable (the current variable name).", "Read get_function.variables.")
+                check("name", variable)
+                return self.call(session_id, "rename", kind=kind, target=variable, new_name=new_name,
+                                 function=need_target("function (address or name)"), author=author)
+            if variable:
+                raise WorkbenchError("rejected", "variable is only valid with kind=local.", "Remove variable.")
+            return self.call(session_id, "rename", kind=kind, target=need_target("address or name"), new_name=new_name, author=author)
+        if action == "set_type":
+            if kind == "function":
+                if not prototype or variable or ctype:
+                    raise WorkbenchError("rejected", "kind=function takes prototype only.", "Pass prototype.")
+                check("prototype", prototype)
+            elif kind == "local":
+                if prototype or not variable or not ctype:
+                    raise WorkbenchError("rejected", "kind=local takes variable and type.", "Pass variable and type.")
+                check("name", variable)
+                check("type", ctype)
+            else:
+                raise WorkbenchError("rejected", "kind must be function or local.", "")
+            return self.call(session_id, "set_type", kind=kind, target=need_target("function (address or name)"), prototype=prototype,
+                             variable=variable, ctype=ctype, author=author)
+        if action == "comment":
+            if not addr:
+                raise WorkbenchError("rejected", "a comment needs an address.", "Give the address (0x...).")
+            check("comment", text or "")
+            return self.call(session_id, "add_comment", addr=addr, text=text or "", author=author)
+        if action == "declare":
+            check("declaration", declaration or "")
+            return self.call(session_id, "apply_struct", declaration=declaration, author=author)
+        raise WorkbenchError("rejected", f"unknown edit {action!r}.", "Use rename, set_type, comment or declare.")
 
     # ------------------------------------------------------------------ list helpers (filter + page; shared by MCP and app)
     @staticmethod

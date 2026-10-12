@@ -43,6 +43,8 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
   const decompiler: Decompiler = params.get('decompiler') === 'ghidra' ? 'ghidra' : 'rizin';
   const layoutRef = useRef<HTMLDivElement>(null);
   const [refocus, setRefocus] = useState<string | null>(null);
+  // piece 5: bumped after every edit / undo / roll back / review, so the list row and the pane's views reload
+  const [editTick, setEditTick] = useState(0);
   const update = useCallback(
     (patch: Record<string, string | null>) =>
       setParams(
@@ -182,7 +184,7 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
         ) : (
           <div ref={layoutRef} className={`fn-layout${fn ? ' with-pane' : ''}`}>
             <div className="fn-list-col stack">
-              <FunctionList key={module.module_id} caseId={caseId} moduleId={module.module_id} moduleName={module.rel_path} selected={fn} onSelect={(addr) => update({ module: module.module_id, fn: addr })} onClose={closePane} />
+              <FunctionList key={module.module_id} caseId={caseId} moduleId={module.module_id} moduleName={module.rel_path} selected={fn} onSelect={(addr) => update({ module: module.module_id, fn: addr })} onClose={closePane} refreshKey={editTick} />
             </div>
             {fn && (
               <FunctionPane
@@ -196,6 +198,8 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
                 onClose={closePane}
                 nav={nav}
                 history={history}
+                editTick={editTick}
+                onEdited={() => setEditTick((t) => t + 1)}
               />
             )}
           </div>
@@ -205,7 +209,7 @@ export function FunctionsTab({ caseId }: { caseId: string }) {
   );
 }
 
-function FunctionList({ caseId, moduleId, moduleName, selected, onSelect, onClose }: { caseId: string; moduleId: string; moduleName: string; selected: string | null; onSelect: (addr: string) => void; onClose: () => void }) {
+function FunctionList({ caseId, moduleId, moduleName, selected, onSelect, onClose, refreshKey = 0 }: { caseId: string; moduleId: string; moduleName: string; selected: string | null; onSelect: (addr: string) => void; onClose: () => void; refreshKey?: number }) {
   const api = useApi();
   const re = useMemo(() => reApi(api), [api]);
   const [search, setSearch] = useState('');
@@ -243,7 +247,8 @@ function FunctionList({ caseId, moduleId, moduleName, selected, onSelect, onClos
         setPage(p);
         setError(null);
         setLoading(false);
-        setActive(0);
+        setActive((a) => (refreshed.current ? Math.min(a, Math.max(0, p.functions.length - 1)) : 0));   // an edit keeps the keyboard row
+        refreshed.current = false;
       },
       (e) => {
         if (!alive) return;
@@ -254,7 +259,13 @@ function FunctionList({ caseId, moduleId, moduleName, selected, onSelect, onClos
     return () => {
       alive = false;
     };
-  }, [re, caseId, moduleId, contains, sort, offset, limit, analyze, tick]);
+  }, [re, caseId, moduleId, contains, sort, offset, limit, analyze, tick, refreshKey]);
+  const refreshed = useRef(false);
+  const lastRefresh = useRef(refreshKey);
+  if (lastRefresh.current !== refreshKey) {
+    lastRefresh.current = refreshKey;
+    refreshed.current = true;
+  }
 
   const rows = page?.functions ?? [];
   useEffect(() => {

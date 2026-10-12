@@ -1956,8 +1956,10 @@ class RizinBackend(BackendAdapter):
                 raise InvalidTarget("variable and type are required for kind=local")
             var = annotations.check_ident(variable)
             t = annotations.check_ctype(ctype)
-            if var not in _var_names(s, fa, poll):
-                raise InvalidTarget(f"no variable {var!r} in {fn.get('name')}")
+            names = _var_names(s, fa, poll)
+            if var not in names:
+                raise InvalidTarget(f"no variable {var!r} in {fn.get('name')} "
+                                    f"(variables: {', '.join(sorted(n for n in names if n))[:300]})")
             s.retype_variable(fa, var, t, poll)
             got = _var_types(s, fa, poll).get(var)
             if got is None or " ".join(got.split()) != t:

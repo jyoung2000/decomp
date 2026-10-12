@@ -466,3 +466,24 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
   .ml-table .col-opt { display: none; }
   .ml-table .ml-inline { display: block; }
 }
+/* R6 piece 5: editing in the function pane */
+.fn-edit-bar { gap: var(--s-1); flex-wrap: wrap; }
+.fn-edit { gap: var(--s-1); padding: var(--s-2); border: 1px solid var(--border); border-radius: 6px; background: var(--muted-bg); min-width: 0; }
+.fn-edit input, .fn-edit textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.fn-edit-area { min-height: 8em; resize: vertical; white-space: pre; }
+.fn-edit-actions { gap: var(--s-1) var(--s-2); flex-wrap: wrap; align-items: center; }
+.fn-edit [aria-invalid="true"] { border-color: var(--bad); }
+.bad-text { color: var(--bad); }
+.chip.outline { background: transparent; color: var(--fg-2, var(--muted)); border-color: var(--border-strong); }
+.fn-vars summary { cursor: pointer; }
+.fn-var-row { gap: 2px var(--s-2); flex-wrap: wrap; align-items: baseline; }
+.fn-var-name { font-weight: 600; }
+.fn-var-actions { gap: var(--s-1); margin-left: auto; }
+.fn-proposal, .fn-revision { gap: var(--s-1) var(--s-2); flex-wrap: wrap; align-items: baseline; }
+.fn-disasm .col-note { width: 1%; white-space: nowrap; }
+.fn-disasm .fn-note-btn { padding: 0 6px; min-height: 0; line-height: 1.4; }
+.fn-status { min-height: 1.2em; }
+@media (max-width: 700px) {
+  .fn-var-actions { margin-left: 0; }
+  .fn-disasm .col-note .fn-note-label { display: none; }
+}

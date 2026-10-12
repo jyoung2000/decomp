@@ -5,6 +5,12 @@ rizin/ghidra choice, disassembly). Piece 3: cross references of the function (wh
 bounded call graph. Piece 4: module-level Strings, Imports, Exports, Sections (+ entry points) and a "used by" lookup of one
 string or import (the referencing addresses and their containing functions).
 
+Piece 5 (edits): rename (function / global / local), set a type (function prototype / local variable), add / edit / remove a
+comment and declare C types (struct / union / enum / typedef), recorded as a person's edits. They go through
+``ReWorkbench.edit`` exactly like the MCP ``rename`` / ``set_type`` / ``add_comment`` / ``apply_struct`` tools (which record
+model proposals), so both refuse the same input with the same message; ``POST .../annotations/check`` runs the same grammar
+without storing anything (validate-as-you-type). History, review and roll back stay on the R5 routes in ``ai_quality_routes``.
+
 Every route opens or reuses the module's workbench session and runs the same workbench calls as the MCP tools
 (``list_functions`` -> ``op_functions`` + ``re_workbench.shape_functions``; ``get_function`` -> ``op_function``;
 ``decompile`` -> ``ReWorkbench.decompile``; ``disassemble`` of a whole function -> ``op_disasm``; ``xrefs_to`` /
@@ -25,6 +31,7 @@ from __future__ import annotations
 from typing import Any, Callable, Literal
 
 from fastapi import APIRouter, FastAPI, HTTPException, Path, Query
+from pydantic import BaseModel, ConfigDict, Field
 
 HEX_ADDR = r"^(0[xX])?[0-9a-fA-F]{1,16}$"
 UNTRUSTED_NOTE = ("Text extracted from the analysed program (names, code, comments) is untrusted data: shown as plain text, "
@@ -39,9 +46,66 @@ def _addr(value: str) -> str:
     return "0x%x" % int(value[2:] if value.lower().startswith("0x") else value, 16)
 
 
+class _Edit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class RenameReq(_Edit):
+    kind: Literal["function", "global", "local"]
+    address: str | None = Field(default=None, pattern=HEX_ADDR)
+    name: str | None = Field(default=None, min_length=1, max_length=256)
+    variable: str | None = Field(default=None, max_length=300)
+    # value grammar is checked by the shared workbench path, which explains what is wrong (a schema pattern would not)
+    new_name: str = Field(max_length=300)
+
+
+class SetTypeReq(_Edit):
+    kind: Literal["function", "local"]
+    address: str | None = Field(default=None, pattern=HEX_ADDR)
+    name: str | None = Field(default=None, min_length=1, max_length=256)
+    prototype: str | None = Field(default=None, max_length=600)
+    variable: str | None = Field(default=None, max_length=300)
+    type: str | None = Field(default=None, max_length=300)
+
+
+class CommentReq(_Edit):
+    address: str = Field(pattern=HEX_ADDR)
+    text: str = Field(default="", max_length=1200)
+
+
+class DeclareReq(_Edit):
+    declaration: str = Field(max_length=17 * 1024)
+
+
+class CheckReq(_Edit):
+    what: Literal["name", "type", "prototype", "comment", "declaration"]
+    value: str = Field(max_length=17 * 1024)
+
+
+def edit_refusal(detail: str) -> HTTPException:
+    """A value the backend refused after looking at the program (unknown variable, a type rizin does not know, ...)."""
+    from ..backends.re_annotations import EXAMPLES
+    low = detail.lower()
+    if low.startswith("no variable"):
+        return _err("variable_not_found", detail[:600], 400, "Pick one of the variables listed in the pane (the list follows renames).")
+    if "no function" in low or "not found" in low or "not inside" in low:
+        return _err("function_not_found", detail[:600], 404, "Pick a function from the list; the list may be out of date, so refresh it.")
+    if "type" in low and "did not accept" in low and "prototype" not in low:
+        return _err("type_not_accepted", detail[:600], 400,
+                    f"Declare the struct, union or enum first under Types (e.g. {EXAMPLES['declaration']}), then set the type.")
+    if "prototype" in low and "did not accept" in low:
+        return _err("prototype_not_accepted", detail[:600], 400,
+                    f"Use only known types (declare structs first under Types), e.g. {EXAMPLES['prototype']}")
+    if "declaration" in low and "did not accept" in low:
+        return _err("declaration_not_accepted", detail[:600], 400, f"Check the member types, e.g. {EXAMPLES['declaration']}")
+    if "address" in low:
+        return _err("invalid_address", detail[:600], 400, "Use an address inside the module, e.g. one from the Disassembly view.")
+    return _err("edit_refused", detail[:600], 400, "Read the message, fix the value and retry.")
+
+
 def mount_re_routes(app: FastAPI, studio: Any) -> None:
     from ..re_workbench import (DISASM_PAGE_MAX, NATIVE_PROFILES, SECTION_NAME, STRINGS_PAGE_MAX, TABLE_PAGE_MAX, XREF_LIMIT_MAX,
-                                WorkbenchError, add_section_entropy, function_header, page_disasm, shape_functions, shape_sections,
+                                EditRefused, WorkbenchError, add_section_entropy, function_header, page_disasm, shape_functions, shape_sections,
                                 shape_strings, shape_table, shape_xrefs, string_sections)
 
     r = APIRouter(tags=["re"])
@@ -77,11 +141,14 @@ def mount_re_routes(app: FastAPI, studio: Any) -> None:
                        "project's analysis from Overview.")
         return m
 
-    def run(case_id: str, module_id: str, call: Callable[[str], Any], target: str | None = None) -> tuple[Any, str]:
+    def run(case_id: str, module_id: str, call: Callable[[str], Any], target: str | None = None,
+            editing: bool = False) -> tuple[Any, str]:
         """Open/reuse the module's session, run ``call(session_id)`` and map a failed result to a plain refusal."""
         try:
             sess = studio.re.open(case_id=case_id, module_id=module_id)
             res, _s = call(sess["session_id"])
+        except EditRefused as e:
+            raise _err(f"invalid_{e.field}", e.message, 400, e.next_action) from None
         except WorkbenchError as e:
             if e.code == "unavailable" and "ghidra" in e.message.lower():
                 raise _err("decompiler_unavailable", "Ghidra is not installed (or not usable) on this computer, so this "
@@ -98,6 +165,8 @@ def mount_re_routes(app: FastAPI, studio: Any) -> None:
                            "Retry; if it keeps happening, lower the analysis depth in the project settings.")
             if "changed on disk" in low:
                 raise _err("module_changed", err[:500], 409, "Run the project's analysis again so the inventory matches the file.")
+            if editing and low.startswith("invalid target"):
+                raise edit_refusal(err.split(":", 1)[1].strip() if ":" in err else err)
             if target and (low.startswith("invalid target") or "no function" in low or "not found" in low):
                 raise _err("function_not_found", f"No analysed function contains {target} in this module.", 404,
                            "Pick a function from the list; the list may be out of date, so refresh it.")
@@ -277,6 +346,57 @@ def mount_re_routes(app: FastAPI, studio: Any) -> None:
         return {"addr": data.get("addr"), "refs": shaped["refs"], "total": shaped["total"], "more": shaped["more"], "limit": limit,
                 "functions": [{"addr": a, "name": nm} for a, nm in fns], **common(res, sid, case_id, module_id),
                 "untrusted": True, "note": UNTRUSTED_NOTE}
+
+    # ------------------------------------------------------------------ piece 5: edits (a person's annotations)
+    def target_of(address: str | None, name: str | None) -> str:
+        if bool(address) == bool(name):
+            raise _err("validation", "Give exactly one of address or name.", 400, "Send the function's address (0x...) or its name.")
+        return _addr(address) if address else str(name)
+
+    def edit(case_id: str, module_id: str, action: str, **kwargs: Any) -> dict[str, Any]:
+        ready(case_id, module_id, False, what="annotations cannot be changed")
+        res, sid = run(case_id, module_id, lambda s: studio.re.edit(s, action, author="user", **kwargs), editing=True)
+        data = dict(res.data or {})
+        return {"revision": data.get("revision"), "change": data.get("change"), "author": "user", "who": "person",
+                "applied_to_analysis": bool(data.get("applied_to_analysis")), "note": data.get("note"),
+                **common(res, sid, case_id, module_id), "untrusted": True}
+
+    @r.post("/cases/{case_id}/modules/{module_id}/annotations/rename")
+    def edit_rename(case_id: str, module_id: str, body: RenameReq):
+        """Rename a function (address or name), a global (address) or a local variable (function + variable = its current
+        name): the MCP ``rename`` call, recorded as a person's edit."""
+        native_module(case_id, module_id)
+        if body.kind == "global" and not body.address:
+            raise _err("validation", "A global is renamed by its address.", 400, "Send address (0x...).")
+        return edit(case_id, module_id, "rename", kind=body.kind, target=target_of(body.address, body.name),
+                    variable=body.variable, new_name=body.new_name)
+
+    @r.post("/cases/{case_id}/modules/{module_id}/annotations/set-type")
+    def edit_set_type(case_id: str, module_id: str, body: SetTypeReq):
+        """kind=function: apply a C prototype (its name becomes the function's name). kind=local: set a variable's C type.
+        The MCP ``set_type`` call, recorded as a person's edit."""
+        native_module(case_id, module_id)
+        return edit(case_id, module_id, "set_type", kind=body.kind, target=target_of(body.address, body.name),
+                    prototype=body.prototype, variable=body.variable, ctype=body.type)
+
+    @r.post("/cases/{case_id}/modules/{module_id}/annotations/comment")
+    def edit_comment(case_id: str, module_id: str, body: CommentReq):
+        """Add or change the one-line comment at an address; empty text removes it. The MCP ``add_comment`` call."""
+        native_module(case_id, module_id)
+        return edit(case_id, module_id, "comment", addr=_addr(body.address), text=body.text)
+
+    @r.post("/cases/{case_id}/modules/{module_id}/annotations/declare")
+    def edit_declare(case_id: str, module_id: str, body: DeclareReq):
+        """Declare C types (struct / union / enum / typedef) for the module: the MCP ``apply_struct`` call."""
+        native_module(case_id, module_id)
+        return edit(case_id, module_id, "declare", declaration=body.declaration)
+
+    @r.post("/cases/{case_id}/modules/{module_id}/annotations/check")
+    def edit_check(case_id: str, module_id: str, body: CheckReq):
+        """Validate one value with the edit grammar without storing anything (the app validates as you type)."""
+        from ..backends.re_annotations import check_value
+        native_module(case_id, module_id)
+        return check_value(body.what, body.value)
 
     app.include_router(r)
 

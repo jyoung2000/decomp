@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Loading } from '../../components/Empty';
 import { ErrorCallout } from '../../components/ErrorCallout';
 import { LocalTabs } from '../../components/Tabs';
 import { ApiError } from '../../lib/api';
-import { DISASM_PAGE, reFunctionApi, type Decompiled, type Decompiler, type DecompilerInfo, type DisasmPage, type FunctionDetail } from '../../lib/re';
+import { DISASM_PAGE, reEditApi, reFunctionApi, type Decompiled, type Decompiler, type DecompilerInfo, type DisasmOp, type DisasmPage, type FunctionDetail } from '../../lib/re';
 import { useApi } from '../../lib/store';
 import { CallGraphView, DEFAULT_GRAPH, ReferencesView, type FnNav, type GraphSettings } from './FunctionRefs';
+import { CommentEditor, HistoryView, TypesDialog, ValueEditor, VariablesPanel } from './FunctionEdit';
 import { useLoad } from './useLoad';
 
-export type CodeView = 'decompiled' | 'disassembly' | 'references' | 'callgraph';
-export const CODE_VIEWS: CodeView[] = ['decompiled', 'disassembly', 'references', 'callgraph'];
+export type CodeView = 'decompiled' | 'disassembly' | 'references' | 'callgraph' | 'history';
+export const CODE_VIEWS: CodeView[] = ['decompiled', 'disassembly', 'references', 'callgraph', 'history'];
+type Editing = null | 'name' | 'prototype' | 'comment';
 
 const n = (v: number) => v.toLocaleString('en-US');
 const bytes = (v: number) => `${n(v)} byte${v === 1 ? '' : 's'}`;
@@ -63,6 +65,8 @@ export function FunctionPane({
   onClose,
   nav,
   history,
+  editTick = 0,
+  onEdited = () => {},
 }: {
   caseId: string;
   moduleId: string;
@@ -74,10 +78,46 @@ export function FunctionPane({
   onClose: () => void;
   nav: FnNav;
   history: PaneHistory;
+  /** bumped after every saved edit, undo, roll back or review: the open views and the list reload */
+  editTick?: number;
+  onEdited?: (message: string) => void;
 }) {
   const api = useApi();
   const re = useMemo(() => reFunctionApi(api), [api]);
-  const detail = useLoad<FunctionDetail>(`${moduleId}|${addr}`, () => re.detail(caseId, moduleId, addr));
+  const detail = useLoad<FunctionDetail>(`${moduleId}|${addr}|${editTick}`, () => re.detail(caseId, moduleId, addr));
+  const editApi = useMemo(() => reEditApi(api), [api]);
+  // keep showing the last header of this function while it reloads after an edit (the edit controls stay in place)
+  const lastDetail = useRef<FunctionDetail | null>(null);
+  if (detail.data) lastDetail.current = detail.data;
+  const shown = detail.data ?? (lastDetail.current?.header.addr === addr ? lastDetail.current : undefined);
+  const [editing, setEditing] = useState<Editing>(null);
+  const [typesOpen, setTypesOpen] = useState(false);
+  const [status, setStatus] = useState('');
+  const editBtn = useRef<Record<string, HTMLButtonElement | null>>({});
+  const returnFocus = useRef<string | null>(null);
+  useEffect(() => {
+    setEditing(null);
+    setStatus('');
+  }, [addr]);
+  useEffect(() => {
+    if (editing || !returnFocus.current) return;
+    const key = returnFocus.current;
+    const btn = editBtn.current[key];
+    if (btn) {
+      btn.focus();
+      returnFocus.current = null;
+    }
+  });
+  const edited = (m: string) => {
+    setStatus(m);
+    onEdited(m);
+  };
+  const closeEditor = (which: string) => (m: string | null) => {
+    returnFocus.current = which;
+    setEditing(null);
+    if (m) edited(m);
+    else setStatus('Not changed.');
+  };
   const paneRef = useRef<HTMLElement>(null);
   const headRef = useRef<HTMLHeadingElement>(null);
   const [graph, setGraph] = useState<GraphSettings>(DEFAULT_GRAPH);
@@ -92,16 +132,20 @@ export function FunctionPane({
     if (active?.classList.contains('fn-hist') && !(active as HTMLButtonElement).disabled) return;   // repeated Back/Forward
     if (!active || active === document.body || paneRef.current?.contains(active)) headRef.current?.focus();
   }, [addr]);
-  const h = detail.data?.header;
+  const h = shown?.header;
   useEffect(() => {
     if (h) setAnnounce(`Function ${h.name} at ${h.addr}.`);
   }, [h]);
 
   const onKey = (e: KeyboardEvent<HTMLElement>) => {
+    const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName);
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
       onClose();
+    } else if (e.key === 'F2' && !inField && h) {
+      e.preventDefault();
+      setEditing('name');
     } else if (e.altKey && e.key === 'ArrowLeft') {
       e.preventDefault();
       if (history.canBack) history.back();
@@ -115,9 +159,25 @@ export function FunctionPane({
   return (
     <section ref={paneRef} className="fn-pane card" aria-labelledby="fn-pane-h" onKeyDown={onKey} data-testid="fn-pane">
       <div className="row fn-pane-head">
-        <h3 id="fn-pane-h" ref={headRef} tabIndex={-1} className="mono wrap-any" data-testid="fn-pane-name">
-          {h?.name ?? addr}
-        </h3>
+        {editing === 'name' && h ? (
+          <ValueEditor
+            caseId={caseId}
+            moduleId={moduleId}
+            what="name"
+            label={`New name for the function at ${h.addr}`}
+            initial={h.name}
+            onSave={async (name) => {
+              const r = await editApi.rename(caseId, moduleId, { kind: 'function', address: h.addr, new_name: name });
+              return `Renamed ${h.name} to ${name} (revision ${r.revision}).`;
+            }}
+            onDone={closeEditor('name')}
+            testId="fn-name-edit"
+          />
+        ) : (
+          <h3 id="fn-pane-h" ref={headRef} tabIndex={-1} className="mono wrap-any" data-testid="fn-pane-name">
+            {h?.name ?? addr}
+          </h3>
+        )}
         <div className="row fn-pane-actions">
           <button type="button" className="btn sm fn-hist" onClick={history.back} disabled={!history.canBack} data-tooltip={history.canBack ? 'Alt+Left' : 'No earlier function opened in this pane'} aria-label="Back to the previous function (Alt+Left)" aria-keyshortcuts="Alt+ArrowLeft" data-testid="fn-back">
             ‹ Back
@@ -160,7 +220,57 @@ export function FunctionPane({
             {h.signature ?? <span className="muted">not recovered</span>}
             {h.calltype && <span className="muted"> · calling convention {h.calltype}</span>}
           </dd>
+          {shown?.annotations?.function?.prov?.origin && (
+            <>
+              <dt>Name from</dt>
+              <dd className="small" data-testid="fn-pane-name-from">
+                <NameFrom prov={shown.annotations.function.prov} />
+              </dd>
+            </>
+          )}
         </dl>
+      )}
+      {h && (
+        <div className="stack fn-edit-zone">
+          <div className="row fn-edit-bar" role="group" aria-label="Edit this function" data-testid="fn-edit-bar">
+            <button type="button" className="btn sm" ref={(el) => { editBtn.current.name = el; }} onClick={() => setEditing('name')} aria-keyshortcuts="F2" data-tooltip="F2" data-testid="fn-edit-name">
+              Edit name
+            </button>
+            <button type="button" className="btn sm" ref={(el) => { editBtn.current.prototype = el; }} onClick={() => setEditing('prototype')} data-testid="fn-edit-proto">
+              Edit prototype
+            </button>
+            <button type="button" className="btn sm" ref={(el) => { editBtn.current.comment = el; }} onClick={() => setEditing('comment')} data-testid="fn-edit-comment">
+              {headComment(shown, h.addr) ? 'Edit comment' : 'Add comment'}
+            </button>
+            <button type="button" className="btn sm" ref={(el) => { editBtn.current.types = el; }} onClick={() => setTypesOpen(true)} aria-haspopup="dialog" data-testid="fn-edit-types">
+              Types…
+            </button>
+          </div>
+          {editing === 'prototype' && (
+            <ValueEditor
+              caseId={caseId}
+              moduleId={moduleId}
+              what="prototype"
+              label={`C prototype of ${h.name}`}
+              initial={(h.signature ?? `int ${h.name.replace(/[^A-Za-z0-9_]/g, '_')}(void)`).replace(/;\s*$/, '')}
+              hint="The name in the prototype becomes the function's name. Declare structs first under Types."
+              onSave={async (proto) => {
+                const r = await editApi.setType(caseId, moduleId, { kind: 'function', address: h.addr, prototype: proto });
+                return `Set the prototype to ${proto} (revision ${r.revision}).`;
+              }}
+              onDone={closeEditor('prototype')}
+              testId="fn-proto-edit"
+            />
+          )}
+          {editing === 'comment' && (
+            <CommentEditor caseId={caseId} moduleId={moduleId} addr={h.addr} initial={headComment(shown, h.addr)} onDone={closeEditor('comment')} testId="fn-head-comment" />
+          )}
+          <VariablesPanel caseId={caseId} moduleId={moduleId} fnAddr={h.addr} variables={shown?.variables ?? []} onEdited={edited} />
+          <div className="small fn-status" role="status" aria-live="polite" data-testid="fn-edit-status">
+            {status}
+          </div>
+          <TypesDialog caseId={caseId} moduleId={moduleId} open={typesOpen} onClose={() => { setTypesOpen(false); returnFocus.current = 'types'; }} onEdited={edited} />
+        </div>
       )}
       <LocalTabs<CodeView>
         label="Code views"
@@ -171,22 +281,25 @@ export function FunctionPane({
           { id: 'disassembly', label: 'Disassembly' },
           { id: 'references', label: 'References' },
           { id: 'callgraph', label: 'Call graph' },
+          { id: 'history', label: 'History' },
         ]}
       />
       <div role="tabpanel" id={`panel-${view}`} aria-labelledby={`tab-${view}`} className="fn-panel">
         {view === 'decompiled' ? (
-          <DecompiledView key={`${addr}|${decompiler}`} caseId={caseId} moduleId={moduleId} addr={addr} decompiler={decompiler} decompilers={detail.data?.decompilers} onDecompiler={onDecompiler} />
+          <DecompiledView key={`${addr}|${decompiler}`} caseId={caseId} moduleId={moduleId} addr={addr} decompiler={decompiler} decompilers={shown?.decompilers} onDecompiler={onDecompiler} tick={editTick} />
         ) : view === 'disassembly' ? (
-          <DisassemblyView key={addr} caseId={caseId} moduleId={moduleId} addr={addr} />
+          <DisassemblyView key={addr} caseId={caseId} moduleId={moduleId} addr={addr} tick={editTick} onEdited={edited} />
         ) : view === 'references' ? (
-          <ReferencesView key={addr} caseId={caseId} moduleId={moduleId} addr={addr} nav={nav} />
+          <ReferencesView key={`${addr}|${editTick}`} caseId={caseId} moduleId={moduleId} addr={addr} nav={nav} />
+        ) : view === 'callgraph' ? (
+          <CallGraphView key={`${addr}|${editTick}`} caseId={caseId} moduleId={moduleId} addr={addr} nav={nav} settings={graph} onSettings={setGraph} />
         ) : (
-          <CallGraphView key={addr} caseId={caseId} moduleId={moduleId} addr={addr} nav={nav} settings={graph} onSettings={setGraph} />
+          <HistoryView caseId={caseId} moduleId={moduleId} fnAddr={h?.addr ?? addr} tick={editTick} onEdited={edited} />
         )}
       </div>
       <p className="xs muted">
-        Names, code, strings and comments here come from the analysed program and are shown as plain text. Escape closes this pane; Alt+Left and Alt+Right go back and forward
-        between the functions opened in it.
+        Names, code, strings and comments here come from the analysed program and are shown as plain text. Escape closes this pane (or the open editor); Alt+Left and Alt+Right go back and
+        forward between the functions opened in it; F2 renames the function. Your edits are recorded as made by a person; History lists every change with Undo and Roll back.
       </p>
     </section>
   );
@@ -212,10 +325,10 @@ function DecompilerSwitch({ value, onChange, decompilers }: { value: Decompiler;
   );
 }
 
-function DecompiledView({ caseId, moduleId, addr, decompiler, decompilers, onDecompiler }: { caseId: string; moduleId: string; addr: string; decompiler: Decompiler; decompilers?: DecompilerInfo[]; onDecompiler: (d: Decompiler) => void }) {
+function DecompiledView({ caseId, moduleId, addr, decompiler, decompilers, onDecompiler, tick = 0 }: { caseId: string; moduleId: string; addr: string; decompiler: Decompiler; decompilers?: DecompilerInfo[]; onDecompiler: (d: Decompiler) => void; tick?: number }) {
   const api = useApi();
   const re = useMemo(() => reFunctionApi(api), [api]);
-  const res = useLoad<Decompiled>(`${moduleId}|${addr}|${decompiler}`, () => re.decompiled(caseId, moduleId, addr, decompiler));
+  const res = useLoad<Decompiled>(`${moduleId}|${addr}|${decompiler}|${tick}`, () => re.decompiled(caseId, moduleId, addr, decompiler));
   const code = res.error instanceof ApiError ? res.error.code : null;
   const d = res.data;
   return (
@@ -274,11 +387,29 @@ function DecompiledView({ caseId, moduleId, addr, decompiler, decompilers, onDec
   );
 }
 
-function DisassemblyView({ caseId, moduleId, addr }: { caseId: string; moduleId: string; addr: string }) {
+function DisassemblyView({ caseId, moduleId, addr, tick = 0, onEdited }: { caseId: string; moduleId: string; addr: string; tick?: number; onEdited: (m: string) => void }) {
   const api = useApi();
   const re = useMemo(() => reFunctionApi(api), [api]);
   const [offset, setOffset] = useState(0);
-  const res = useLoad<DisasmPage>(`${moduleId}|${addr}|${offset}`, () => re.disassembly(caseId, moduleId, addr, offset, DISASM_PAGE));
+  const res = useLoad<DisasmPage>(`${moduleId}|${addr}|${offset}|${tick}`, () => re.disassembly(caseId, moduleId, addr, offset, DISASM_PAGE));
+  const [commenting, setCommenting] = useState<string | null>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const back = useRef<string | null>(null);
+  useEffect(() => {
+    if (commenting || !back.current) return;
+    const el = tableRef.current?.querySelector<HTMLElement>(`[data-note="${back.current}"]`);
+    if (el) {
+      el.focus();
+      back.current = null;
+    }
+  });
+  const onTableKey = (e: KeyboardEvent<HTMLTableSectionElement>) => {
+    const a = (e.target as HTMLElement).dataset.note;
+    if (e.key === ';' && a) {
+      e.preventDefault();
+      setCommenting(a);
+    }
+  };
   const [last, setLast] = useState<DisasmPage | null>(null);
   useEffect(() => {
     if (res.data) setLast(res.data);
@@ -297,8 +428,9 @@ function DisassemblyView({ caseId, moduleId, addr }: { caseId: string; moduleId:
         </span>
         <CopyButton text={text} what="instructions on this page" testId="fn-copy-disasm" />
       </div>
+      <p className="xs muted">Comment on an instruction with its ✎ button (or press ; on that button). Comments are kept with the module and shown here and in the decompiled code.</p>
       <div className="table-wrap fn-disasm-wrap" tabIndex={0} aria-label="Disassembly">
-        <table className="table fn-disasm mono small" data-testid="fn-disasm-table">
+        <table ref={tableRef} className="table fn-disasm mono small" data-testid="fn-disasm-table">
           <thead>
             <tr>
               <th scope="col">Address</th>
@@ -306,18 +438,33 @@ function DisassemblyView({ caseId, moduleId, addr }: { caseId: string; moduleId:
                 Bytes
               </th>
               <th scope="col">Instruction</th>
+              <th scope="col" className="col-note">
+                <span className="sr-only">Your comment</span>
+              </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody onKeyDown={onTableKey}>
             {p.ops.map((o) => (
-              <tr key={o.addr} data-testid={`fn-op-${o.addr}`}>
-                <td>{o.addr}</td>
-                <td className="col-bytes muted wrap-any">{o.bytes}</td>
-                <td className="wrap-any">
-                  {o.disasm}
-                  {(o.user_comment || o.comment) && <span className="muted"> ; {o.user_comment ?? o.comment}</span>}
-                </td>
-              </tr>
+              <DisasmRow
+                key={o.addr}
+                o={o}
+                editing={commenting === o.addr}
+                onEdit={() => setCommenting(o.addr)}
+                editor={
+                  <CommentEditor
+                    caseId={caseId}
+                    moduleId={moduleId}
+                    addr={o.addr}
+                    initial={o.user_comment ?? ''}
+                    testId="fn-op-comment"
+                    onDone={(m) => {
+                      back.current = o.addr;
+                      setCommenting(null);
+                      if (m) onEdited(m);
+                    }}
+                  />
+                }
+              />
             ))}
           </tbody>
         </table>
@@ -334,4 +481,44 @@ function DisassemblyView({ caseId, moduleId, addr }: { caseId: string; moduleId:
       )}
     </div>
   );
+}
+
+function DisasmRow({ o, editing, onEdit, editor }: { o: DisasmOp; editing: boolean; onEdit: () => void; editor: ReactNode }) {
+  const has = !!o.user_comment;
+  return (
+    <>
+      <tr data-testid={`fn-op-${o.addr}`}>
+        <td>{o.addr}</td>
+        <td className="col-bytes muted wrap-any">{o.bytes}</td>
+        <td className="wrap-any">
+          {o.disasm}
+          {(o.user_comment || o.comment) && <span className="muted"> ; {o.user_comment ?? o.comment}</span>}
+          {o.user_comment && o.comment_status && <span className="chip warn">{o.comment_status}</span>}
+        </td>
+        <td className="col-note">
+          <button type="button" className="btn sm fn-note-btn" data-note={o.addr} onClick={onEdit} aria-expanded={editing} aria-label={has ? `Edit the comment at ${o.addr}` : `Add a comment at ${o.addr}`} aria-keyshortcuts=";" data-testid={`fn-note-${o.addr}`}>
+            ✎<span className="fn-note-label"> {has ? 'Edit' : 'Note'}</span>
+          </button>
+        </td>
+      </tr>
+      {editing && (
+        <tr className="fn-note-row">
+          <td colSpan={4}>{editor}</td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function NameFrom({ prov }: { prov: { origin?: string; status?: string } }) {
+  if (prov.origin !== 'model') return <span className="chip outline">a person</span>;
+  if (prov.status === 'proposed') return <span className="chip warn">model-proposed (accept or reject it under History)</span>;
+  if (prov.status === 'confirmed') return <span className="chip ok">a model, confirmed by a test</span>;
+  return <span className="chip ok">a model, accepted by a person</span>;
+}
+
+/** The comment stored at the function's own address (not the notes overlaid for model-proposed names). */
+function headComment(d: FunctionDetail | undefined, addr: string): string {
+  const c = d?.annotations?.comments?.find((x) => x.addr === addr && !/^\[model-proposed\] (function name|local) /.test(x.text));
+  return c ? c.text.replace(/^\[model-proposed\] /, '') : '';
 }

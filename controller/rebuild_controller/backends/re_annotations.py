@@ -22,9 +22,12 @@ from . import native
 
 KIND = "re.annotations"
 IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+IDENT_CHAR = r"[A-Za-z0-9_]"
 CTYPE_RE = re.compile(r"^(?:(?:struct|union|enum|unsigned|signed|const|long|short|volatile)\s+){0,4}[A-Za-z_][A-Za-z0-9_]{0,63}"
                       r"(?:\s*\*{1,3})?$")
 PROTO_RE = re.compile(r"^[A-Za-z0-9_ *,()\[\].]{3,512}$")
+PROTO_CHAR = r"[A-Za-z0-9_ *,()\[\].]"
+DECL_CHAR = r"[A-Za-z0-9_ \t\r\n*;,{}\[\]():=\-]"
 PROTO_NAME_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 DECL_CHARS_RE = re.compile(r"^[A-Za-z0-9_ \t\r\n*;,{}\[\]():=\-]+$")
 DECL_NAMES_RE = re.compile(r"\b(struct|union|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{")
@@ -33,6 +36,15 @@ MAX_COMMENT_CHARS = 1000
 MAX_DECL_BYTES = 16 * 1024
 MAX_TYPES = 200
 MAX_ENTRIES = 20_000
+
+# One valid example per kind of value, shown next to every refusal (app and MCP) so the fix is obvious.
+EXAMPLES = {
+    "name": "parse_args",
+    "type": "uint32_t, char *, struct point *",
+    "prototype": "int parse_args(int argc, char **argv)",
+    "comment": "Opens the settings file and reads the [items] section",
+    "declaration": "struct point { int x; int y; };",
+}
 
 
 class AnnotationError(ValueError):
@@ -46,13 +58,26 @@ def empty() -> dict[str, Any]:
 # ----------------------------------------------------------------------------------------------- validation
 def check_ident(name: str) -> str:
     if not isinstance(name, str) or not IDENT_RE.fullmatch(name):
-        raise AnnotationError(f"invalid name {str(name)[:80]!r}: use letters, digits and _ (not starting with a digit), at most 128")
+        shown = str(name)[:80]
+        why = ("it is empty" if not str(name) else "it starts with a digit" if str(name)[:1].isdigit()
+               else "it is longer than 128 characters" if len(str(name)) > 128
+               else f"it contains {_bad_chars(str(name), IDENT_CHAR)}")
+        raise AnnotationError(f"invalid name {shown!r}: {why}. Use letters, digits and _ (not starting with a digit), at most 128, "
+                              f"e.g. {EXAMPLES['name']}")
     return name
+
+
+def _bad_chars(text: str, allowed: str) -> str:
+    bad = sorted({c for c in text if not re.fullmatch(allowed, c)})
+    shown = " ".join("space" if c == " " else repr(c) for c in bad[:6])
+    return f"characters that are not allowed ({shown})" if bad else "something that is not allowed"
 
 
 def check_ctype(t: str) -> str:
     if not isinstance(t, str) or not CTYPE_RE.fullmatch(t.strip()):
-        raise AnnotationError(f"invalid C type {str(t)[:80]!r}: e.g. 'int', 'uint32_t', 'char *', 'struct point *'")
+        raise AnnotationError(f"invalid C type {str(t)[:80]!r}: one type name with up to 4 qualifiers (struct, unsigned, const, "
+                              "...) and up to 3 '*', no array sizes or function pointers; e.g. 'int', 'uint32_t', 'char *', "
+                              "'struct point *'")
     return " ".join(t.split())
 
 
@@ -60,16 +85,22 @@ def check_prototype(p: str) -> tuple[str, str]:
     """Return (normalised prototype, function name declared in it)."""
     if not isinstance(p, str) or not PROTO_RE.fullmatch(p.strip()) or p.count("(") != 1 or p.count(")") != 1 \
             or not p.strip().endswith(")"):
-        raise AnnotationError(f"invalid prototype {str(p)[:80]!r}: expected e.g. 'int parse_args(int argc, char **argv)'")
+        t = str(p).strip()
+        why = ("it is shorter than 3 characters" if len(t) < 3 else "it is longer than 512 characters" if len(t) > 512
+               else f"it contains {_bad_chars(t, PROTO_CHAR)}" if not PROTO_RE.fullmatch(t)
+               else "it needs exactly one '(' and one ')'" if t.count("(") != 1 or t.count(")") != 1
+               else "it must end with ')' (leave out the ';' and the body)")
+        raise AnnotationError(f"invalid prototype {str(p)[:80]!r}: {why}; expected e.g. '{EXAMPLES['prototype']}'")
     m = PROTO_NAME_RE.search(p)
     if not m:
-        raise AnnotationError("prototype has no function name before '('")
+        raise AnnotationError(f"prototype has no function name before '(', e.g. {EXAMPLES['prototype']}")
     return " ".join(p.split()), m.group(1)
 
 
 def check_comment(text: str) -> str:
     if not isinstance(text, str) or len(text) > MAX_COMMENT_CHARS:
-        raise AnnotationError(f"comment must be a string of at most {MAX_COMMENT_CHARS} characters")
+        raise AnnotationError(f"comment must be a string of at most {MAX_COMMENT_CHARS} characters "
+                              f"(this one has {len(text) if isinstance(text, str) else 0})")
     if any((ord(c) < 32 and c not in "\t") or ord(c) == 127 for c in text):
         raise AnnotationError("comment must be a single line without control characters")
     return text
@@ -78,21 +109,24 @@ def check_comment(text: str) -> str:
 def check_declaration(decl: str) -> tuple[str, list[dict[str, str]]]:
     """A C struct/union/enum/typedef declaration. No preprocessor ('#'), no comments ('/'), no quotes, bounded size."""
     if not isinstance(decl, str) or not decl.strip():
-        raise AnnotationError("declaration must be non-empty C text")
+        raise AnnotationError(f"declaration must be non-empty C text, e.g. {EXAMPLES['declaration']}")
     if len(decl.encode("utf-8")) > MAX_DECL_BYTES:
         raise AnnotationError(f"declaration larger than {MAX_DECL_BYTES} bytes")
     if not DECL_CHARS_RE.fullmatch(decl):
-        raise AnnotationError("declaration may only contain identifiers, digits, whitespace and * ; , { } [ ] ( ) : = - "
-                              "(no '#' preprocessor lines, comments or quotes)")
+        raise AnnotationError(f"declaration contains {_bad_chars(decl, DECL_CHAR)}: it may only contain "
+                              "identifiers, digits, whitespace and * ; , { } [ ] ( ) : = - (no '#' preprocessor lines, comments "
+                              f"or quotes), e.g. {EXAMPLES['declaration']}")
     if not re.match(r"^\s*(struct|union|enum|typedef)\b", decl):
-        raise AnnotationError("declaration must start with struct, union, enum or typedef")
+        raise AnnotationError(f"declaration must start with struct, union, enum or typedef, e.g. {EXAMPLES['declaration']}")
     if decl.count("{") != decl.count("}"):
-        raise AnnotationError("unbalanced braces")
+        raise AnnotationError(f"unbalanced braces ({decl.count('{')} '{{' and {decl.count('}')} '}}'), "
+                              f"e.g. {EXAMPLES['declaration']}")
     names = [{"kind": k, "name": n} for k, n in DECL_NAMES_RE.findall(decl)]
     if decl.lstrip().startswith("typedef"):
         names += [{"kind": "typedef", "name": n} for n in TYPEDEF_NAME_RE.findall(decl)]
     if not names:
-        raise AnnotationError("no named struct/union/enum (or typedef name) found in the declaration")
+        raise AnnotationError("no named struct/union/enum (or typedef name) found in the declaration, "
+                              f"e.g. {EXAMPLES['declaration']}")
     text = decl.strip()
     if not text.endswith(";"):
         text += ";"
@@ -133,12 +167,41 @@ def history(cases: Any, case_id: str, module_id: str, limit: int = 50) -> list[d
     out = []
     for r in rows:
         body = cases.blobs.get_json(r["blob_sha"]) if r.get("blob_sha") else {}
-        out.append({"evidence_id": r["evidence_id"], "revision": r["revision"], "change": (body or {}).get("change")})
+        change = (body or {}).get("change")
+        out.append({"evidence_id": r["evidence_id"], "revision": r["revision"], "change": change,
+                    "who": who_label(change)})
     return out
 
 
+def who_label(change: dict[str, Any] | None) -> str:
+    """Who made a stored change, in the words the app shows: a person, a model (proposal) or a test (confirmation)."""
+    author = (change or {}).get("author")
+    if author == "model":
+        return "model-proposed"
+    if author == "test":
+        return "confirmed by test"
+    return "person"
+
+
+def check_value(what: str, value: str) -> dict[str, Any]:
+    """Validate one value with the same grammar the edit operations use (no rizin, nothing stored): the app's
+    validate-as-you-type. Returns {ok, normalized | message, example}."""
+    checks = {"name": lambda v: check_ident(v), "type": lambda v: check_ctype(v), "prototype": lambda v: check_prototype(v)[0],
+              "comment": lambda v: check_comment(v), "declaration": lambda v: ", ".join(
+                  f"{n['kind']} {n['name']}" for n in check_declaration(v)[1])}
+    if what not in checks:
+        raise AnnotationError(f"unknown value kind {what!r}; expected one of {', '.join(checks)}")
+    try:
+        return {"ok": True, "what": what, "normalized": checks[what](value), "example": EXAMPLES[what]}
+    except AnnotationError as e:
+        return {"ok": False, "what": what, "message": str(e), "example": EXAMPLES[what]}
+
+
 def state_at(cases: Any, case_id: str, module_id: str, revision: int) -> tuple[dict[str, Any], str]:
-    """The complete annotation state stored at ``revision`` (for a rollback). Raises AnnotationError when there is none."""
+    """The complete annotation state stored at ``revision`` (for a rollback). Revision 0 is the state before any annotation
+    (undoing the first change). Raises AnnotationError when there is no such revision."""
+    if int(revision) == 0:
+        return empty(), ""
     for r in cases.list_evidence(case_id, kind=KIND, module_id=module_id):
         if int(r["revision"]) == int(revision):
             body = cases.blobs.get_json(r["blob_sha"]) if r.get("blob_sha") else {}

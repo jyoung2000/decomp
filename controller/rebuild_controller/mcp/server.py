@@ -791,6 +791,16 @@ class Runtime:
             return Outcome(data, case_id=sess["case_id"], truncated=trunc)
         return body
 
+    def t_re_edit(self, session_id: str, action: str, **kwargs: Any) -> Callable[[StudioLike], Outcome]:
+        """Annotation edits go through ``ReWorkbench.edit`` (author model), the same path as the app's edit routes."""
+        def body(s: StudioLike) -> Outcome:
+            wb = self.workbench(s)
+            res, sess = self._wb_guard(lambda: wb.edit(session_id, action, author="model", **kwargs))
+            data = self.op_data(res)
+            data["session_id"] = session_id
+            return Outcome(data, case_id=sess["case_id"], truncated=bool(res.truncated))
+        return body
+
     def t_re_custom(self, fn: Callable[[Any, StudioLike], tuple[Any, Optional[str], bool]]) -> Callable[[StudioLike], Outcome]:
         def body(s: StudioLike) -> Outcome:
             data, case_id, trunc = self._wb_guard(lambda: fn(self.workbench(s), s))
@@ -1196,14 +1206,8 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
     async def rename(session_id: SID, kind: Literal["function", "global", "local"], new_name: Ident,
                      address: Addr = None, name: Name = None, variable: Optional[Ident] = None) -> CallToolResult:
         def body(s: StudioLike) -> Outcome:
-            target = _target(address, name)
-            if kind == "local":
-                if not variable:
-                    raise ToolFailure("rejected", "kind=local needs variable (the current variable name).", "Read get_function.variables.")
-                return rt.t_re(session_id, "rename", kind=kind, target=variable, new_name=new_name, function=target, author="model")(s)
-            if variable:
-                raise ToolFailure("rejected", "variable is only valid with kind=local.", "Remove variable.")
-            return rt.t_re(session_id, "rename", kind=kind, target=target, new_name=new_name, author="model")(s)
+            # argument rules + name grammar live in ReWorkbench.edit, shared with the app's POST .../annotations/rename
+            return rt.t_re_edit(session_id, "rename", kind=kind, target=_target(address, name), variable=variable, new_name=new_name)(s)
         return await run("rename", body)
 
     @spec("set_type", "kind=function: apply a C prototype to the function at address/name (the name in the prototype becomes "
@@ -1215,13 +1219,8 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
                        variable: Optional[Ident] = None,
                        type: Optional[Annotated[str, Field(pattern=r"^[A-Za-z0-9_ *]{1,128}$")]] = None) -> CallToolResult:
         def body(s: StudioLike) -> Outcome:
-            target = _target(address, name)
-            if kind == "function" and (not prototype or variable or type):
-                raise ToolFailure("rejected", "kind=function takes prototype only.", "Pass prototype.")
-            if kind == "local" and (prototype or not variable or not type):
-                raise ToolFailure("rejected", "kind=local takes variable and type.", "Pass variable and type.")
-            return rt.t_re(session_id, "set_type", kind=kind, target=target, prototype=prototype, variable=variable,
-                           ctype=type, author="model")(s)
+            return rt.t_re_edit(session_id, "set_type", kind=kind, target=_target(address, name), prototype=prototype,
+                                variable=variable, ctype=type)(s)
         return await run("set_type", body)
 
     @spec("add_comment", "Attach a one-line comment (<= 1000 chars) to an address; empty text removes it. Shown in disassemble "
@@ -1231,13 +1230,13 @@ def build_server(studio_or_factory: Any, config: Optional[ServerConfig] = None) 
         if "\n" in text:
             return rt._error(new_id("op"), "add_comment", time.monotonic(),
                              ToolFailure("rejected", "Comments are single-line.", "Remove newlines."))
-        return await run("add_comment", rt.t_re(session_id, "add_comment", addr=normalize_address(address), text=text, author="model"))
+        return await run("add_comment", rt.t_re_edit(session_id, "comment", addr=normalize_address(address), text=text))
 
     @spec("apply_struct", "Declare C types for the module from declaration text: struct/union/enum/typedef only, no '#' "
                           "preprocessor lines, comments or quotes, <= 16 KiB. Afterwards usable in set_type. Persisted.",
           read_only=False, idempotent=True)
     async def apply_struct(session_id: SID, declaration: Annotated[str, Field(min_length=1, max_length=16384)]) -> CallToolResult:
-        return await run("apply_struct", rt.t_re(session_id, "apply_struct", declaration=declaration, author="model"))
+        return await run("apply_struct", rt.t_re_edit(session_id, "declare", declaration=declaration))
 
     @spec("patch_bytes", "Write bytes at an address into a COPY of the binary inside the session's work folder (the user's "
                          "original file is never written). confirm must be true. Returns the copy's path and sha256 and the "
