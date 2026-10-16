@@ -2031,7 +2031,13 @@ const DEP_TOOLS = [
   { name: 'node', title: 'Node.js (optional)', purpose: 'Optional. Unpacks Electron apps and runs browser behaviour tests.', size: 35_556_852, requires: [], optional: true },
   { name: 'playwright-core', title: 'Browser test library (optional)', purpose: 'Optional. Compares web apps in a browser.', size: 2_208_739, requires: ['node'], optional: true },
 ];
-const DEP = { installed: new Set(['rizin', 'dotnet-runtime', 'ilspycmd']), settings: { auto_install: false, asked: false }, queue: depEmptyQueue(), timer: null };
+const DEP = { installed: null, settings: null, queue: null, timer: null };
+/** Initial tool state; /__mock/reset calls this too, so a test that installs a tool does not change the next test's preflight. */
+function depReset() {
+  clearInterval(DEP.timer);
+  Object.assign(DEP, { installed: new Set(['rizin', 'dotnet-runtime', 'ilspycmd']), settings: { auto_install: false, asked: false }, queue: depEmptyQueue(), timer: null });
+}
+depReset();
 const mb = (n) => `${Math.max(1, Math.round(n / 1_000_000))} MB`;
 
 function depEmptyQueue() {
@@ -2398,6 +2404,7 @@ function mockControl(req, res, url) {
     if (p === '/__mock/reset') {
       if (S.autoTimer) clearInterval(S.autoTimer);
       seed();
+      depReset();
       for (const ws of sockets) ws.terminate();
       for (let i = 0; i < Number(b.preload ?? 0); i++) step();
       return send(res, 200, { ok: true, step: S.step });

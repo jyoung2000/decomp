@@ -77,7 +77,8 @@ describe('App shell', () => {
     expect(summary).toHaveTextContent('Affected:');
     expect(summary).toHaveTextContent('Next:');
     await waitFor(() => expect(within(screen.getByTestId('output-exe')).getByRole('radio')).toBeDisabled());
-    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    // Invalid forms never create a project. (The debounced, read-only POST /implementation/forecast may already have run.)
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/cases')).toBe(false);
     store.stop();
   });
 

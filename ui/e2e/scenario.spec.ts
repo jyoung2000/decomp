@@ -107,16 +107,22 @@ test('create a project, start it and see raw counts with unknown scope', async (
   await page.getByLabel(/^Name/).fill('Calculator');
   await page.getByLabel(/Source folder/).fill('C:\\Originals\\Calc');
   await page.getByLabel(/Output folder/).fill('C:\\Originals\\Calc\\out');
-  await page.getByRole('radio', { name: /^Rust Native/ }).check();
+  await page.getByRole('radio', { name: /^Rust Port: native/ }).check();
   await expect(page.getByTestId('output-web').getByRole('radio')).toBeDisabled();
   await page.getByTestId('create-project').click();
   await expect(page.getByTestId('validation-summary')).toContainText('The output folder is inside the source folder.');
   await page.getByLabel(/Output folder/).fill('D:\\Rebuilds\\Calc');
-  await page.getByRole('radio', { name: /AI-assisted/ }).check();
-  await page.getByLabel(/Per-job budget/).fill('0.25');
+  await page.getByRole('radio', { name: /^Use the app ladder/ }).check();
+  await page.getByLabel(/^Budget per job/).fill('0.25');
   await page.getByTestId('create-project').click();
   await expect(page).toHaveURL(/#\/projects\/case_[0-9a-f]+\/overview$/);
   await expect(page.getByTestId('project-title')).toHaveText('Calculator');
+  // A Rust target needs the private Rust compiler, which the mock starts without: Start stays blocked until it is installed.
+  const preflight = page.getByRole('region', { name: 'Before this project can start' });
+  await expect(preflight).toContainText('Rust compiler (private)');
+  await expect(page.getByTestId('btn-start')).toBeDisabled();
+  await preflight.getByRole('button', { name: /^Install what's missing/ }).click();
+  await expect(page.getByTestId('btn-start')).toBeEnabled({ timeout: 20_000 });
   await page.getByTestId('btn-start').click();
   await expect(page.locator('[data-phase="analysis"]')).toContainText('3 files done · unknown scope');
   await expect(page.getByTestId('btn-pause')).toBeEnabled();

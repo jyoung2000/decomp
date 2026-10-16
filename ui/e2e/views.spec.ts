@@ -46,14 +46,17 @@ test('navigates every view through the sidebar and workspace tabs', async ({ pag
   await shot(page, '04-feedback-1920');
 
   await page.getByTestId('tab-comparisons').click();
-  await page.getByLabel('Candidate').selectOption({ label: /Version 1/ } as never).catch(async () => {
-    const opts = await page.getByLabel('Candidate').locator('option').allTextContents();
-    await page.getByLabel('Candidate').selectOption({ label: opts.find((o) => o.startsWith('Version 1'))! });
-  });
+  // The view opens on the latest candidate (Version 2); Version 1's failing Screens comparison is the one with a diff image.
+  const candidate = page.getByLabel('Candidate');
+  const v1 = candidate.locator('option', { hasText: /^Version 1\b/ });
+  await expect(v1).toHaveCount(1);
+  await candidate.selectOption((await v1.getAttribute('value'))!);
+  await expect(candidate.locator('option:checked')).toHaveText(/^Version 1\b/);
   const screensRow = page.getByRole('row').filter({ hasText: 'Screens' });
   await expect(screensRow.getByTestId('tolerance')).toContainText('Not exact — declared tolerance: Max diff ratio ≤ 0.01');
   await expect(page.getByText(/pixel-perfect/i)).toHaveCount(0);
-  await screensRow.getByRole('button', { name: /details/ }).click();
+  // Version 2's Screens row has the same tolerance text but only 2 artifacts (no diff); wait for Version 1's row to render.
+  await screensRow.getByRole('button', { name: /^3 · details/ }).click();
   await expect(page.getByTestId('screenshots').locator('img')).toHaveCount(3);
   await shot(page, '05-comparisons-1920');
 

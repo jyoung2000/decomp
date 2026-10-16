@@ -33,6 +33,9 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/test-setup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
       css: false,
+      // The R6 workbench tests drive several panes with userEvent and take 2–3 s alone; under a full parallel run on a
+      // busy host they can pass the 5 s default. A hang still fails, just later.
+      testTimeout: 15_000,
     },
   };
 });
